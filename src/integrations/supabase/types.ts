@@ -14,16 +14,220 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      equipamentos: {
+        Row: {
+          created_at: string
+          endereco: string | null
+          id: string
+          municipio: string
+          observacoes: string | null
+          possui_patrulha: boolean
+          responsavel: string | null
+          telefone: string | null
+          tipo: Database["public"]["Enums"]["tipo_equipamento"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          endereco?: string | null
+          id?: string
+          municipio: string
+          observacoes?: string | null
+          possui_patrulha?: boolean
+          responsavel?: string | null
+          telefone?: string | null
+          tipo: Database["public"]["Enums"]["tipo_equipamento"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          endereco?: string | null
+          id?: string
+          municipio?: string
+          observacoes?: string | null
+          possui_patrulha?: boolean
+          responsavel?: string | null
+          telefone?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_equipamento"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      solicitacoes: {
+        Row: {
+          anexos: string[] | null
+          capacitacao_realizada: boolean
+          created_at: string
+          data_solicitacao: string
+          guarda_municipal_estruturada: boolean
+          id: string
+          kit_athena_entregue: boolean
+          municipio: string
+          observacoes: string | null
+          recebeu_patrulha: boolean
+          status: Database["public"]["Enums"]["status_solicitacao"]
+          suite_implantada: number | null
+          tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento"]
+          updated_at: string
+        }
+        Insert: {
+          anexos?: string[] | null
+          capacitacao_realizada?: boolean
+          created_at?: string
+          data_solicitacao?: string
+          guarda_municipal_estruturada?: boolean
+          id?: string
+          kit_athena_entregue?: boolean
+          municipio: string
+          observacoes?: string | null
+          recebeu_patrulha?: boolean
+          status?: Database["public"]["Enums"]["status_solicitacao"]
+          suite_implantada?: number | null
+          tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento"]
+          updated_at?: string
+        }
+        Update: {
+          anexos?: string[] | null
+          capacitacao_realizada?: boolean
+          created_at?: string
+          data_solicitacao?: string
+          guarda_municipal_estruturada?: boolean
+          id?: string
+          kit_athena_entregue?: boolean
+          municipio?: string
+          observacoes?: string | null
+          recebeu_patrulha?: boolean
+          status?: Database["public"]["Enums"]["status_solicitacao"]
+          suite_implantada?: number | null
+          tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      viaturas: {
+        Row: {
+          created_at: string
+          data_implantacao: string
+          equipamento_id: string | null
+          id: string
+          municipio: string
+          observacoes: string | null
+          orgao_responsavel: Database["public"]["Enums"]["orgao_responsavel"]
+          quantidade: number
+          responsavel: string | null
+          tipo_patrulha: string
+          updated_at: string
+          vinculada_equipamento: boolean
+        }
+        Insert: {
+          created_at?: string
+          data_implantacao?: string
+          equipamento_id?: string | null
+          id?: string
+          municipio: string
+          observacoes?: string | null
+          orgao_responsavel: Database["public"]["Enums"]["orgao_responsavel"]
+          quantidade?: number
+          responsavel?: string | null
+          tipo_patrulha?: string
+          updated_at?: string
+          vinculada_equipamento?: boolean
+        }
+        Update: {
+          created_at?: string
+          data_implantacao?: string
+          equipamento_id?: string | null
+          id?: string
+          municipio?: string
+          observacoes?: string | null
+          orgao_responsavel?: Database["public"]["Enums"]["orgao_responsavel"]
+          quantidade?: number
+          responsavel?: string | null
+          tipo_patrulha?: string
+          updated_at?: string
+          vinculada_equipamento?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "viaturas_equipamento_id_fkey"
+            columns: ["equipamento_id"]
+            isOneToOne: false
+            referencedRelation: "equipamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_system_user: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "editor" | "viewer"
+      orgao_responsavel: "PMCE" | "Guarda Municipal" | "Outro"
+      status_solicitacao:
+        | "Recebida"
+        | "Em análise"
+        | "Aprovada"
+        | "Em implantação"
+        | "Inaugurada"
+        | "Cancelada"
+      tipo_equipamento:
+        | "Casa da Mulher Brasileira"
+        | "Casa da Mulher Cearense"
+        | "Casa da Mulher Municipal"
+        | "Sala Lilás"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +354,23 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "editor", "viewer"],
+      orgao_responsavel: ["PMCE", "Guarda Municipal", "Outro"],
+      status_solicitacao: [
+        "Recebida",
+        "Em análise",
+        "Aprovada",
+        "Em implantação",
+        "Inaugurada",
+        "Cancelada",
+      ],
+      tipo_equipamento: [
+        "Casa da Mulher Brasileira",
+        "Casa da Mulher Cearense",
+        "Casa da Mulher Municipal",
+        "Sala Lilás",
+      ],
+    },
   },
 } as const
