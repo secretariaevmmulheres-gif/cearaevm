@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useDataStore } from '@/store/dataStore';
+import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import {
   municipiosCeara,
   tiposEquipamento,
@@ -56,8 +56,8 @@ const statusStyles: Record<StatusSolicitacao, string> = {
 };
 
 export default function Solicitacoes() {
-  const { solicitacoes, addSolicitacao, updateSolicitacao, deleteSolicitacao, transformarEmEquipamento } =
-    useDataStore();
+  const { solicitacoes, addSolicitacao, updateSolicitacao, deleteSolicitacao, transformarEmEquipamento, isAdding, isUpdating } =
+    useSolicitacoes();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterTipo, setFilterTipo] = useState<string>('all');
@@ -71,14 +71,14 @@ export default function Solicitacoes() {
   // Form state
   const [formData, setFormData] = useState({
     municipio: '',
-    dataSolicitacao: '',
-    tipoEquipamento: '' as TipoEquipamento | '',
+    data_solicitacao: '',
+    tipo_equipamento: '' as TipoEquipamento | '',
     status: 'Recebida' as StatusSolicitacao,
-    recebeuPatrulha: false,
-    guardaMunicipalEstruturada: false,
-    kitAthenaEntregue: false,
-    capacitacaoRealizada: false,
-    suiteImplantada: false,
+    recebeu_patrulha: false,
+    guarda_municipal_estruturada: false,
+    kit_athena_entregue: false,
+    capacitacao_realizada: false,
+    suite_implantada: 0,
     observacoes: '',
     anexos: [] as string[],
   });
@@ -86,9 +86,9 @@ export default function Solicitacoes() {
   const filteredSolicitacoes = solicitacoes.filter((s) => {
     const matchesSearch =
       s.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.observacoes.toLowerCase().includes(searchTerm.toLowerCase());
+      (s.observacoes || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
-    const matchesTipo = filterTipo === 'all' || s.tipoEquipamento === filterTipo;
+    const matchesTipo = filterTipo === 'all' || s.tipo_equipamento === filterTipo;
     return matchesSearch && matchesStatus && matchesTipo;
   });
 
@@ -96,14 +96,14 @@ export default function Solicitacoes() {
     setEditingSolicitacao(null);
     setFormData({
       municipio: '',
-      dataSolicitacao: format(new Date(), 'yyyy-MM-dd'),
-      tipoEquipamento: '',
+      data_solicitacao: format(new Date(), 'yyyy-MM-dd'),
+      tipo_equipamento: '',
       status: 'Recebida',
-      recebeuPatrulha: false,
-      guardaMunicipalEstruturada: false,
-      kitAthenaEntregue: false,
-      capacitacaoRealizada: false,
-      suiteImplantada: false,
+      recebeu_patrulha: false,
+      guarda_municipal_estruturada: false,
+      kit_athena_entregue: false,
+      capacitacao_realizada: false,
+      suite_implantada: 0,
       observacoes: '',
       anexos: [],
     });
@@ -114,38 +114,44 @@ export default function Solicitacoes() {
     setEditingSolicitacao(solicitacao);
     setFormData({
       municipio: solicitacao.municipio,
-      dataSolicitacao: format(new Date(solicitacao.dataSolicitacao), 'yyyy-MM-dd'),
-      tipoEquipamento: solicitacao.tipoEquipamento,
+      data_solicitacao: format(new Date(solicitacao.data_solicitacao), 'yyyy-MM-dd'),
+      tipo_equipamento: solicitacao.tipo_equipamento,
       status: solicitacao.status,
-      recebeuPatrulha: solicitacao.recebeuPatrulha,
-      guardaMunicipalEstruturada: solicitacao.guardaMunicipalEstruturada,
-      kitAthenaEntregue: solicitacao.kitAthenaEntregue,
-      capacitacaoRealizada: solicitacao.capacitacaoRealizada,
-      suiteImplantada: solicitacao.suiteImplantada,
-      observacoes: solicitacao.observacoes,
-      anexos: solicitacao.anexos,
+      recebeu_patrulha: solicitacao.recebeu_patrulha,
+      guarda_municipal_estruturada: solicitacao.guarda_municipal_estruturada,
+      kit_athena_entregue: solicitacao.kit_athena_entregue,
+      capacitacao_realizada: solicitacao.capacitacao_realizada,
+      suite_implantada: solicitacao.suite_implantada || 0,
+      observacoes: solicitacao.observacoes || '',
+      anexos: solicitacao.anexos || [],
     });
     setIsDialogOpen(true);
   };
 
   const handleSubmit = () => {
-    if (!formData.municipio || !formData.tipoEquipamento) {
+    if (!formData.municipio || !formData.tipo_equipamento) {
       toast.error('Preencha os campos obrigatórios');
       return;
     }
 
     const data = {
-      ...formData,
-      dataSolicitacao: new Date(formData.dataSolicitacao),
-      tipoEquipamento: formData.tipoEquipamento as TipoEquipamento,
+      municipio: formData.municipio,
+      data_solicitacao: formData.data_solicitacao,
+      tipo_equipamento: formData.tipo_equipamento as TipoEquipamento,
+      status: formData.status,
+      recebeu_patrulha: formData.recebeu_patrulha,
+      guarda_municipal_estruturada: formData.guarda_municipal_estruturada,
+      kit_athena_entregue: formData.kit_athena_entregue,
+      capacitacao_realizada: formData.capacitacao_realizada,
+      suite_implantada: formData.suite_implantada,
+      observacoes: formData.observacoes,
+      anexos: formData.anexos,
     };
 
     if (editingSolicitacao) {
-      updateSolicitacao(editingSolicitacao.id, data);
-      toast.success('Solicitação atualizada com sucesso');
+      updateSolicitacao({ id: editingSolicitacao.id, ...data });
     } else {
       addSolicitacao(data);
-      toast.success('Solicitação cadastrada com sucesso');
     }
     setIsDialogOpen(false);
   };
@@ -153,7 +159,6 @@ export default function Solicitacoes() {
   const handleDelete = () => {
     if (deletingId) {
       deleteSolicitacao(deletingId);
-      toast.success('Solicitação excluída com sucesso');
       setIsDeleteDialogOpen(false);
       setDeletingId(null);
     }
@@ -162,7 +167,6 @@ export default function Solicitacoes() {
   const handleTransform = () => {
     if (transformingId) {
       transformarEmEquipamento(transformingId);
-      toast.success('Equipamento criado com sucesso a partir da solicitação');
       setIsTransformDialogOpen(false);
       setTransformingId(null);
     }
@@ -250,9 +254,9 @@ export default function Solicitacoes() {
                 filteredSolicitacoes.map((solicitacao) => (
                   <tr key={solicitacao.id} className="animate-fade-in">
                     <td className="font-medium">{solicitacao.municipio}</td>
-                    <td className="text-sm">{solicitacao.tipoEquipamento}</td>
+                    <td className="text-sm">{solicitacao.tipo_equipamento}</td>
                     <td>
-                      {format(new Date(solicitacao.dataSolicitacao), 'dd/MM/yyyy', { locale: ptBR })}
+                      {format(new Date(solicitacao.data_solicitacao), 'dd/MM/yyyy', { locale: ptBR })}
                     </td>
                     <td>
                       <span className={cn('badge-status', statusStyles[solicitacao.status])}>
@@ -261,20 +265,20 @@ export default function Solicitacoes() {
                     </td>
                     <td>
                       <div className="flex gap-1">
-                        {solicitacao.recebeuPatrulha && (
+                        {solicitacao.recebeu_patrulha && (
                           <span className="w-2 h-2 rounded-full bg-success" title="Patrulha" />
                         )}
-                        {solicitacao.guardaMunicipalEstruturada && (
+                        {solicitacao.guarda_municipal_estruturada && (
                           <span className="w-2 h-2 rounded-full bg-info" title="Guarda" />
                         )}
-                        {solicitacao.kitAthenaEntregue && (
+                        {solicitacao.kit_athena_entregue && (
                           <span className="w-2 h-2 rounded-full bg-warning" title="Kit Athena" />
                         )}
-                        {solicitacao.capacitacaoRealizada && (
+                        {solicitacao.capacitacao_realizada && (
                           <span className="w-2 h-2 rounded-full bg-accent" title="Capacitação" />
                         )}
-                        {solicitacao.suiteImplantada && (
-                          <span className="w-2 h-2 rounded-full bg-primary" title="Suíte" />
+                        {(solicitacao.suite_implantada || 0) > 0 && (
+                          <span className="w-2 h-2 rounded-full bg-primary" title={`Suíte: ${solicitacao.suite_implantada}`} />
                         )}
                       </div>
                     </td>
@@ -358,8 +362,8 @@ export default function Solicitacoes() {
                 <Label>Data da Solicitação</Label>
                 <Input
                   type="date"
-                  value={formData.dataSolicitacao}
-                  onChange={(e) => setFormData({ ...formData, dataSolicitacao: e.target.value })}
+                  value={formData.data_solicitacao}
+                  onChange={(e) => setFormData({ ...formData, data_solicitacao: e.target.value })}
                 />
               </div>
             </div>
@@ -368,9 +372,9 @@ export default function Solicitacoes() {
               <div className="space-y-2">
                 <Label>Tipo de Equipamento *</Label>
                 <Select
-                  value={formData.tipoEquipamento}
+                  value={formData.tipo_equipamento}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, tipoEquipamento: value as TipoEquipamento })
+                    setFormData({ ...formData, tipo_equipamento: value as TipoEquipamento })
                   }
                 >
                   <SelectTrigger>
@@ -416,9 +420,9 @@ export default function Solicitacoes() {
                   </Label>
                   <Switch
                     id="patrulha"
-                    checked={formData.recebeuPatrulha}
+                    checked={formData.recebeu_patrulha}
                     onCheckedChange={(checked) =>
-                      setFormData({ ...formData, recebeuPatrulha: checked })
+                      setFormData({ ...formData, recebeu_patrulha: checked })
                     }
                   />
                 </div>
@@ -428,9 +432,9 @@ export default function Solicitacoes() {
                   </Label>
                   <Switch
                     id="guarda"
-                    checked={formData.guardaMunicipalEstruturada}
+                    checked={formData.guarda_municipal_estruturada}
                     onCheckedChange={(checked) =>
-                      setFormData({ ...formData, guardaMunicipalEstruturada: checked })
+                      setFormData({ ...formData, guarda_municipal_estruturada: checked })
                     }
                   />
                 </div>
@@ -440,9 +444,9 @@ export default function Solicitacoes() {
                   </Label>
                   <Switch
                     id="kit"
-                    checked={formData.kitAthenaEntregue}
+                    checked={formData.kit_athena_entregue}
                     onCheckedChange={(checked) =>
-                      setFormData({ ...formData, kitAthenaEntregue: checked })
+                      setFormData({ ...formData, kit_athena_entregue: checked })
                     }
                   />
                 </div>
@@ -452,22 +456,25 @@ export default function Solicitacoes() {
                   </Label>
                   <Switch
                     id="capacitacao"
-                    checked={formData.capacitacaoRealizada}
+                    checked={formData.capacitacao_realizada}
                     onCheckedChange={(checked) =>
-                      setFormData({ ...formData, capacitacaoRealizada: checked })
+                      setFormData({ ...formData, capacitacao_realizada: checked })
                     }
                   />
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="suite" className="text-sm font-normal">
-                    Suíte implantada
+                    Suíte implantada (quantidade)
                   </Label>
-                  <Switch
+                  <Input
                     id="suite"
-                    checked={formData.suiteImplantada}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, suiteImplantada: checked })
+                    type="number"
+                    min={0}
+                    value={formData.suite_implantada}
+                    onChange={(e) =>
+                      setFormData({ ...formData, suite_implantada: parseInt(e.target.value) || 0 })
                     }
+                    className="w-20"
                   />
                 </div>
               </div>
@@ -488,7 +495,7 @@ export default function Solicitacoes() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit}>
+            <Button onClick={handleSubmit} disabled={isAdding || isUpdating}>
               {editingSolicitacao ? 'Salvar Alterações' : 'Cadastrar'}
             </Button>
           </DialogFooter>

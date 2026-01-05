@@ -1,10 +1,14 @@
-import { useDataStore } from '@/store/dataStore';
+import { useEquipamentos } from '@/hooks/useEquipamentos';
+import { useViaturas } from '@/hooks/useViaturas';
+import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { municipiosCeara, tiposEquipamento, statusSolicitacao, orgaosResponsaveis } from '@/data/municipios';
 import { DashboardStats } from '@/types';
 import { useMemo } from 'react';
 
 export function useDashboardStats(): DashboardStats {
-  const { equipamentos, viaturas, solicitacoes } = useDataStore();
+  const { equipamentos } = useEquipamentos();
+  const { viaturas } = useViaturas();
+  const { solicitacoes } = useSolicitacoes();
 
   return useMemo(() => {
     const municipiosComEquipamento = new Set(equipamentos.map((e) => e.municipio));
@@ -16,7 +20,7 @@ export function useDashboardStats(): DashboardStats {
     }, {} as Record<typeof tiposEquipamento[number], number>);
 
     const viaturasPorOrgao = orgaosResponsaveis.reduce((acc, orgao) => {
-      acc[orgao] = viaturas.filter((v) => v.orgaoResponsavel === orgao).reduce((sum, v) => sum + v.quantidade, 0);
+      acc[orgao] = viaturas.filter((v) => v.orgao_responsavel === orgao).reduce((sum, v) => sum + v.quantidade, 0);
       return acc;
     }, {} as Record<typeof orgaosResponsaveis[number], number>);
 
@@ -26,7 +30,7 @@ export function useDashboardStats(): DashboardStats {
     }, {} as Record<typeof statusSolicitacao[number], number>);
 
     const solicitacoesPorTipo = tiposEquipamento.reduce((acc, tipo) => {
-      acc[tipo] = solicitacoes.filter((s) => s.tipoEquipamento === tipo).length;
+      acc[tipo] = solicitacoes.filter((s) => s.tipo_equipamento === tipo).length;
       return acc;
     }, {} as Record<typeof tiposEquipamento[number], number>);
 
@@ -46,7 +50,7 @@ export function useDashboardStats(): DashboardStats {
       equipamentosPorTipo,
       municipiosComEquipamento: municipiosComEquipamento.size,
       municipiosSemEquipamento: municipiosCeara.length - municipiosComEquipamento.size,
-      equipamentosComPatrulha: equipamentos.filter((e) => e.possuiPatrulha).length,
+      equipamentosComPatrulha: equipamentos.filter((e) => e.possui_patrulha).length,
       totalViaturas: viaturas.reduce((sum, v) => sum + v.quantidade, 0),
       municipiosComViaturaSemEquipamento,
       municipiosComViaturaComEquipamento,

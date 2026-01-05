@@ -31,11 +31,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useDataStore } from '@/store/dataStore';
+import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { municipiosCeara, tiposEquipamento, TipoEquipamento } from '@/data/municipios';
 import { Equipamento } from '@/types';
 import { Plus, Pencil, Trash2, Search, Building2, CheckCircle, XCircle } from 'lucide-react';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const tipoStyles: Record<TipoEquipamento, string> = {
@@ -46,7 +45,7 @@ const tipoStyles: Record<TipoEquipamento, string> = {
 };
 
 export default function Equipamentos() {
-  const { equipamentos, addEquipamento, updateEquipamento, deleteEquipamento } = useDataStore();
+  const { equipamentos, addEquipamento, updateEquipamento, deleteEquipamento, isAdding, isUpdating } = useEquipamentos();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<string>('all');
   const [filterPatrulha, setFilterPatrulha] = useState<string>('all');
@@ -59,7 +58,7 @@ export default function Equipamentos() {
   const [formData, setFormData] = useState({
     municipio: '',
     tipo: '' as TipoEquipamento | '',
-    possuiPatrulha: false,
+    possui_patrulha: false,
     endereco: '',
     telefone: '',
     responsavel: '',
@@ -69,13 +68,13 @@ export default function Equipamentos() {
   const filteredEquipamentos = equipamentos.filter((e) => {
     const matchesSearch =
       e.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.responsavel.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.endereco.toLowerCase().includes(searchTerm.toLowerCase());
+      (e.responsavel || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (e.endereco || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTipo = filterTipo === 'all' || e.tipo === filterTipo;
     const matchesPatrulha =
       filterPatrulha === 'all' ||
-      (filterPatrulha === 'sim' && e.possuiPatrulha) ||
-      (filterPatrulha === 'nao' && !e.possuiPatrulha);
+      (filterPatrulha === 'sim' && e.possui_patrulha) ||
+      (filterPatrulha === 'nao' && !e.possui_patrulha);
     return matchesSearch && matchesTipo && matchesPatrulha;
   });
 
@@ -84,7 +83,7 @@ export default function Equipamentos() {
     setFormData({
       municipio: '',
       tipo: '',
-      possuiPatrulha: false,
+      possui_patrulha: false,
       endereco: '',
       telefone: '',
       responsavel: '',
@@ -98,27 +97,34 @@ export default function Equipamentos() {
     setFormData({
       municipio: equipamento.municipio,
       tipo: equipamento.tipo,
-      possuiPatrulha: equipamento.possuiPatrulha,
-      endereco: equipamento.endereco,
-      telefone: equipamento.telefone,
-      responsavel: equipamento.responsavel,
-      observacoes: equipamento.observacoes,
+      possui_patrulha: equipamento.possui_patrulha,
+      endereco: equipamento.endereco || '',
+      telefone: equipamento.telefone || '',
+      responsavel: equipamento.responsavel || '',
+      observacoes: equipamento.observacoes || '',
     });
     setIsDialogOpen(true);
   };
 
   const handleSubmit = () => {
     if (!formData.municipio || !formData.tipo) {
-      toast.error('Preencha os campos obrigatórios');
       return;
     }
 
+    const data = {
+      municipio: formData.municipio,
+      tipo: formData.tipo as TipoEquipamento,
+      possui_patrulha: formData.possui_patrulha,
+      endereco: formData.endereco,
+      telefone: formData.telefone,
+      responsavel: formData.responsavel,
+      observacoes: formData.observacoes,
+    };
+
     if (editingEquipamento) {
-      updateEquipamento(editingEquipamento.id, formData as Omit<Equipamento, 'id' | 'createdAt' | 'updatedAt'>);
-      toast.success('Equipamento atualizado com sucesso');
+      updateEquipamento({ id: editingEquipamento.id, ...data });
     } else {
-      addEquipamento(formData as Omit<Equipamento, 'id' | 'createdAt' | 'updatedAt'>);
-      toast.success('Equipamento cadastrado com sucesso');
+      addEquipamento(data);
     }
     setIsDialogOpen(false);
   };
@@ -126,7 +132,6 @@ export default function Equipamentos() {
   const handleDelete = () => {
     if (deletingId) {
       deleteEquipamento(deletingId);
-      toast.success('Equipamento excluído com sucesso');
       setIsDeleteDialogOpen(false);
       setDeletingId(null);
     }
@@ -214,7 +219,7 @@ export default function Equipamentos() {
                       </span>
                     </td>
                     <td>
-                      {equipamento.possuiPatrulha ? (
+                      {equipamento.possui_patrulha ? (
                         <span className="flex items-center gap-1 text-success">
                           <CheckCircle className="w-4 h-4" /> Sim
                         </span>
@@ -312,8 +317,8 @@ export default function Equipamentos() {
               <Label htmlFor="patrulha">Possui Patrulha Maria da Penha?</Label>
               <Switch
                 id="patrulha"
-                checked={formData.possuiPatrulha}
-                onCheckedChange={(checked) => setFormData({ ...formData, possuiPatrulha: checked })}
+                checked={formData.possui_patrulha}
+                onCheckedChange={(checked) => setFormData({ ...formData, possui_patrulha: checked })}
               />
             </div>
 
@@ -360,7 +365,7 @@ export default function Equipamentos() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit}>
+            <Button onClick={handleSubmit} disabled={isAdding || isUpdating}>
               {editingEquipamento ? 'Salvar Alterações' : 'Cadastrar'}
             </Button>
           </DialogFooter>
