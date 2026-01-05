@@ -31,16 +31,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useDataStore } from '@/store/dataStore';
+import { useViaturas } from '@/hooks/useViaturas';
+import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { municipiosCeara, orgaosResponsaveis, OrgaoResponsavel } from '@/data/municipios';
 import { Viatura } from '@/types';
 import { Plus, Pencil, Trash2, Search, Truck } from 'lucide-react';
-import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function Viaturas() {
-  const { viaturas, equipamentos, addViatura, updateViatura, deleteViatura } = useDataStore();
+  const { viaturas, addViatura, updateViatura, deleteViatura, isAdding, isUpdating } = useViaturas();
+  const { equipamentos } = useEquipamentos();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOrgao, setFilterOrgao] = useState<string>('all');
   const [filterVinculada, setFilterVinculada] = useState<string>('all');
@@ -52,12 +53,12 @@ export default function Viaturas() {
   // Form state
   const [formData, setFormData] = useState({
     municipio: '',
-    tipoPatrulha: 'Patrulha Maria da Penha' as const,
-    vinculadaEquipamento: false,
-    equipamentoId: '',
-    orgaoResponsavel: '' as OrgaoResponsavel | '',
+    tipo_patrulha: 'Patrulha Maria da Penha',
+    vinculada_equipamento: false,
+    equipamento_id: '',
+    orgao_responsavel: '' as OrgaoResponsavel | '',
     quantidade: 1,
-    dataImplantacao: '',
+    data_implantacao: '',
     responsavel: '',
     observacoes: '',
   });
@@ -69,12 +70,12 @@ export default function Viaturas() {
   const filteredViaturas = viaturas.filter((v) => {
     const matchesSearch =
       v.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.responsavel.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesOrgao = filterOrgao === 'all' || v.orgaoResponsavel === filterOrgao;
+      (v.responsavel || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesOrgao = filterOrgao === 'all' || v.orgao_responsavel === filterOrgao;
     const matchesVinculada =
       filterVinculada === 'all' ||
-      (filterVinculada === 'sim' && v.vinculadaEquipamento) ||
-      (filterVinculada === 'nao' && !v.vinculadaEquipamento);
+      (filterVinculada === 'sim' && v.vinculada_equipamento) ||
+      (filterVinculada === 'nao' && !v.vinculada_equipamento);
     return matchesSearch && matchesOrgao && matchesVinculada;
   });
 
@@ -82,12 +83,12 @@ export default function Viaturas() {
     setEditingViatura(null);
     setFormData({
       municipio: '',
-      tipoPatrulha: 'Patrulha Maria da Penha',
-      vinculadaEquipamento: false,
-      equipamentoId: '',
-      orgaoResponsavel: '',
+      tipo_patrulha: 'Patrulha Maria da Penha',
+      vinculada_equipamento: false,
+      equipamento_id: '',
+      orgao_responsavel: '',
       quantidade: 1,
-      dataImplantacao: '',
+      data_implantacao: '',
       responsavel: '',
       observacoes: '',
     });
@@ -98,44 +99,41 @@ export default function Viaturas() {
     setEditingViatura(viatura);
     setFormData({
       municipio: viatura.municipio,
-      tipoPatrulha: viatura.tipoPatrulha,
-      vinculadaEquipamento: viatura.vinculadaEquipamento,
-      equipamentoId: viatura.equipamentoId || '',
-      orgaoResponsavel: viatura.orgaoResponsavel,
+      tipo_patrulha: viatura.tipo_patrulha,
+      vinculada_equipamento: viatura.vinculada_equipamento,
+      equipamento_id: viatura.equipamento_id || '',
+      orgao_responsavel: viatura.orgao_responsavel,
       quantidade: viatura.quantidade,
-      dataImplantacao: viatura.dataImplantacao
-        ? format(new Date(viatura.dataImplantacao), 'yyyy-MM-dd')
+      data_implantacao: viatura.data_implantacao
+        ? format(new Date(viatura.data_implantacao), 'yyyy-MM-dd')
         : '',
-      responsavel: viatura.responsavel,
-      observacoes: viatura.observacoes,
+      responsavel: viatura.responsavel || '',
+      observacoes: viatura.observacoes || '',
     });
     setIsDialogOpen(true);
   };
 
   const handleSubmit = () => {
-    if (!formData.municipio || !formData.orgaoResponsavel) {
-      toast.error('Preencha os campos obrigatórios');
+    if (!formData.municipio || !formData.orgao_responsavel) {
       return;
     }
 
     const data = {
       municipio: formData.municipio,
-      tipoPatrulha: formData.tipoPatrulha,
-      vinculadaEquipamento: formData.vinculadaEquipamento,
-      equipamentoId: formData.vinculadaEquipamento ? formData.equipamentoId : undefined,
-      orgaoResponsavel: formData.orgaoResponsavel as OrgaoResponsavel,
+      tipo_patrulha: formData.tipo_patrulha,
+      vinculada_equipamento: formData.vinculada_equipamento,
+      equipamento_id: formData.vinculada_equipamento ? formData.equipamento_id : null,
+      orgao_responsavel: formData.orgao_responsavel as OrgaoResponsavel,
       quantidade: formData.quantidade,
-      dataImplantacao: formData.dataImplantacao ? new Date(formData.dataImplantacao) : new Date(),
+      data_implantacao: formData.data_implantacao || format(new Date(), 'yyyy-MM-dd'),
       responsavel: formData.responsavel,
       observacoes: formData.observacoes,
     };
 
     if (editingViatura) {
-      updateViatura(editingViatura.id, data);
-      toast.success('Viatura atualizada com sucesso');
+      updateViatura({ id: editingViatura.id, ...data });
     } else {
       addViatura(data);
-      toast.success('Viatura cadastrada com sucesso');
     }
     setIsDialogOpen(false);
   };
@@ -143,13 +141,12 @@ export default function Viaturas() {
   const handleDelete = () => {
     if (deletingId) {
       deleteViatura(deletingId);
-      toast.success('Viatura excluída com sucesso');
       setIsDeleteDialogOpen(false);
       setDeletingId(null);
     }
   };
 
-  const getEquipamentoNome = (id?: string) => {
+  const getEquipamentoNome = (id?: string | null) => {
     if (!id) return '-';
     const eq = equipamentos.find((e) => e.id === id);
     return eq ? `${eq.tipo} - ${eq.municipio}` : '-';
@@ -234,16 +231,16 @@ export default function Viaturas() {
                     <td className="font-medium">{viatura.municipio}</td>
                     <td>
                       <span className="badge-status bg-primary/10 text-primary">
-                        {viatura.orgaoResponsavel}
+                        {viatura.orgao_responsavel}
                       </span>
                     </td>
                     <td className="font-semibold">{viatura.quantidade}</td>
                     <td>
-                      {format(new Date(viatura.dataImplantacao), 'dd/MM/yyyy', { locale: ptBR })}
+                      {format(new Date(viatura.data_implantacao), 'dd/MM/yyyy', { locale: ptBR })}
                     </td>
                     <td className="text-xs">
-                      {viatura.vinculadaEquipamento
-                        ? getEquipamentoNome(viatura.equipamentoId)
+                      {viatura.vinculada_equipamento
+                        ? getEquipamentoNome(viatura.equipamento_id)
                         : 'Não vinculada'}
                     </td>
                     <td>{viatura.responsavel || '-'}</td>
@@ -294,7 +291,7 @@ export default function Viaturas() {
                 <Select
                   value={formData.municipio}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, municipio: value, equipamentoId: '' })
+                    setFormData({ ...formData, municipio: value, equipamento_id: '' })
                   }
                 >
                   <SelectTrigger>
@@ -312,9 +309,9 @@ export default function Viaturas() {
               <div className="space-y-2">
                 <Label>Órgão Responsável *</Label>
                 <Select
-                  value={formData.orgaoResponsavel}
+                  value={formData.orgao_responsavel}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, orgaoResponsavel: value as OrgaoResponsavel })
+                    setFormData({ ...formData, orgao_responsavel: value as OrgaoResponsavel })
                   }
                 >
                   <SelectTrigger>
@@ -347,8 +344,8 @@ export default function Viaturas() {
                 <Label>Data de Implantação</Label>
                 <Input
                   type="date"
-                  value={formData.dataImplantacao}
-                  onChange={(e) => setFormData({ ...formData, dataImplantacao: e.target.value })}
+                  value={formData.data_implantacao}
+                  onChange={(e) => setFormData({ ...formData, data_implantacao: e.target.value })}
                 />
               </div>
             </div>
@@ -357,19 +354,19 @@ export default function Viaturas() {
               <Label htmlFor="vinculada">Vinculada a Equipamento?</Label>
               <Switch
                 id="vinculada"
-                checked={formData.vinculadaEquipamento}
+                checked={formData.vinculada_equipamento}
                 onCheckedChange={(checked) =>
-                  setFormData({ ...formData, vinculadaEquipamento: checked, equipamentoId: '' })
+                  setFormData({ ...formData, vinculada_equipamento: checked, equipamento_id: '' })
                 }
               />
             </div>
 
-            {formData.vinculadaEquipamento && (
+            {formData.vinculada_equipamento && (
               <div className="space-y-2">
                 <Label>Equipamento</Label>
                 <Select
-                  value={formData.equipamentoId}
-                  onValueChange={(value) => setFormData({ ...formData, equipamentoId: value })}
+                  value={formData.equipamento_id}
+                  onValueChange={(value) => setFormData({ ...formData, equipamento_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o equipamento" />
@@ -415,7 +412,7 @@ export default function Viaturas() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit}>
+            <Button onClick={handleSubmit} disabled={isAdding || isUpdating}>
               {editingViatura ? 'Salvar Alterações' : 'Cadastrar'}
             </Button>
           </DialogFooter>

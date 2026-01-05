@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useDataStore } from '@/store/dataStore';
+import { useEquipamentos } from '@/hooks/useEquipamentos';
+import { useViaturas } from '@/hooks/useViaturas';
+import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { municipiosCeara } from '@/data/municipios';
-import { Building2, Truck, FileText, MapPin, X } from 'lucide-react';
+import { Building2, Truck, FileText, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { Equipamento, Viatura, Solicitacao } from '@/types';
@@ -18,7 +20,9 @@ interface MunicipioData {
 }
 
 export default function Mapa() {
-  const { equipamentos, viaturas, solicitacoes } = useDataStore();
+  const { equipamentos } = useEquipamentos();
+  const { viaturas } = useViaturas();
+  const { solicitacoes } = useSolicitacoes();
   const [selectedMunicipio, setSelectedMunicipio] = useState<MunicipioData | null>(null);
   const [hoveredMunicipio, setHoveredMunicipio] = useState<string | null>(null);
 
@@ -207,7 +211,7 @@ export default function Mapa() {
                     {selectedMunicipio.equipamentos.map((e) => (
                       <li key={e.id} className="text-sm">
                         • {e.tipo}
-                        {e.possuiPatrulha && (
+                        {e.possui_patrulha && (
                           <span className="text-success ml-1">(com Patrulha)</span>
                         )}
                       </li>
@@ -231,7 +235,7 @@ export default function Mapa() {
                   <ul className="space-y-1 pl-6">
                     {selectedMunicipio.viaturas.map((v) => (
                       <li key={v.id} className="text-sm">
-                        • {v.quantidade}x {v.orgaoResponsavel}
+                        • {v.quantidade}x {v.orgao_responsavel}
                       </li>
                     ))}
                   </ul>
@@ -252,7 +256,7 @@ export default function Mapa() {
                   <ul className="space-y-1 pl-6">
                     {selectedMunicipio.solicitacoes.map((s) => (
                       <li key={s.id} className="text-sm">
-                        • {s.tipoEquipamento}{' '}
+                        • {s.tipo_equipamento}{' '}
                         <span className="text-muted-foreground">({s.status})</span>
                       </li>
                     ))}
