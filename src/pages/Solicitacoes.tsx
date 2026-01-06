@@ -78,7 +78,7 @@ export default function Solicitacoes() {
     guarda_municipal_estruturada: false,
     kit_athena_entregue: false,
     capacitacao_realizada: false,
-    suite_implantada: 0,
+    suite_implantada: '',
     observacoes: '',
     anexos: [] as string[],
   });
@@ -103,7 +103,7 @@ export default function Solicitacoes() {
       guarda_municipal_estruturada: false,
       kit_athena_entregue: false,
       capacitacao_realizada: false,
-      suite_implantada: 0,
+      suite_implantada: '',
       observacoes: '',
       anexos: [],
     });
@@ -121,7 +121,7 @@ export default function Solicitacoes() {
       guarda_municipal_estruturada: solicitacao.guarda_municipal_estruturada,
       kit_athena_entregue: solicitacao.kit_athena_entregue,
       capacitacao_realizada: solicitacao.capacitacao_realizada,
-      suite_implantada: solicitacao.suite_implantada || 0,
+      suite_implantada: solicitacao.suite_implantada || '',
       observacoes: solicitacao.observacoes || '',
       anexos: solicitacao.anexos || [],
     });
@@ -277,8 +277,8 @@ export default function Solicitacoes() {
                         {solicitacao.capacitacao_realizada && (
                           <span className="w-2 h-2 rounded-full bg-accent" title="Capacitação" />
                         )}
-                        {(solicitacao.suite_implantada || 0) > 0 && (
-                          <span className="w-2 h-2 rounded-full bg-primary" title={`Suíte: ${solicitacao.suite_implantada}`} />
+                        {(solicitacao.suite_implantada || '').length > 0 && (
+                          <span className="w-2 h-2 rounded-full bg-primary" title={`NUP: ${solicitacao.suite_implantada}`} />
                         )}
                       </div>
                     </td>
@@ -462,19 +462,24 @@ export default function Solicitacoes() {
                     }
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="suite" className="text-sm font-normal">
-                    Suíte implantada (quantidade)
-                  </Label>
+                <div className="space-y-2">
+                  <Label htmlFor="suite">Número do Processo (NUP)</Label>
                   <Input
                     id="suite"
-                    type="number"
-                    min={0}
                     value={formData.suite_implantada}
-                    onChange={(e) =>
-                      setFormData({ ...formData, suite_implantada: parseInt(e.target.value) || 0 })
-                    }
-                    className="w-20"
+                    onChange={(e) => {
+                      // Format NUP: 62000.001753/2025-56
+                      const value = e.target.value.replace(/\D/g, '');
+                      let formatted = '';
+                      for (let i = 0; i < value.length && i < 17; i++) {
+                        if (i === 5) formatted += '.';
+                        if (i === 11) formatted += '/';
+                        if (i === 15) formatted += '-';
+                        formatted += value[i];
+                      }
+                      setFormData({ ...formData, suite_implantada: formatted });
+                    }}
+                    placeholder="62000.001753/2025-56"
                   />
                 </div>
               </div>
