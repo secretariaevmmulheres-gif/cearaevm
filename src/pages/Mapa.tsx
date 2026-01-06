@@ -1,12 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { municipiosCeara } from '@/data/municipios';
-import { Building2, Truck, FileText, X } from 'lucide-react';
+import { CEARA_GEOJSON_URL } from '@/data/ceara-geojson-url';
+import { Building2, Truck, FileText, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
+import type { Feature, FeatureCollection, Geometry } from 'geojson';
+import type { Layer, PathOptions } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 
@@ -17,17 +22,45 @@ interface MunicipioData {
   solicitacoes: Solicitacao[];
   prioridade: number;
   cor: string;
+  hexColor: string;
 }
+
+// Color mapping for hex colors
+const priorityColors: Record<number, string> = {
+  1: '#0d9488', // brasileira - teal-600
+  2: '#7c3aed', // cearense - violet-600
+  3: '#ea580c', // municipal - orange-600
+  4: '#d946ef', // lilas - fuchsia-500
+  5: '#06b6d4', // viatura - cyan-500
+  6: '#e5e7eb', // sem cobertura - gray-200
+};
 
 export default function Mapa() {
   const { equipamentos } = useEquipamentos();
   const { viaturas } = useViaturas();
   const { solicitacoes } = useSolicitacoes();
   const [selectedMunicipio, setSelectedMunicipio] = useState<MunicipioData | null>(null);
-  const [hoveredMunicipio, setHoveredMunicipio] = useState<string | null>(null);
+  const [geoJsonData, setGeoJsonData] = useState<FeatureCollection | null>(null);
+  const [isLoadingGeoJson, setIsLoadingGeoJson] = useState(true);
+
+  // Fetch GeoJSON data
+  useEffect(() => {
+    fetch(CEARA_GEOJSON_URL)
+      .then(res => res.json())
+      .then((data: FeatureCollection) => {
+        setGeoJsonData(data);
+        setIsLoadingGeoJson(false);
+      })
+      .catch(err => {
+        console.error('Error loading GeoJSON:', err);
+        setIsLoadingGeoJson(false);
+      });
+  }, []);
 
   const municipiosData = useMemo(() => {
-    return municipiosCeara.map((nome) => {
+    const dataMap = new Map<string, MunicipioData>();
+    
+    municipiosCeara.forEach((nome) => {
       const eqs = equipamentos.filter((e) => e.municipio === nome);
       const viats = viaturas.filter((v) => v.municipio === nome);
       const sols = solicitacoes.filter((s) => s.municipio === nome);
@@ -35,33 +68,42 @@ export default function Mapa() {
       // Determinar prioridade e cor
       let prioridade = 6;
       let cor = 'bg-muted';
+      let hexColor = priorityColors[6];
 
       if (eqs.some((e) => e.tipo === 'Casa da Mulher Brasileira')) {
         prioridade = 1;
         cor = 'bg-equipment-brasileira';
+        hexColor = priorityColors[1];
       } else if (eqs.some((e) => e.tipo === 'Casa da Mulher Cearense')) {
         prioridade = 2;
         cor = 'bg-equipment-cearense';
+        hexColor = priorityColors[2];
       } else if (eqs.some((e) => e.tipo === 'Casa da Mulher Municipal')) {
         prioridade = 3;
         cor = 'bg-equipment-municipal';
+        hexColor = priorityColors[3];
       } else if (eqs.some((e) => e.tipo === 'Sala Lilás')) {
         prioridade = 4;
         cor = 'bg-equipment-lilas';
+        hexColor = priorityColors[4];
       } else if (viats.length > 0) {
         prioridade = 5;
         cor = 'bg-equipment-viatura';
+        hexColor = priorityColors[5];
       }
 
-      return {
+      dataMap.set(nome.toLowerCase(), {
         nome,
         equipamentos: eqs,
         viaturas: viats,
         solicitacoes: sols,
         prioridade,
         cor,
-      };
+        hexColor,
+      });
     });
+
+    return dataMap;
   }, [equipamentos, viaturas, solicitacoes]);
 
   const stats = useMemo(() => {
@@ -99,6 +141,79 @@ export default function Mapa() {
     return counts;
   }, [municipiosData]);
 
+  // Get style for each feature
+  const getFeatureStyle = (feature: Feature<Geometry> | undefined): PathOptions => {
+    if (!feature?.properties) {
+      return {
+        fillColor: priorityColors[6],
+        weight: 1,
+        opacity: 1,
+        color: '#ffffff',
+        fillOpacity: 0.7,
+      };
+    }
+
+    // GeoJSON uses "name" property for municipality name
+    const municipioName = feature.properties.name as string;
+    const municipioData = municipiosData.get(municipioName.toLowerCase());
+
+    return {
+      fillColor: municipioData?.hexColor || priorityColors[6],
+      weight: 1,
+      opacity: 1,
+      color: '#ffffff',
+      fillOpacity: 0.7,
+    };
+  };
+
+  // Handle feature interactions
+  const onEachFeature = (feature: Feature<Geometry>, layer: Layer) => {
+    const municipioName = feature.properties?.name as string;
+    const municipioData = municipiosData.get(municipioName.toLowerCase());
+
+    layer.on({
+      mouseover: (e) => {
+        const target = e.target;
+        target.setStyle({
+          weight: 3,
+          color: '#1f2937',
+          fillOpacity: 0.9,
+        });
+        target.bringToFront();
+      },
+      mouseout: (e) => {
+        const target = e.target;
+        target.setStyle({
+          weight: 1,
+          color: '#ffffff',
+          fillOpacity: 0.7,
+        });
+      },
+      click: () => {
+        if (municipioData) {
+          setSelectedMunicipio(municipioData);
+        } else {
+          // Create default data for municipalities not in our list
+          setSelectedMunicipio({
+            nome: municipioName,
+            equipamentos: [],
+            viaturas: [],
+            solicitacoes: [],
+            prioridade: 6,
+            cor: 'bg-muted',
+            hexColor: priorityColors[6],
+          });
+        }
+      },
+    });
+
+    layer.bindTooltip(municipioName, {
+      permanent: false,
+      direction: 'center',
+      className: 'bg-card text-foreground border border-border rounded-md px-2 py-1 text-xs shadow-lg',
+    });
+  };
+
   return (
     <AppLayout>
       <PageHeader title="Mapa do Ceará" description="Visualização geográfica da cobertura estadual" />
@@ -110,27 +225,27 @@ export default function Mapa() {
             <h3 className="font-display font-semibold mb-4">Legenda</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded bg-equipment-brasileira" />
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[1] }} />
                 <span className="text-sm">Casa da Mulher Brasileira ({stats.brasileira})</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded bg-equipment-cearense" />
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[2] }} />
                 <span className="text-sm">Casa da Mulher Cearense ({stats.cearense})</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded bg-equipment-municipal" />
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[3] }} />
                 <span className="text-sm">Casa da Mulher Municipal ({stats.municipal})</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded bg-equipment-lilas" />
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[4] }} />
                 <span className="text-sm">Sala Lilás ({stats.lilas})</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded bg-equipment-viatura" />
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[5] }} />
                 <span className="text-sm">Só Viatura ({stats.viaturaOnly})</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded bg-muted border border-border" />
+                <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: priorityColors[6] }} />
                 <span className="text-sm">Sem Cobertura ({stats.semCobertura})</span>
               </div>
             </div>
@@ -147,45 +262,50 @@ export default function Mapa() {
           </div>
         </div>
 
-        {/* Mapa Grid */}
+        {/* Mapa Leaflet */}
         <div className="lg:col-span-3">
-          <div className="bg-card rounded-xl p-4 border border-border shadow-sm">
-            <div className="grid grid-cols-8 sm:grid-cols-10 md:grid-cols-12 lg:grid-cols-14 gap-1">
-              {municipiosData.map((m) => (
-                <button
-                  key={m.nome}
-                  className={cn(
-                    'aspect-square rounded-sm transition-all duration-200 relative group',
-                    m.cor,
-                    hoveredMunicipio === m.nome && 'ring-2 ring-primary ring-offset-1 scale-110 z-10',
-                    selectedMunicipio?.nome === m.nome && 'ring-2 ring-foreground'
-                  )}
-                  onClick={() => setSelectedMunicipio(m)}
-                  onMouseEnter={() => setHoveredMunicipio(m.nome)}
-                  onMouseLeave={() => setHoveredMunicipio(null)}
-                  title={m.nome}
-                >
-                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-foreground text-background text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-                    {m.nome}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-4 text-center">
-              Clique em um município para ver detalhes
-            </p>
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden" style={{ height: '600px' }}>
+            {isLoadingGeoJson ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Carregando mapa...</span>
+              </div>
+            ) : (
+              <MapContainer
+                center={[-5.2, -39.5]}
+                zoom={7}
+                style={{ height: '100%', width: '100%' }}
+                scrollWheelZoom={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {geoJsonData && (
+                  <GeoJSON
+                    key={JSON.stringify(municipiosData.size)}
+                    data={geoJsonData}
+                    style={getFeatureStyle}
+                    onEachFeature={onEachFeature}
+                  />
+                )}
+              </MapContainer>
+            )}
           </div>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Clique em um município para ver detalhes
+          </p>
         </div>
       </div>
 
       {/* Modal de detalhes */}
       {selectedMunicipio && (
-        <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
           <div className="bg-card rounded-2xl shadow-lg max-w-md w-full max-h-[80vh] overflow-y-auto animate-scale-in">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className={cn('w-4 h-4 rounded', selectedMunicipio.cor)} />
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: selectedMunicipio.hexColor }} />
                   <h2 className="font-display text-xl font-bold">{selectedMunicipio.nome}</h2>
                 </div>
                 <button
