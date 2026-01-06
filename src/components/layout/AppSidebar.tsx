@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Users,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -133,10 +134,22 @@ export function AppSidebar() {
 
           {/* User info and logout */}
           <div className="p-4 border-t border-sidebar-border">
-            <div className="px-4 py-2 mb-2">
-              <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email}</p>
-              <p className="text-xs text-sidebar-primary capitalize">{role}</p>
-            </div>
+            <NavLink
+              to="/perfil"
+              onClick={() => setIsMobileOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-4 py-2 mb-2 rounded-lg text-sm transition-all duration-200",
+                location.pathname === '/perfil'
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "hover:bg-sidebar-accent"
+              )}
+            >
+              <User className="w-4 h-4" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs truncate">{user?.email}</p>
+                <p className="text-xs text-sidebar-foreground/60 capitalize">{role}</p>
+              </div>
+            </NavLink>
             <Button
               variant="ghost"
               className="w-full justify-start gap-3 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"

@@ -90,7 +90,7 @@ export type Database = {
           observacoes: string | null
           recebeu_patrulha: boolean
           status: Database["public"]["Enums"]["status_solicitacao"]
-          suite_implantada: number | null
+          suite_implantada: string | null
           tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento"]
           updated_at: string
         }
@@ -106,7 +106,7 @@ export type Database = {
           observacoes?: string | null
           recebeu_patrulha?: boolean
           status?: Database["public"]["Enums"]["status_solicitacao"]
-          suite_implantada?: number | null
+          suite_implantada?: string | null
           tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento"]
           updated_at?: string
         }
@@ -122,7 +122,7 @@ export type Database = {
           observacoes?: string | null
           recebeu_patrulha?: boolean
           status?: Database["public"]["Enums"]["status_solicitacao"]
-          suite_implantada?: number | null
+          suite_implantada?: string | null
           tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento"]
           updated_at?: string
         }

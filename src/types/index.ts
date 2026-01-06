@@ -54,7 +54,7 @@ export interface Solicitacao {
   guarda_municipal_estruturada: boolean;
   kit_athena_entregue: boolean;
   capacitacao_realizada: boolean;
-  suite_implantada: number;
+  suite_implantada: string;
   observacoes: string;
   anexos: string[];
   created_at: string;

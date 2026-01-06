@@ -12,6 +12,7 @@ import Viaturas from "./pages/Viaturas";
 import Solicitacoes from "./pages/Solicitacoes";
 import Mapa from "./pages/Mapa";
 import Usuarios from "./pages/Usuarios";
+import Perfil from "./pages/Perfil";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -78,6 +79,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Usuarios />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/perfil"
+        element={
+          <ProtectedRoute>
+            <Perfil />
           </ProtectedRoute>
         }
       />
