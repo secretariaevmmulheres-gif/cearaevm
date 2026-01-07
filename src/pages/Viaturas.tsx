@@ -35,9 +35,16 @@ import { useViaturas } from '@/hooks/useViaturas';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { municipiosCeara, orgaosResponsaveis, OrgaoResponsavel } from '@/data/municipios';
 import { Viatura } from '@/types';
-import { Plus, Pencil, Trash2, Search, Truck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Truck, Download, FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { exportViaturasToPDF, exportViaturasToExcel } from '@/lib/exportUtils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function Viaturas() {
   const { viaturas, addViatura, updateViatura, deleteViatura, isAdding, isUpdating } = useViaturas();
@@ -155,10 +162,30 @@ export default function Viaturas() {
   return (
     <AppLayout>
       <PageHeader title="Viaturas" description="Gerencie as viaturas da Patrulha Maria da Penha">
-        <Button onClick={openCreateDialog}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Viatura
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportViaturasToPDF(filteredViaturas)}>
+                <FilePdf className="w-4 h-4 mr-2" />
+                Exportar PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportViaturasToExcel(filteredViaturas)}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Exportar Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={openCreateDialog}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Viatura
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Filters */}

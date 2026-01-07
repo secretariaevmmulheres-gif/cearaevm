@@ -40,11 +40,18 @@ import {
   StatusSolicitacao,
 } from '@/data/municipios';
 import { Solicitacao } from '@/types';
-import { Plus, Pencil, Trash2, Search, FileText, ArrowRight, Building2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, FileText, ArrowRight, Building2, Download, FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { exportSolicitacoesToPDF, exportSolicitacoesToExcel } from '@/lib/exportUtils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const statusStyles: Record<StatusSolicitacao, string> = {
   Recebida: 'badge-recebida',
@@ -178,10 +185,30 @@ export default function Solicitacoes() {
         title="Solicitações"
         description="Acompanhe os pedidos de implantação de equipamentos"
       >
-        <Button onClick={openCreateDialog}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Solicitação
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportSolicitacoesToPDF(filteredSolicitacoes)}>
+                <FilePdf className="w-4 h-4 mr-2" />
+                Exportar PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportSolicitacoesToExcel(filteredSolicitacoes)}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Exportar Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={openCreateDialog}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Solicitação
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Filters */}

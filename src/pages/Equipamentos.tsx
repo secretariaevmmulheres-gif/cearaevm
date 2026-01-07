@@ -34,8 +34,15 @@ import {
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { municipiosCeara, tiposEquipamento, TipoEquipamento } from '@/data/municipios';
 import { Equipamento } from '@/types';
-import { Plus, Pencil, Trash2, Search, Building2, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Building2, CheckCircle, XCircle, Download, FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { exportEquipamentosToPDF, exportEquipamentosToExcel } from '@/lib/exportUtils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const tipoStyles: Record<TipoEquipamento, string> = {
   'Casa da Mulher Brasileira': 'equipment-brasileira',
@@ -140,10 +147,30 @@ export default function Equipamentos() {
   return (
     <AppLayout>
       <PageHeader title="Equipamentos" description="Gerencie os equipamentos de atendimento à mulher">
-        <Button onClick={openCreateDialog}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Equipamento
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportEquipamentosToPDF(filteredEquipamentos)}>
+                <FilePdf className="w-4 h-4 mr-2" />
+                Exportar PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportEquipamentosToExcel(filteredEquipamentos)}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Exportar Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={openCreateDialog}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Equipamento
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Filters */}
