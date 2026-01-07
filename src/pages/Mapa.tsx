@@ -6,12 +6,13 @@ import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { municipiosCeara } from '@/data/municipios';
 import { CEARA_GEOJSON_URL } from '@/data/ceara-geojson-url';
-import { Building2, Truck, FileText, X, Loader2 } from 'lucide-react';
+import { Building2, Truck, FileText, X, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import type { Layer, PathOptions } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 
@@ -264,32 +265,42 @@ export default function Mapa() {
 
         {/* Mapa Leaflet */}
         <div className="lg:col-span-3">
-          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden" style={{ height: '600px' }}>
+          <div
+            className="bg-card rounded-xl border border-border shadow-sm overflow-hidden"
+            style={{ height: '600px' }}
+          >
             {isLoadingGeoJson ? (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 <span className="ml-2 text-muted-foreground">Carregando mapa...</span>
               </div>
             ) : (
-              <MapContainer
-                center={[-5.2, -39.5]}
-                zoom={7}
-                style={{ height: '100%', width: '100%' }}
-                scrollWheelZoom={true}
+              <ErrorBoundary
+                fallback={
+                  <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+                    <RefreshCw className="w-8 h-8 text-muted-foreground mb-3" />
+                    <p className="font-medium text-foreground">Erro ao carregar o mapa</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Isso normalmente acontece após uma atualização de dependências. Recarregue a página (Ctrl+Shift+R).
+                    </p>
+                  </div>
+                }
               >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {geoJsonData && (
-                  <GeoJSON
-                    key={JSON.stringify(municipiosData.size)}
-                    data={geoJsonData}
-                    style={getFeatureStyle}
-                    onEachFeature={onEachFeature}
+                <MapContainer
+                  center={[-5.2, -39.5]}
+                  zoom={7}
+                  style={{ height: '100%', width: '100%' }}
+                  scrollWheelZoom={true}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                )}
-              </MapContainer>
+                  {geoJsonData && (
+                    <GeoJSON data={geoJsonData} style={getFeatureStyle} onEachFeature={onEachFeature} />
+                  )}
+                </MapContainer>
+              </ErrorBoundary>
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-2 text-center">
