@@ -4,17 +4,27 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
-import { municipiosCeara } from '@/data/municipios';
+import { municipiosCeara, tiposEquipamento, statusSolicitacao } from '@/data/municipios';
 import { CEARA_GEOJSON_URL } from '@/data/ceara-geojson-url';
-import { Building2, Truck, FileText, X, Loader2, RefreshCw } from 'lucide-react';
+import { Building2, Truck, FileText, X, Loader2, RefreshCw, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import type { Layer, PathOptions } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 import { Equipamento, Viatura, Solicitacao } from '@/types';
+import { TipoEquipamento, StatusSolicitacao } from '@/data/municipios';
 
 interface MunicipioData {
   nome: string;
@@ -24,6 +34,7 @@ interface MunicipioData {
   prioridade: number;
   cor: string;
   hexColor: string;
+  visible: boolean;
 }
 
 // Color mapping for hex colors
@@ -34,6 +45,7 @@ const priorityColors: Record<number, string> = {
   4: '#d946ef', // lilas - fuchsia-500
   5: '#06b6d4', // viatura - cyan-500
   6: '#e5e7eb', // sem cobertura - gray-200
+  0: '#9ca3af', // filtered out - gray-400
 };
 
 export default function Mapa() {
@@ -43,6 +55,11 @@ export default function Mapa() {
   const [selectedMunicipio, setSelectedMunicipio] = useState<MunicipioData | null>(null);
   const [geoJsonData, setGeoJsonData] = useState<FeatureCollection | null>(null);
   const [isLoadingGeoJson, setIsLoadingGeoJson] = useState(true);
+
+  // Filters
+  const [filterTipoEquipamento, setFilterTipoEquipamento] = useState<string>('all');
+  const [filterStatusSolicitacao, setFilterStatusSolicitacao] = useState<string>('all');
+  const [filterApenasComViatura, setFilterApenasComViatura] = useState(false);
 
   // Fetch GeoJSON data
   useEffect(() => {
@@ -66,12 +83,36 @@ export default function Mapa() {
       const viats = viaturas.filter((v) => v.municipio === nome);
       const sols = solicitacoes.filter((s) => s.municipio === nome);
 
+      // Apply filters
+      let visible = true;
+      
+      // Filter by equipment type
+      if (filterTipoEquipamento !== 'all') {
+        const hasEquipType = eqs.some((e) => e.tipo === filterTipoEquipamento);
+        if (!hasEquipType) visible = false;
+      }
+      
+      // Filter by solicitacao status
+      if (filterStatusSolicitacao !== 'all') {
+        const hasSolStatus = sols.some((s) => s.status === filterStatusSolicitacao);
+        if (!hasSolStatus) visible = false;
+      }
+      
+      // Filter only with viatura
+      if (filterApenasComViatura && viats.length === 0) {
+        visible = false;
+      }
+
       // Determinar prioridade e cor
       let prioridade = 6;
       let cor = 'bg-muted';
       let hexColor = priorityColors[6];
 
-      if (eqs.some((e) => e.tipo === 'Casa da Mulher Brasileira')) {
+      if (!visible) {
+        prioridade = 0;
+        cor = 'bg-muted/50';
+        hexColor = priorityColors[0];
+      } else if (eqs.some((e) => e.tipo === 'Casa da Mulher Brasileira')) {
         prioridade = 1;
         cor = 'bg-equipment-brasileira';
         hexColor = priorityColors[1];
@@ -101,11 +142,12 @@ export default function Mapa() {
         prioridade,
         cor,
         hexColor,
+        visible,
       });
     });
 
     return dataMap;
-  }, [equipamentos, viaturas, solicitacoes]);
+  }, [equipamentos, viaturas, solicitacoes, filterTipoEquipamento, filterStatusSolicitacao, filterApenasComViatura]);
 
   const stats = useMemo(() => {
     const counts = {
@@ -115,9 +157,14 @@ export default function Mapa() {
       lilas: 0,
       viaturaOnly: 0,
       semCobertura: 0,
+      filteredOut: 0,
     };
 
     municipiosData.forEach((m) => {
+      if (!m.visible) {
+        counts.filteredOut++;
+        return;
+      }
       switch (m.prioridade) {
         case 1:
           counts.brasileira++;
@@ -203,6 +250,7 @@ export default function Mapa() {
             prioridade: 6,
             cor: 'bg-muted',
             hexColor: priorityColors[6],
+            visible: true,
           });
         }
       },
@@ -220,8 +268,53 @@ export default function Mapa() {
       <PageHeader title="Mapa do Ceará" description="Visualização geográfica da cobertura estadual" />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Legenda */}
+        {/* Legenda e Filtros */}
         <div className="lg:col-span-1 space-y-4">
+          {/* Filtros */}
+          <div className="bg-card rounded-xl p-4 border border-border shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <Filter className="w-4 h-4 text-primary" />
+              <h3 className="font-display font-semibold">Filtros</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Tipo de Equipamento</Label>
+                <Select value={filterTipoEquipamento} onValueChange={setFilterTipoEquipamento}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    {tiposEquipamento.map((tipo) => (
+                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Status da Solicitação</Label>
+                <Select value={filterStatusSolicitacao} onValueChange={setFilterStatusSolicitacao}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    {statusSolicitacao.map((status) => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Apenas com Viatura</Label>
+                <Switch
+                  checked={filterApenasComViatura}
+                  onCheckedChange={setFilterApenasComViatura}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="bg-card rounded-xl p-4 border border-border shadow-sm">
             <h3 className="font-display font-semibold mb-4">Legenda</h3>
             <div className="space-y-3">

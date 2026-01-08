@@ -2,6 +2,10 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { useEquipamentos } from '@/hooks/useEquipamentos';
+import { useViaturas } from '@/hooks/useViaturas';
+import { useSolicitacoes } from '@/hooks/useSolicitacoes';
+import { Button } from '@/components/ui/button';
 import {
   Building2,
   Truck,
@@ -11,6 +15,7 @@ import {
   Clock,
   AlertCircle,
   Users,
+  Download,
 } from 'lucide-react';
 import {
   BarChart,
@@ -25,11 +30,21 @@ import {
   Cell,
   Legend,
 } from 'recharts';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { exportAllToPDF, exportAllToExcel } from '@/lib/exportUtils';
 
 const COLORS = ['#c026d3', '#7c3aed', '#0ea5e9', '#ec4899', '#6366f1', '#8b5cf6'];
 
 export default function Dashboard() {
   const stats = useDashboardStats();
+  const { equipamentos } = useEquipamentos();
+  const { viaturas } = useViaturas();
+  const { solicitacoes } = useSolicitacoes();
 
   const equipamentoChartData = Object.entries(stats.equipamentosPorTipo).map(([name, value]) => ({
     name: name.replace('Casa da Mulher ', 'C.M. ').replace('Sala Lilás', 'S. Lilás'),
@@ -46,10 +61,30 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <PageHeader
-        title="Dashboard"
-        description="Visão geral da Rede de Atendimento à Mulher no Ceará"
-      />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <PageHeader
+          title="Dashboard"
+          description="Visão geral da Rede de Atendimento à Mulher no Ceará"
+        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Download className="w-4 h-4" />
+              Exportar Tudo
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => exportAllToPDF(equipamentos, viaturas, solicitacoes)}>
+              <FileText className="w-4 h-4 mr-2" />
+              Exportar PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportAllToExcel(equipamentos, viaturas, solicitacoes)}>
+              <FileText className="w-4 h-4 mr-2" />
+              Exportar Excel
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
