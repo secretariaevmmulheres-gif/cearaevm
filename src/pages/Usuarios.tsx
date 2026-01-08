@@ -23,12 +23,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Users, Shield, Trash2, UserCheck, UserX, Clock } from 'lucide-react';
+import { Search, Users, Shield, Trash2, UserCheck, UserX, Clock, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AppRole } from '@/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { useAuditLogs } from '@/hooks/useAuditLogs';
 
 interface UserWithRole {
   id: string;
@@ -53,9 +54,11 @@ const roleColors: Record<AppRole, string> = {
 export default function Usuarios() {
   const { hasRole } = useAuthContext();
   const queryClient = useQueryClient();
+  const { logs: auditLogs, createLog, isLoading: isLoadingLogs } = useAuditLogs();
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [deletingUserEmail, setDeletingUserEmail] = useState<string>('');
 
   // Redirect if not admin
   if (!hasRole('admin')) {
@@ -97,13 +100,15 @@ export default function Usuarios() {
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
+    mutationFn: async ({ userId, role, userEmail, isNewApproval }: { userId: string; role: AppRole; userEmail: string; isNewApproval: boolean }) => {
       // Check if user already has a role
       const { data: existingRole } = await supabase
         .from('user_roles')
-        .select('id')
+        .select('id, role')
         .eq('user_id', userId)
         .maybeSingle();
+
+      const previousRole = existingRole?.role as AppRole | undefined;
 
       if (existingRole) {
         // Update existing role
@@ -119,10 +124,20 @@ export default function Usuarios() {
           .insert({ user_id: userId, role });
         if (error) throw error;
       }
+
+      // Create audit log
+      await createLog({
+        action: isNewApproval ? 'approve_user' : 'change_role',
+        targetUserId: userId,
+        targetUserEmail: userEmail,
+        details: isNewApproval 
+          ? { new_role: role }
+          : { previous_role: previousRole, new_role: role },
+      });
     },
-    onSuccess: () => {
+    onSuccess: (_, { isNewApproval }) => {
       queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
-      toast.success('Permissão atualizada com sucesso');
+      toast.success(isNewApproval ? 'Usuário aprovado com sucesso' : 'Permissão atualizada com sucesso');
     },
     onError: (error) => {
       toast.error('Erro ao atualizar permissão: ' + error.message);
@@ -130,18 +145,26 @@ export default function Usuarios() {
   });
 
   const removeRoleMutation = useMutation({
-    mutationFn: async (userId: string) => {
+    mutationFn: async ({ userId, userEmail }: { userId: string; userEmail: string }) => {
       const { error } = await supabase
         .from('user_roles')
         .delete()
         .eq('user_id', userId);
       if (error) throw error;
+
+      // Create audit log
+      await createLog({
+        action: 'remove_access',
+        targetUserId: userId,
+        targetUserEmail: userEmail,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
       toast.success('Acesso removido com sucesso');
       setIsDeleteDialogOpen(false);
       setDeletingUserId(null);
+      setDeletingUserEmail('');
     },
     onError: (error) => {
       toast.error('Erro ao remover acesso: ' + error.message);
@@ -197,6 +220,10 @@ export default function Usuarios() {
             <UserCheck className="w-4 h-4" />
             Aprovados ({approvedUsers.length})
           </TabsTrigger>
+          <TabsTrigger value="logs" className="gap-2">
+            <History className="w-4 h-4" />
+            Auditoria
+          </TabsTrigger>
         </TabsList>
 
         {/* Pending Users Tab */}
@@ -238,7 +265,7 @@ export default function Usuarios() {
                           <div className="flex items-center gap-2">
                             <Select
                               onValueChange={(value) =>
-                                updateRoleMutation.mutate({ userId: user.id, role: value as AppRole })
+                                updateRoleMutation.mutate({ userId: user.id, role: value as AppRole, userEmail: user.email, isNewApproval: true })
                               }
                             >
                               <SelectTrigger className="w-40">
@@ -365,7 +392,7 @@ export default function Usuarios() {
                           <Select
                             value={user.role || ''}
                             onValueChange={(value) =>
-                              updateRoleMutation.mutate({ userId: user.id, role: value as AppRole })
+                              updateRoleMutation.mutate({ userId: user.id, role: value as AppRole, userEmail: user.email, isNewApproval: false })
                             }
                           >
                             <SelectTrigger className="w-40">
@@ -386,6 +413,7 @@ export default function Usuarios() {
                               className="text-destructive hover:text-destructive"
                               onClick={() => {
                                 setDeletingUserId(user.id);
+                                setDeletingUserEmail(user.email);
                                 setIsDeleteDialogOpen(true);
                               }}
                               title="Remover acesso"
@@ -393,6 +421,79 @@ export default function Usuarios() {
                               <UserX className="w-4 h-4" />
                             </Button>
                           </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Audit Logs Tab */}
+        <TabsContent value="logs">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Data/Hora</th>
+                    <th>Ação</th>
+                    <th>Usuário Afetado</th>
+                    <th>Executado Por</th>
+                    <th>Detalhes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoadingLogs ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                        Carregando...
+                      </td>
+                    </tr>
+                  ) : auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <History className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>Nenhum registro de auditoria</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    auditLogs.map((log) => (
+                      <tr key={log.id} className="animate-fade-in">
+                        <td className="text-sm">
+                          {new Date(log.created_at).toLocaleDateString('pt-BR')}{' '}
+                          {new Date(log.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td>
+                          <span className={cn('badge-status', {
+                            'bg-success/10 text-success': log.action === 'approve_user',
+                            'bg-primary/10 text-primary': log.action === 'change_role',
+                            'bg-destructive/10 text-destructive': log.action === 'remove_access',
+                          })}>
+                            {log.action === 'approve_user' && 'Aprovação'}
+                            {log.action === 'change_role' && 'Alteração de Role'}
+                            {log.action === 'remove_access' && 'Remoção de Acesso'}
+                          </span>
+                        </td>
+                        <td className="text-sm">{log.target_user_email || '-'}</td>
+                        <td className="text-sm">{log.performed_by_email || '-'}</td>
+                        <td className="text-xs text-muted-foreground">
+                          {log.details && (
+                            <>
+                              {(log.details as Record<string, unknown>).previous_role && (
+                                <span>
+                                  {roleLabels[(log.details as Record<string, unknown>).previous_role as AppRole]} →{' '}
+                                </span>
+                              )}
+                              {(log.details as Record<string, unknown>).new_role && (
+                                <span className="font-medium text-foreground">
+                                  {roleLabels[(log.details as Record<string, unknown>).new_role as AppRole]}
+                                </span>
+                              )}
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -416,7 +517,7 @@ export default function Usuarios() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deletingUserId && removeRoleMutation.mutate(deletingUserId)}
+              onClick={() => deletingUserId && removeRoleMutation.mutate({ userId: deletingUserId, userEmail: deletingUserEmail })}
               className="bg-destructive hover:bg-destructive/90"
             >
               Remover Acesso
