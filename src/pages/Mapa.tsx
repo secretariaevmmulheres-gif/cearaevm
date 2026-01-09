@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
@@ -6,8 +6,9 @@ import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { municipiosCeara, tiposEquipamento, statusSolicitacao } from '@/data/municipios';
 import { CEARA_GEOJSON_URL } from '@/data/ceara-geojson-url';
-import { Building2, Truck, FileText, X, Loader2, RefreshCw, Filter, Search } from 'lucide-react';
+import { Building2, Truck, FileText, X, Loader2, RefreshCw, Filter, Search, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
@@ -23,6 +24,8 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { exportMapToPDF } from '@/lib/exportUtils';
+import { toast } from 'sonner';
 
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 import { TipoEquipamento, StatusSolicitacao } from '@/data/municipios';
@@ -56,6 +59,8 @@ export default function Mapa() {
   const [selectedMunicipio, setSelectedMunicipio] = useState<MunicipioData | null>(null);
   const [geoJsonData, setGeoJsonData] = useState<FeatureCollection | null>(null);
   const [isLoadingGeoJson, setIsLoadingGeoJson] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   // Filters
   const [filterTipoEquipamento, setFilterTipoEquipamento] = useState<string>('all');
@@ -66,6 +71,32 @@ export default function Mapa() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[]>([]);
 
+  // Export handler
+  const handleExportMap = async () => {
+    if (!mapContainerRef.current) {
+      toast.error('Não foi possível capturar o mapa');
+      return;
+    }
+    
+    setIsExporting(true);
+    try {
+      await exportMapToPDF(
+        mapContainerRef.current,
+        {
+          tipoEquipamento: filterTipoEquipamento,
+          statusSolicitacao: filterStatusSolicitacao,
+          apenasComViatura: filterApenasComViatura,
+        },
+        stats
+      );
+      toast.success('Mapa exportado com sucesso!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Erro ao exportar o mapa');
+    } finally {
+      setIsExporting(false);
+    }
+  };
   // Fetch GeoJSON data
   useEffect(() => {
     fetch(CEARA_GEOJSON_URL)
@@ -436,11 +467,27 @@ export default function Mapa() {
               {stats.brasileira + stats.cearense + stats.municipal + stats.lilas} de 184 municípios com equipamento
             </p>
           </div>
+
+          {/* Exportar Mapa */}
+          <Button
+            onClick={handleExportMap}
+            disabled={isExporting || isLoadingGeoJson}
+            className="w-full gap-2"
+            variant="outline"
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Exportar Mapa PDF
+          </Button>
         </div>
 
         {/* Mapa Leaflet */}
         <div className="lg:col-span-3">
           <div
+            ref={mapContainerRef}
             className="bg-card rounded-xl border border-border shadow-sm overflow-hidden"
             style={{ height: '600px' }}
           >
