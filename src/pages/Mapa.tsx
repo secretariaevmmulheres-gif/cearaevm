@@ -6,7 +6,8 @@ import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { municipiosCeara, tiposEquipamento, statusSolicitacao } from '@/data/municipios';
 import { CEARA_GEOJSON_URL } from '@/data/ceara-geojson-url';
-import { Building2, Truck, FileText, X, Loader2, RefreshCw, Filter } from 'lucide-react';
+import { Building2, Truck, FileText, X, Loader2, RefreshCw, Filter, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
@@ -60,6 +61,10 @@ export default function Mapa() {
   const [filterTipoEquipamento, setFilterTipoEquipamento] = useState<string>('all');
   const [filterStatusSolicitacao, setFilterStatusSolicitacao] = useState<string>('all');
   const [filterApenasComViatura, setFilterApenasComViatura] = useState(false);
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<string[]>([]);
 
   // Fetch GeoJSON data
   useEffect(() => {
@@ -270,6 +275,83 @@ export default function Mapa() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Legenda e Filtros */}
         <div className="lg:col-span-1 space-y-4">
+          {/* Filtros */}
+          {/* Busca */}
+          <div className="bg-card rounded-xl p-4 border border-border shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <Search className="w-4 h-4 text-primary" />
+              <h3 className="font-display font-semibold">Buscar Município</h3>
+            </div>
+            <div className="relative">
+              <Input
+                placeholder="Digite o nome..."
+                value={searchQuery}
+                onChange={(e) => {
+                  const query = e.target.value;
+                  setSearchQuery(query);
+                  if (query.length >= 2) {
+                    const results = municipiosCeara.filter((m) =>
+                      m.toLowerCase().includes(query.toLowerCase())
+                    );
+                    setSearchResults(results.slice(0, 5));
+                  } else {
+                    setSearchResults([]);
+                  }
+                }}
+                className="pr-8"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {searchResults.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {searchResults.map((municipio) => {
+                  const data = municipiosData.get(municipio.toLowerCase());
+                  return (
+                    <li key={municipio}>
+                      <button
+                        onClick={() => {
+                          if (data) {
+                            setSelectedMunicipio(data);
+                          } else {
+                            setSelectedMunicipio({
+                              nome: municipio,
+                              equipamentos: [],
+                              viaturas: [],
+                              solicitacoes: [],
+                              prioridade: 6,
+                              cor: 'bg-muted',
+                              hexColor: priorityColors[6],
+                              visible: true,
+                            });
+                          }
+                          setSearchQuery('');
+                          setSearchResults([]);
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-left rounded hover:bg-muted transition-colors"
+                      >
+                        <div
+                          className="w-3 h-3 rounded"
+                          style={{ backgroundColor: data?.hexColor || priorityColors[6] }}
+                        />
+                        {municipio}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
           {/* Filtros */}
           <div className="bg-card rounded-xl p-4 border border-border shadow-sm">
             <div className="flex items-center gap-2 mb-4">
