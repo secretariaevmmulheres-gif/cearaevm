@@ -430,10 +430,10 @@ export default function Mapa() {
           <div className="bg-card rounded-xl p-4 border border-border shadow-sm">
             <h3 className="font-display font-semibold mb-2">Cobertura Total</h3>
             <p className="text-3xl font-display font-bold text-primary">
-              {((184 - stats.semCobertura) / 184 * 100).toFixed(1)}%
+              {((stats.brasileira + stats.cearense + stats.municipal + stats.lilas) / 184 * 100).toFixed(1)}%
             </p>
             <p className="text-sm text-muted-foreground">
-              {184 - stats.semCobertura} de 184 municípios
+              {stats.brasileira + stats.cearense + stats.municipal + stats.lilas} de 184 municípios com equipamento
             </p>
           </div>
         </div>

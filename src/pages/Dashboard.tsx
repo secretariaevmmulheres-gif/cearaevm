@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -29,7 +30,11 @@ import {
   Pie,
   Cell,
   Legend,
+  LineChart,
+  Line,
 } from 'recharts';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +63,43 @@ export default function Dashboard() {
   const viaturasChartData = Object.entries(stats.viaturasPorOrgao)
     .filter(([_, value]) => value > 0)
     .map(([name, value]) => ({ name, value }));
+
+  // Evolução temporal - agrupa por mês
+  const evolutionData = useMemo(() => {
+    const monthlyData = new Map<string, { equipamentos: number; solicitacoes: number }>();
+
+    // Processa equipamentos
+    equipamentos.forEach((e) => {
+      const month = format(parseISO(e.created_at), 'yyyy-MM');
+      const existing = monthlyData.get(month) || { equipamentos: 0, solicitacoes: 0 };
+      existing.equipamentos++;
+      monthlyData.set(month, existing);
+    });
+
+    // Processa solicitações
+    solicitacoes.forEach((s) => {
+      const month = format(parseISO(s.created_at), 'yyyy-MM');
+      const existing = monthlyData.get(month) || { equipamentos: 0, solicitacoes: 0 };
+      existing.solicitacoes++;
+      monthlyData.set(month, existing);
+    });
+
+    // Ordena e calcula acumulado
+    const sorted = Array.from(monthlyData.entries()).sort(([a], [b]) => a.localeCompare(b));
+    
+    let accEquip = 0;
+    let accSolic = 0;
+
+    return sorted.map(([month, data]) => {
+      accEquip += data.equipamentos;
+      accSolic += data.solicitacoes;
+      return {
+        month: format(parseISO(`${month}-01`), 'MMM/yy', { locale: ptBR }),
+        equipamentos: accEquip,
+        solicitacoes: accSolic,
+      };
+    });
+  }, [equipamentos, solicitacoes]);
 
   return (
     <AppLayout>
@@ -273,13 +315,57 @@ export default function Dashboard() {
               <div
                 className="h-full bg-gradient-accent transition-all duration-500"
                 style={{
-                  width: `${((stats.municipiosComEquipamento + stats.municipiosComViaturaSemEquipamento) / 184) * 100}%`,
+                  width: `${(stats.municipiosComEquipamento / 184) * 100}%`,
                 }}
               />
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              {(((stats.municipiosComEquipamento + stats.municipiosComViaturaSemEquipamento) / 184) * 100).toFixed(1)}% do estado com alguma cobertura
+              {((stats.municipiosComEquipamento / 184) * 100).toFixed(1)}% do estado com equipamento
             </p>
+          </div>
+        </div>
+
+        {/* Evolução Temporal */}
+        <div className="bg-card rounded-xl p-6 border border-border shadow-sm lg:col-span-2">
+          <h3 className="font-display font-semibold text-lg mb-4">Evolução Temporal</h3>
+          <div className="h-64">
+            {evolutionData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={evolutionData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="equipamentos"
+                    name="Equipamentos"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="solicitacoes"
+                    name="Solicitações"
+                    stroke="hsl(var(--accent))"
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--accent))' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                Nenhum dado para exibir evolução temporal
+              </div>
+            )}
           </div>
         </div>
       </div>
