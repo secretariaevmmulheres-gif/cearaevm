@@ -38,6 +38,8 @@ import {
   statusSolicitacao,
   TipoEquipamento,
   StatusSolicitacao,
+  regioesList,
+  getRegiao,
 } from '@/data/municipios';
 import { Solicitacao } from '@/types';
 import { Plus, Pencil, Trash2, Search, FileText, ArrowRight, Building2, Download, FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
@@ -68,6 +70,7 @@ export default function Solicitacoes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterTipo, setFilterTipo] = useState<string>('all');
+  const [filterRegiao, setFilterRegiao] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTransformDialogOpen, setIsTransformDialogOpen] = useState(false);
@@ -96,7 +99,8 @@ export default function Solicitacoes() {
       (s.observacoes || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
     const matchesTipo = filterTipo === 'all' || s.tipo_equipamento === filterTipo;
-    return matchesSearch && matchesStatus && matchesTipo;
+    const matchesRegiao = filterRegiao === 'all' || getRegiao(s.municipio) === filterRegiao;
+    return matchesSearch && matchesStatus && matchesTipo && matchesRegiao;
   });
 
   const openCreateDialog = () => {
@@ -213,7 +217,7 @@ export default function Solicitacoes() {
 
       {/* Filters */}
       <div className="bg-card rounded-xl p-4 border border-border shadow-sm mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -223,6 +227,19 @@ export default function Solicitacoes() {
               className="pl-9"
             />
           </div>
+          <Select value={filterRegiao} onValueChange={setFilterRegiao}>
+            <SelectTrigger>
+              <SelectValue placeholder="Região" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as regiões</SelectItem>
+              {regioesList.map((regiao) => (
+                <SelectItem key={regiao} value={regiao}>
+                  {regiao}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger>
               <SelectValue placeholder="Status" />

@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
-import { municipiosCeara, orgaosResponsaveis, OrgaoResponsavel } from '@/data/municipios';
+import { municipiosCeara, orgaosResponsaveis, OrgaoResponsavel, regioesList, getRegiao } from '@/data/municipios';
 import { Viatura } from '@/types';
 import { Plus, Pencil, Trash2, Search, Truck, Download, FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
 import { format } from 'date-fns';
@@ -52,6 +52,7 @@ export default function Viaturas() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOrgao, setFilterOrgao] = useState<string>('all');
   const [filterVinculada, setFilterVinculada] = useState<string>('all');
+  const [filterRegiao, setFilterRegiao] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingViatura, setEditingViatura] = useState<Viatura | null>(null);
@@ -83,7 +84,8 @@ export default function Viaturas() {
       filterVinculada === 'all' ||
       (filterVinculada === 'sim' && v.vinculada_equipamento) ||
       (filterVinculada === 'nao' && !v.vinculada_equipamento);
-    return matchesSearch && matchesOrgao && matchesVinculada;
+    const matchesRegiao = filterRegiao === 'all' || getRegiao(v.municipio) === filterRegiao;
+    return matchesSearch && matchesOrgao && matchesVinculada && matchesRegiao;
   });
 
   const openCreateDialog = () => {
@@ -190,7 +192,7 @@ export default function Viaturas() {
 
       {/* Filters */}
       <div className="bg-card rounded-xl p-4 border border-border shadow-sm mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -200,6 +202,19 @@ export default function Viaturas() {
               className="pl-9"
             />
           </div>
+          <Select value={filterRegiao} onValueChange={setFilterRegiao}>
+            <SelectTrigger>
+              <SelectValue placeholder="Região" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as regiões</SelectItem>
+              {regioesList.map((regiao) => (
+                <SelectItem key={regiao} value={regiao}>
+                  {regiao}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={filterOrgao} onValueChange={setFilterOrgao}>
             <SelectTrigger>
               <SelectValue placeholder="Órgão Responsável" />

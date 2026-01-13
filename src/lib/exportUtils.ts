@@ -163,15 +163,30 @@ export function exportAllToPDF(
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, currentY);
   currentY += 12;
   
+  // Calculate stats
+  const totalEquipamentos = equipamentos.length;
+  const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
+  const viaturasVinculadas = viaturas.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
+  const viaturasNaoVinculadas = viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
+  const totalViaturas = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
+  
   // Summary
   doc.setFontSize(12);
   doc.text('Resumo Geral:', 14, currentY);
   currentY += 8;
   doc.setFontSize(10);
-  doc.text(`• Total de Equipamentos: ${equipamentos.length}`, 14, currentY);
+  doc.text(`• Total de Equipamentos: ${totalEquipamentos}`, 14, currentY);
   currentY += 6;
-  doc.text(`• Total de Viaturas: ${viaturas.reduce((sum, v) => sum + v.quantidade, 0)}`, 14, currentY);
+  doc.text(`  - Com Patrulha Maria da Penha vinculada: ${equipamentosComPatrulha}`, 14, currentY);
   currentY += 6;
+  doc.text(`  - Sem Patrulha Maria da Penha vinculada: ${totalEquipamentos - equipamentosComPatrulha}`, 14, currentY);
+  currentY += 8;
+  doc.text(`• Total de Viaturas (Patrulha Maria da Penha): ${totalViaturas}`, 14, currentY);
+  currentY += 6;
+  doc.text(`  - Vinculadas a equipamentos (Casas): ${viaturasVinculadas}`, 14, currentY);
+  currentY += 6;
+  doc.text(`  - Não vinculadas (PMCE/Polícia): ${viaturasNaoVinculadas}`, 14, currentY);
+  currentY += 8;
   doc.text(`• Total de Solicitações: ${solicitacoes.length}`, 14, currentY);
   currentY += 12;
   
@@ -188,7 +203,7 @@ export function exportAllToPDF(
   ]);
 
   autoTable(doc, {
-    head: [['Município', 'Tipo', 'Responsável', 'Telefone', 'Patrulha']],
+    head: [['Município', 'Tipo', 'Responsável', 'Telefone', 'Patrulha M.P.']],
     body: eqData,
     startY: currentY + 5,
     styles: { fontSize: 7 },
@@ -200,19 +215,20 @@ export function exportAllToPDF(
   currentY = 22;
   
   doc.setFontSize(12);
-  doc.text('Viaturas:', 14, currentY);
+  doc.text('Viaturas (Patrulha Maria da Penha):', 14, currentY);
   
   const vData = viaturas.map((v) => [
     v.municipio,
     v.tipo_patrulha,
     v.orgao_responsavel,
     v.quantidade.toString(),
+    v.vinculada_equipamento ? 'Sim' : 'Não',
     v.responsavel || '-',
     new Date(v.data_implantacao).toLocaleDateString('pt-BR'),
   ]);
 
   autoTable(doc, {
-    head: [['Município', 'Tipo', 'Órgão', 'Qtd', 'Responsável', 'Data Implantação']],
+    head: [['Município', 'Tipo', 'Órgão', 'Qtd', 'Vinculada', 'Responsável', 'Data Impl.']],
     body: vData,
     startY: currentY + 5,
     styles: { fontSize: 7 },
