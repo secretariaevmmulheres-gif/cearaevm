@@ -7,6 +7,7 @@ import { AuthProvider, useAuthContext } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import DashboardRegional from "./pages/DashboardRegional";
 import Equipamentos from "./pages/Equipamentos";
 import Viaturas from "./pages/Viaturas";
 import Solicitacoes from "./pages/Solicitacoes";
@@ -39,6 +40,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard-regional"
+        element={
+          <ProtectedRoute>
+            <DashboardRegional />
           </ProtectedRoute>
         }
       />
