@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthContext } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
+  PieChart,
   Building2,
   Truck,
   FileText,
@@ -19,6 +20,7 @@ import { useState } from 'react';
 
 const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/dashboard-regional', label: 'Por Região', icon: PieChart },
   { path: '/equipamentos', label: 'Equipamentos', icon: Building2 },
   { path: '/viaturas', label: 'Viaturas', icon: Truck },
   { path: '/solicitacoes', label: 'Solicitações', icon: FileText },
