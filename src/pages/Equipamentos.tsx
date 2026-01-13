@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
-import { municipiosCeara, tiposEquipamento, TipoEquipamento } from '@/data/municipios';
+import { municipiosCeara, tiposEquipamento, TipoEquipamento, regioesList, getRegiao } from '@/data/municipios';
 import { Equipamento } from '@/types';
 import { Plus, Pencil, Trash2, Search, Building2, CheckCircle, XCircle, Download, FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -56,6 +56,7 @@ export default function Equipamentos() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<string>('all');
   const [filterPatrulha, setFilterPatrulha] = useState<string>('all');
+  const [filterRegiao, setFilterRegiao] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingEquipamento, setEditingEquipamento] = useState<Equipamento | null>(null);
@@ -82,7 +83,8 @@ export default function Equipamentos() {
       filterPatrulha === 'all' ||
       (filterPatrulha === 'sim' && e.possui_patrulha) ||
       (filterPatrulha === 'nao' && !e.possui_patrulha);
-    return matchesSearch && matchesTipo && matchesPatrulha;
+    const matchesRegiao = filterRegiao === 'all' || getRegiao(e.municipio) === filterRegiao;
+    return matchesSearch && matchesTipo && matchesPatrulha && matchesRegiao;
   });
 
   const openCreateDialog = () => {
@@ -175,7 +177,7 @@ export default function Equipamentos() {
 
       {/* Filters */}
       <div className="bg-card rounded-xl p-4 border border-border shadow-sm mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -185,6 +187,19 @@ export default function Equipamentos() {
               className="pl-9"
             />
           </div>
+          <Select value={filterRegiao} onValueChange={setFilterRegiao}>
+            <SelectTrigger>
+              <SelectValue placeholder="Região" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as regiões</SelectItem>
+              {regioesList.map((regiao) => (
+                <SelectItem key={regiao} value={regiao}>
+                  {regiao}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={filterTipo} onValueChange={setFilterTipo}>
             <SelectTrigger>
               <SelectValue placeholder="Tipo de Equipamento" />
