@@ -30,6 +30,16 @@ import { toast } from 'sonner';
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 import { TipoEquipamento, StatusSolicitacao } from '@/data/municipios';
 
+// Normalização de nomes de municípios (GeoJSON pode ter variações)
+const normalizarNome = (nome: string): string => {
+  const normalizacao: Record<string, string> = {
+    'itapagé': 'itapajé',
+    'itapaje': 'itapajé',
+  };
+  const nomeNormalizado = nome.toLowerCase().trim();
+  return normalizacao[nomeNormalizado] || nomeNormalizado;
+};
+
 interface MunicipioData {
   nome: string;
   equipamentos: Equipamento[];
@@ -170,7 +180,7 @@ export default function Mapa() {
         hexColor = priorityColors[5];
       }
 
-      dataMap.set(nome.toLowerCase(), {
+      dataMap.set(normalizarNome(nome), {
         nome,
         equipamentos: eqs,
         viaturas: viats,
@@ -239,7 +249,7 @@ export default function Mapa() {
 
     // GeoJSON uses "name" property for municipality name
     const municipioName = feature.properties.name as string;
-    const municipioData = municipiosData.get(municipioName.toLowerCase());
+    const municipioData = municipiosData.get(normalizarNome(municipioName));
 
     return {
       fillColor: municipioData?.hexColor || priorityColors[6],
@@ -253,7 +263,7 @@ export default function Mapa() {
   // Handle feature interactions
   const onEachFeature = (feature: Feature<Geometry>, layer: Layer) => {
     const municipioName = feature.properties?.name as string;
-    const municipioData = municipiosData.get(municipioName.toLowerCase());
+    const municipioData = municipiosData.get(normalizarNome(municipioName));
 
     layer.on({
       mouseover: (e) => {
@@ -346,7 +356,7 @@ export default function Mapa() {
             {searchResults.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {searchResults.map((municipio) => {
-                  const data = municipiosData.get(municipio.toLowerCase());
+                  const data = municipiosData.get(normalizarNome(municipio));
                   return (
                     <li key={municipio}>
                       <button

@@ -78,8 +78,8 @@ export function AppSidebar() {
                 <Shield className="w-5 h-5 text-sidebar-primary-foreground" />
               </div>
               <div>
-                <h2 className="font-display font-bold text-sm">SPM Ceará</h2>
-                <p className="text-xs text-sidebar-foreground/60">Gestão de Rede</p>
+                <h2 className="font-display font-bold text-sm">EVM</h2>
+                <p className="text-xs text-sidebar-foreground/60">Enfrentamento à Violência</p>
               </div>
             </div>
           </div>

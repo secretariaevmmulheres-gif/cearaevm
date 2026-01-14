@@ -158,7 +158,7 @@ export default function Equipamentos() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportEquipamentosToPDF(filteredEquipamentos)}>
+              <DropdownMenuItem onClick={() => exportEquipamentosToPDF(filteredEquipamentos, filterRegiao)}>
                 <FilePdf className="w-4 h-4 mr-2" />
                 Exportar PDF
               </DropdownMenuItem>

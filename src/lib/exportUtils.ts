@@ -4,13 +4,20 @@ import autoTable from 'jspdf-autotable';
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 
 // Equipamentos export
-export function exportEquipamentosToPDF(equipamentos: Equipamento[]) {
+export function exportEquipamentosToPDF(equipamentos: Equipamento[], filterRegiao?: string) {
   const doc = new jsPDF();
   
   doc.setFontSize(18);
   doc.text('Relatório de Equipamentos', 14, 22);
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+  
+  let startY = 35;
+  if (filterRegiao && filterRegiao !== 'all') {
+    doc.setFontSize(11);
+    doc.text(`Região: ${filterRegiao}`, 14, 38);
+    startY = 45;
+  }
   
   const tableData = equipamentos.map((e) => [
     e.municipio,
@@ -23,7 +30,7 @@ export function exportEquipamentosToPDF(equipamentos: Equipamento[]) {
   autoTable(doc, {
     head: [['Município', 'Tipo', 'Responsável', 'Telefone', 'Patrulha']],
     body: tableData,
-    startY: 35,
+    startY: startY,
     styles: { fontSize: 8 },
     headStyles: { fillColor: [31, 81, 140] },
   });
@@ -97,13 +104,24 @@ export function exportViaturasToExcel(viaturas: Viatura[]) {
 }
 
 // Solicitações export
-export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[]) {
+export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[], filterRegiao?: string) {
   const doc = new jsPDF('landscape');
   
   doc.setFontSize(18);
   doc.text('Relatório de Solicitações', 14, 22);
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+  
+  let startY = 35;
+  if (filterRegiao && filterRegiao !== 'all') {
+    doc.setFontSize(11);
+    doc.text(`Região: ${filterRegiao}`, 14, 38);
+    startY = 45;
+  }
+  
+  doc.setFontSize(10);
+  doc.text(`Total de registros: ${solicitacoes.length}`, 14, startY);
+  startY += 8;
   
   const tableData = solicitacoes.map((s) => [
     s.municipio,
@@ -113,13 +131,16 @@ export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[]) {
     s.suite_implantada || '-',
     s.guarda_municipal_estruturada ? 'Sim' : 'Não',
     s.recebeu_patrulha ? 'Sim' : 'Não',
+    s.kit_athena_entregue ? 'Sim' : 'Não',
+    s.capacitacao_realizada ? 'Sim' : 'Não',
+    s.observacoes ? (s.observacoes.length > 30 ? s.observacoes.substring(0, 30) + '...' : s.observacoes) : '-',
   ]);
 
   autoTable(doc, {
-    head: [['Município', 'Tipo Equipamento', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha']],
+    head: [['Município', 'Tipo Equipamento', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Capacitação', 'Observações']],
     body: tableData,
-    startY: 35,
-    styles: { fontSize: 8 },
+    startY: startY,
+    styles: { fontSize: 7 },
     headStyles: { fillColor: [31, 81, 140] },
   });
 
@@ -157,7 +178,7 @@ export function exportAllToPDF(
   
   // Title
   doc.setFontSize(18);
-  doc.text('Relatório Completo - Sistema de Gestão', 14, currentY);
+  doc.text('Relatório Completo - EVM', 14, currentY);
   currentY += 8;
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, currentY);
@@ -344,9 +365,45 @@ export async function exportMapToPDF(
   
   // Title
   doc.setFontSize(18);
-  doc.text('Mapa do Ceará - Rede de Atendimento à Mulher', 14, 22);
+  doc.text('Mapa do Ceará - EVM - Enfrentamento à Violência contra as Mulheres', 14, 22);
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+  
+  // Capture map screenshot FIRST - wait for tiles to load
+  let mapCaptured = false;
+  try {
+    // Find the leaflet container specifically
+    const leafletContainer = mapElement.querySelector('.leaflet-container') as HTMLElement;
+    const targetElement = leafletContainer || mapElement;
+    
+    // Wait a bit for tiles to render
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const canvas = await html2canvas(targetElement, {
+      useCORS: true,
+      allowTaint: true,
+      scale: 2,
+      logging: false,
+      backgroundColor: '#f3f4f6',
+      onclone: (clonedDoc) => {
+        // Ensure SVG elements render properly
+        const svgs = clonedDoc.querySelectorAll('svg');
+        svgs.forEach(svg => {
+          svg.setAttribute('width', svg.getBoundingClientRect().width.toString());
+          svg.setAttribute('height', svg.getBoundingClientRect().height.toString());
+        });
+      }
+    });
+    
+    const imgData = canvas.toDataURL('image/png');
+    const imgWidth = 160;
+    const imgHeight = (canvas.height / canvas.width) * imgWidth;
+    
+    doc.addImage(imgData, 'PNG', 130, 35, imgWidth, Math.min(imgHeight, 165));
+    mapCaptured = true;
+  } catch (error) {
+    console.error('Error capturing map:', error);
+  }
   
   // Filters applied
   doc.setFontSize(12);
@@ -369,23 +426,10 @@ export async function exportMapToPDF(
   
   const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilas;
   doc.setFontSize(12);
-  doc.text(`Cobertura Total: ${(totalComEquipamento / 184 * 100).toFixed(1)}% (${totalComEquipamento}/184 municípios)`, 14, 125);
+  doc.text(`Cobertura Total: ${(totalComEquipamento / 184 * 100).toFixed(2)}% (${totalComEquipamento}/184 municípios)`, 14, 125);
   
-  // Capture map screenshot
-  try {
-    const canvas = await html2canvas(mapElement, {
-      useCORS: true,
-      allowTaint: true,
-      scale: 2,
-    });
-    
-    const imgData = canvas.toDataURL('image/png');
-    const imgWidth = 150;
-    const imgHeight = (canvas.height / canvas.width) * imgWidth;
-    
-    doc.addImage(imgData, 'PNG', 140, 40, imgWidth, Math.min(imgHeight, 160));
-  } catch (error) {
-    console.error('Error capturing map:', error);
+  if (!mapCaptured) {
+    doc.setFontSize(10);
     doc.text('(Não foi possível capturar a imagem do mapa)', 180, 100);
   }
   

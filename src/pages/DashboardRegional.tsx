@@ -37,6 +37,8 @@ interface RegionStats {
   totalEquipamentos: number;
   totalViaturas: number;
   viaturasVinculadas: number;
+  viaturasNaoVinculadas: number;
+  patrulhasEmEquipamentos: number;
   totalSolicitacoes: number;
   solicitacoesEmAndamento: number;
   cobertura: number;
@@ -62,10 +64,13 @@ export default function DashboardRegional() {
       
       const equipamentosDaRegiao = equipamentos.filter(e => getRegiao(e.municipio) === regiao);
       const municipiosComEquipamento = new Set(equipamentosDaRegiao.map(e => e.municipio)).size;
+      const patrulhasEmEquipamentos = equipamentosDaRegiao.filter(e => e.possui_patrulha).length;
       
       const viaturasDaRegiao = viaturas.filter(v => getRegiao(v.municipio) === regiao);
-      const totalViaturas = viaturasDaRegiao.reduce((sum, v) => sum + v.quantidade, 0);
+      const viaturasNaoVinculadas = viaturasDaRegiao.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
       const viaturasVinculadas = viaturasDaRegiao.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
+      // Total de viaturas inclui: viaturas cadastradas + patrulhas vinculadas aos equipamentos
+      const totalViaturas = viaturasDaRegiao.reduce((sum, v) => sum + v.quantidade, 0) + patrulhasEmEquipamentos;
       
       const solicitacoesDaRegiao = solicitacoes.filter(s => getRegiao(s.municipio) === regiao);
       const solicitacoesEmAndamento = solicitacoesDaRegiao.filter(s => 
@@ -79,6 +84,8 @@ export default function DashboardRegional() {
         totalEquipamentos: equipamentosDaRegiao.length,
         totalViaturas,
         viaturasVinculadas,
+        viaturasNaoVinculadas,
+        patrulhasEmEquipamentos,
         totalSolicitacoes: solicitacoesDaRegiao.length,
         solicitacoesEmAndamento,
         cobertura: totalMunicipios > 0 ? (municipiosComEquipamento / totalMunicipios) * 100 : 0,
@@ -135,12 +142,15 @@ export default function DashboardRegional() {
   }, [regionStats, selectedRegiao]);
 
   // Estatísticas totais
+  const patrulhasEmEquipamentos = equipamentos.filter(e => e.possui_patrulha).length;
   const totals = useMemo(() => ({
     equipamentos: equipamentos.length,
-    viaturas: viaturas.reduce((sum, v) => sum + v.quantidade, 0),
+    viaturas: viaturas.reduce((sum, v) => sum + v.quantidade, 0) + patrulhasEmEquipamentos,
+    viaturasNaoVinculadas: viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0),
+    patrulhasEmEquipamentos,
     solicitacoes: solicitacoes.length,
     mediaCobertura: regionStats.reduce((sum, r) => sum + r.cobertura, 0) / regionStats.length,
-  }), [equipamentos, viaturas, solicitacoes, regionStats]);
+  }), [equipamentos, viaturas, solicitacoes, regionStats, patrulhasEmEquipamentos]);
 
   // Região selecionada
   const selectedStats = selectedRegiao !== 'all' 
@@ -190,12 +200,12 @@ export default function DashboardRegional() {
           </div>
           <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Viaturas</span>
+              <span className="text-sm text-muted-foreground">Patrulhas M.P.</span>
               {getComparisonIcon(selectedStats.totalViaturas, totals.viaturas / 14)}
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-display font-bold text-accent">{selectedStats.totalViaturas}</span>
-              <span className="text-sm text-muted-foreground">({selectedStats.viaturasVinculadas} vinculadas)</span>
+              <span className="text-sm text-muted-foreground">({selectedStats.patrulhasEmEquipamentos} em casas)</span>
             </div>
           </div>
           <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
@@ -214,7 +224,7 @@ export default function DashboardRegional() {
               {getComparisonIcon(selectedStats.cobertura, totals.mediaCobertura)}
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-display font-bold text-success">{selectedStats.cobertura.toFixed(1)}%</span>
+              <span className="text-3xl font-display font-bold text-success">{selectedStats.cobertura.toFixed(2)}%</span>
               <span className="text-sm text-muted-foreground">({selectedStats.municipiosComEquipamento}/{selectedStats.totalMunicipios} municípios)</span>
             </div>
           </div>
@@ -231,9 +241,10 @@ export default function DashboardRegional() {
           <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <Truck className="w-5 h-5 text-accent" />
-              <span className="text-sm text-muted-foreground">Total Viaturas</span>
+              <span className="text-sm text-muted-foreground">Total Patrulhas M.P.</span>
             </div>
             <span className="text-3xl font-display font-bold">{totals.viaturas}</span>
+            <p className="text-xs text-muted-foreground mt-1">{totals.patrulhasEmEquipamentos} em casas + {totals.viaturasNaoVinculadas} PMCE</p>
           </div>
           <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
             <div className="flex items-center gap-3 mb-2">
@@ -247,7 +258,7 @@ export default function DashboardRegional() {
               <MapPin className="w-5 h-5 text-success" />
               <span className="text-sm text-muted-foreground">Média de Cobertura</span>
             </div>
-            <span className="text-3xl font-display font-bold">{totals.mediaCobertura.toFixed(1)}%</span>
+            <span className="text-3xl font-display font-bold">{totals.mediaCobertura.toFixed(2)}%</span>
           </div>
         </div>
       )}
@@ -430,7 +441,7 @@ export default function DashboardRegional() {
                         "text-sm font-medium",
                         r.cobertura >= 50 ? "text-success" : r.cobertura >= 25 ? "text-warning" : "text-destructive"
                       )}>
-                        {r.cobertura.toFixed(1)}%
+                        {r.cobertura.toFixed(2)}%
                       </span>
                     </div>
                   </td>
