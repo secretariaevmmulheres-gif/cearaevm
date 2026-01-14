@@ -342,6 +342,7 @@ export interface MapExportFilters {
   tipoEquipamento: string;
   statusSolicitacao: string;
   apenasComViatura: boolean;
+  regiao?: string;
 }
 
 export interface MapExportStats {
@@ -409,28 +410,29 @@ export async function exportMapToPDF(
   doc.setFontSize(12);
   doc.text('Filtros Aplicados:', 14, 42);
   doc.setFontSize(10);
-  doc.text(`• Tipo de Equipamento: ${filters.tipoEquipamento === 'all' ? 'Todos' : filters.tipoEquipamento}`, 14, 50);
-  doc.text(`• Status de Solicitação: ${filters.statusSolicitacao === 'all' ? 'Todos' : filters.statusSolicitacao}`, 14, 56);
-  doc.text(`• Apenas com Viatura: ${filters.apenasComViatura ? 'Sim' : 'Não'}`, 14, 62);
+  doc.text(`• Região: ${filters.regiao && filters.regiao !== 'all' ? filters.regiao : 'Todas'}`, 14, 50);
+  doc.text(`• Tipo de Equipamento: ${filters.tipoEquipamento === 'all' ? 'Todos' : filters.tipoEquipamento}`, 14, 56);
+  doc.text(`• Status de Solicitação: ${filters.statusSolicitacao === 'all' ? 'Todos' : filters.statusSolicitacao}`, 14, 62);
+  doc.text(`• Apenas com Viatura: ${filters.apenasComViatura ? 'Sim' : 'Não'}`, 14, 68);
   
   // Stats
   doc.setFontSize(12);
-  doc.text('Estatísticas:', 14, 75);
+  doc.text('Estatísticas:', 14, 81);
   doc.setFontSize(10);
-  doc.text(`• Casa da Mulher Brasileira: ${stats.brasileira}`, 14, 83);
-  doc.text(`• Casa da Mulher Cearense: ${stats.cearense}`, 14, 89);
-  doc.text(`• Casa da Mulher Municipal: ${stats.municipal}`, 14, 95);
-  doc.text(`• Sala Lilás: ${stats.lilas}`, 14, 101);
-  doc.text(`• Apenas Viatura: ${stats.viaturaOnly}`, 14, 107);
-  doc.text(`• Sem Cobertura: ${stats.semCobertura}`, 14, 113);
+  doc.text(`• Casa da Mulher Brasileira: ${stats.brasileira}`, 14, 89);
+  doc.text(`• Casa da Mulher Cearense: ${stats.cearense}`, 14, 95);
+  doc.text(`• Casa da Mulher Municipal: ${stats.municipal}`, 14, 101);
+  doc.text(`• Sala Lilás: ${stats.lilas}`, 14, 107);
+  doc.text(`• Apenas Viatura: ${stats.viaturaOnly}`, 14, 113);
+  doc.text(`• Sem Cobertura: ${stats.semCobertura}`, 14, 119);
   
   const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilas;
   doc.setFontSize(12);
-  doc.text(`Cobertura Total: ${(totalComEquipamento / 184 * 100).toFixed(2)}% (${totalComEquipamento}/184 municípios)`, 14, 125);
+  doc.text(`Cobertura Total: ${(totalComEquipamento / 184 * 100).toFixed(2)}% (${totalComEquipamento}/184 municípios)`, 14, 131);
   
   if (!mapCaptured) {
     doc.setFontSize(10);
-    doc.text('(Não foi possível capturar a imagem do mapa)', 180, 100);
+    doc.text('(Não foi possível capturar a imagem do mapa)', 180, 105);
   }
   
   doc.save('mapa-ceara.pdf');
