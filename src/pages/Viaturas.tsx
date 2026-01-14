@@ -407,7 +407,7 @@ export default function Viaturas() {
               <div className="space-y-2">
                 <Label>Equipamento</Label>
                 <Select
-                  value={formData.equipamento_id}
+                  value={formData.equipamento_id || undefined}
                   onValueChange={(value) => setFormData({ ...formData, equipamento_id: value })}
                 >
                   <SelectTrigger>
@@ -415,9 +415,9 @@ export default function Viaturas() {
                   </SelectTrigger>
                   <SelectContent>
                     {equipamentosDoMunicipio.length === 0 ? (
-                      <SelectItem value="" disabled>
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
                         Nenhum equipamento neste município
-                      </SelectItem>
+                      </div>
                     ) : (
                       equipamentosDoMunicipio.map((e) => (
                         <SelectItem key={e.id} value={e.id}>

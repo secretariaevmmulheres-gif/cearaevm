@@ -198,7 +198,7 @@ export default function Solicitacoes() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportSolicitacoesToPDF(filteredSolicitacoes)}>
+              <DropdownMenuItem onClick={() => exportSolicitacoesToPDF(filteredSolicitacoes, filterRegiao)}>
                 <FilePdf className="w-4 h-4 mr-2" />
                 Exportar PDF
               </DropdownMenuItem>
