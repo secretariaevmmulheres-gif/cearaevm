@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
-import { municipiosCeara, tiposEquipamento, statusSolicitacao } from '@/data/municipios';
+import { municipiosCeara, tiposEquipamento, statusSolicitacao, regioesList, getRegiao } from '@/data/municipios';
 import { CEARA_GEOJSON_URL } from '@/data/ceara-geojson-url';
 import { Building2, Truck, FileText, X, Loader2, RefreshCw, Filter, Search, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -76,6 +76,7 @@ export default function Mapa() {
   const [filterTipoEquipamento, setFilterTipoEquipamento] = useState<string>('all');
   const [filterStatusSolicitacao, setFilterStatusSolicitacao] = useState<string>('all');
   const [filterApenasComViatura, setFilterApenasComViatura] = useState(false);
+  const [filterRegiao, setFilterRegiao] = useState<string>('all');
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,6 +97,7 @@ export default function Mapa() {
           tipoEquipamento: filterTipoEquipamento,
           statusSolicitacao: filterStatusSolicitacao,
           apenasComViatura: filterApenasComViatura,
+          regiao: filterRegiao,
         },
         stats
       );
@@ -131,6 +133,12 @@ export default function Mapa() {
 
       // Apply filters
       let visible = true;
+      
+      // Filter by region
+      if (filterRegiao !== 'all') {
+        const municipioRegiao = getRegiao(nome);
+        if (municipioRegiao !== filterRegiao) visible = false;
+      }
       
       // Filter by equipment type
       if (filterTipoEquipamento !== 'all') {
@@ -193,7 +201,7 @@ export default function Mapa() {
     });
 
     return dataMap;
-  }, [equipamentos, viaturas, solicitacoes, filterTipoEquipamento, filterStatusSolicitacao, filterApenasComViatura]);
+  }, [equipamentos, viaturas, solicitacoes, filterTipoEquipamento, filterStatusSolicitacao, filterApenasComViatura, filterRegiao]);
 
   const stats = useMemo(() => {
     const counts = {
@@ -400,6 +408,20 @@ export default function Mapa() {
               <h3 className="font-display font-semibold">Filtros</h3>
             </div>
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Região de Planejamento</Label>
+                <Select value={filterRegiao} onValueChange={setFilterRegiao}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as regiões</SelectItem>
+                    {regioesList.map((regiao) => (
+                      <SelectItem key={regiao} value={regiao}>{regiao}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label className="text-xs">Tipo de Equipamento</Label>
                 <Select value={filterTipoEquipamento} onValueChange={setFilterTipoEquipamento}>
