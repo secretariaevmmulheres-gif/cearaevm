@@ -68,6 +68,8 @@ export interface DashboardStats {
   municipiosSemEquipamento: number;
   equipamentosComPatrulha: number;
   totalViaturas: number;
+  viaturasPatrulhasCasas: number;
+  viaturasPMCE: number;
   municipiosComViaturaSemEquipamento: number;
   municipiosComViaturaComEquipamento: number;
   viaturasPorOrgao: Record<OrgaoResponsavel, number>;

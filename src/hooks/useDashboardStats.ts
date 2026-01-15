@@ -45,13 +45,20 @@ export function useDashboardStats(): DashboardStats {
       }
     });
 
+    // Patrulhas das Casas = equipamentos com possui_patrulha = true
+    const viaturasPatrulhasCasas = equipamentos.filter((e) => e.possui_patrulha).length;
+    // Viaturas PMCE = soma das quantidades de todas as viaturas cadastradas
+    const viaturasPMCE = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
+
     return {
       totalEquipamentos: equipamentos.length,
       equipamentosPorTipo,
       municipiosComEquipamento: municipiosComEquipamento.size,
       municipiosSemEquipamento: municipiosCeara.length - municipiosComEquipamento.size,
-      equipamentosComPatrulha: equipamentos.filter((e) => e.possui_patrulha).length,
-      totalViaturas: viaturas.reduce((sum, v) => sum + v.quantidade, 0),
+      equipamentosComPatrulha: viaturasPatrulhasCasas,
+      totalViaturas: viaturasPMCE + viaturasPatrulhasCasas,
+      viaturasPatrulhasCasas,
+      viaturasPMCE,
       municipiosComViaturaSemEquipamento,
       municipiosComViaturaComEquipamento,
       viaturasPorOrgao,

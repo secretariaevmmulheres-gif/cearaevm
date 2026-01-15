@@ -129,7 +129,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <StatCard
           title="Total de Equipamentos"
           value={stats.totalEquipamentos}
@@ -138,11 +138,18 @@ export default function Dashboard() {
           description="Unidades cadastradas"
         />
         <StatCard
-          title="Total de Viaturas"
-          value={stats.totalViaturas}
+          title="Viaturas PMCE"
+          value={stats.viaturasPMCE}
           icon={Truck}
           variant="accent"
-          description="Patrulha Maria da Penha"
+          description="Batalhão PMCE"
+        />
+        <StatCard
+          title="Patrulhas das Casas"
+          value={stats.viaturasPatrulhasCasas}
+          icon={Truck}
+          variant="success"
+          description="Vinculadas a equipamentos"
         />
         <StatCard
           title="Solicitações"
@@ -155,7 +162,6 @@ export default function Dashboard() {
           title="Municípios Cobertos"
           value={stats.municipiosComEquipamento}
           icon={MapPin}
-          variant="success"
           description={`de 184 municípios`}
         />
       </div>

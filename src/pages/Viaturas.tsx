@@ -39,7 +39,7 @@ import { Plus, Pencil, Trash2, Search, Truck, Download, FileSpreadsheet, FileTex
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { exportViaturasToPDF, exportViaturasToExcel } from '@/lib/exportUtils';
+import { exportViaturasToPDF, exportViaturasToExcel, exportPatrulhasCasasToPDF, exportPatrulhasCasasToExcel } from '@/lib/exportUtils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -345,6 +345,26 @@ export default function Viaturas() {
 
         {/* Patrulhas das Casas Table */}
         <TabsContent value="casas">
+          <div className="flex justify-end mb-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar Patrulhas
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportPatrulhasCasasToPDF(patrulhasDasCasas)}>
+                  <FilePdf className="w-4 h-4 mr-2" />
+                  Exportar PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportPatrulhasCasasToExcel(patrulhasDasCasas)}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Exportar Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="data-table">
