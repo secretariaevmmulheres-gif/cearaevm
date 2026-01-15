@@ -3,6 +3,55 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 
+// Patrulhas das Casas export
+export function exportPatrulhasCasasToPDF(equipamentos: Equipamento[]) {
+  const patrulhas = equipamentos.filter((e) => e.possui_patrulha);
+  const doc = new jsPDF();
+  
+  doc.setFontSize(18);
+  doc.text('Relatório de Patrulhas Maria da Penha das Casas', 14, 22);
+  doc.setFontSize(10);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+  doc.text(`Total de registros: ${patrulhas.length}`, 14, 38);
+  
+  const tableData = patrulhas.map((e) => [
+    e.municipio,
+    e.tipo,
+    e.endereco || '-',
+    e.responsavel || '-',
+    e.telefone || '-',
+  ]);
+
+  autoTable(doc, {
+    head: [['Município', 'Tipo de Equipamento', 'Endereço', 'Responsável', 'Telefone']],
+    body: tableData,
+    startY: 45,
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [16, 185, 129] },
+  });
+
+  doc.save('patrulhas-casas.pdf');
+}
+
+export function exportPatrulhasCasasToExcel(equipamentos: Equipamento[]) {
+  const patrulhas = equipamentos.filter((e) => e.possui_patrulha);
+  
+  const data = patrulhas.map((e) => ({
+    'Município': e.municipio,
+    'Tipo de Equipamento': e.tipo,
+    'Endereço': e.endereco || '',
+    'Responsável': e.responsavel || '',
+    'Telefone': e.telefone || '',
+    'Observações': e.observacoes || '',
+    'Data de Criação': new Date(e.created_at).toLocaleDateString('pt-BR'),
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Patrulhas Casas');
+  XLSX.writeFile(wb, 'patrulhas-casas.xlsx');
+}
+
 // Equipamentos export
 export function exportEquipamentosToPDF(equipamentos: Equipamento[], filterRegiao?: string) {
   const doc = new jsPDF();
@@ -370,37 +419,61 @@ export async function exportMapToPDF(
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
   
-  // Capture map screenshot FIRST - wait for tiles to load
+  // Capture map screenshot - use the SVG overlay for proper colors
   let mapCaptured = false;
   try {
-    // Find the leaflet container specifically
+    // Find the leaflet map pane that contains the SVG
     const leafletContainer = mapElement.querySelector('.leaflet-container') as HTMLElement;
     const targetElement = leafletContainer || mapElement;
     
-    // Wait a bit for tiles to render
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Get the bounds of the map container
+    const bounds = targetElement.getBoundingClientRect();
+    
+    // Wait for tiles to fully render
+    await new Promise(resolve => setTimeout(resolve, 800));
     
     const canvas = await html2canvas(targetElement, {
       useCORS: true,
       allowTaint: true,
       scale: 2,
       logging: false,
-      backgroundColor: '#f3f4f6',
-      onclone: (clonedDoc) => {
-        // Ensure SVG elements render properly
-        const svgs = clonedDoc.querySelectorAll('svg');
-        svgs.forEach(svg => {
-          svg.setAttribute('width', svg.getBoundingClientRect().width.toString());
-          svg.setAttribute('height', svg.getBoundingClientRect().height.toString());
+      backgroundColor: '#f8fafc',
+      width: bounds.width,
+      height: bounds.height,
+      x: 0,
+      y: 0,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: bounds.width,
+      windowHeight: bounds.height,
+      onclone: (clonedDoc, clonedElement) => {
+        // Reset any transforms that might affect positioning
+        const clonedContainer = clonedElement.querySelector('.leaflet-container') as HTMLElement;
+        if (clonedContainer) {
+          clonedContainer.style.transform = 'none';
+          clonedContainer.style.position = 'relative';
+        }
+        
+        // Ensure SVG paths render with correct colors
+        const paths = clonedDoc.querySelectorAll('path');
+        paths.forEach(path => {
+          const fill = path.getAttribute('fill');
+          if (fill) {
+            path.style.fill = fill;
+          }
+          const stroke = path.getAttribute('stroke');
+          if (stroke) {
+            path.style.stroke = stroke;
+          }
         });
       }
     });
     
     const imgData = canvas.toDataURL('image/png');
-    const imgWidth = 160;
+    const imgWidth = 155;
     const imgHeight = (canvas.height / canvas.width) * imgWidth;
     
-    doc.addImage(imgData, 'PNG', 130, 35, imgWidth, Math.min(imgHeight, 165));
+    doc.addImage(imgData, 'PNG', 135, 35, imgWidth, Math.min(imgHeight, 160));
     mapCaptured = true;
   } catch (error) {
     console.error('Error capturing map:', error);
