@@ -35,7 +35,8 @@ import { useViaturas } from '@/hooks/useViaturas';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { municipiosCeara, orgaosResponsaveis, OrgaoResponsavel, regioesList, getRegiao } from '@/data/municipios';
 import { Viatura } from '@/types';
-import { Plus, Pencil, Trash2, Search, Truck, Download, FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Truck, Download, FileSpreadsheet, FileText as FilePdf, Building2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { exportViaturasToPDF, exportViaturasToExcel } from '@/lib/exportUtils';
@@ -87,6 +88,17 @@ export default function Viaturas() {
     const matchesRegiao = filterRegiao === 'all' || getRegiao(v.municipio) === filterRegiao;
     return matchesSearch && matchesOrgao && matchesVinculada && matchesRegiao;
   });
+
+  // Patrulhas Maria da Penha das Casas (equipamentos com possui_patrulha = true)
+  const patrulhasDasCasas = equipamentos
+    .filter((e) => e.possui_patrulha)
+    .filter((e) => {
+      const matchesSearch =
+        e.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (e.responsavel || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRegiao = filterRegiao === 'all' || getRegiao(e.municipio) === filterRegiao;
+      return matchesSearch && matchesRegiao;
+    });
 
   const openCreateDialog = () => {
     setEditingViatura(null);
@@ -244,77 +256,139 @@ export default function Viaturas() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Município</th>
-                <th>Órgão</th>
-                <th>Qtd</th>
-                <th>Implantação</th>
-                <th>Vinculada</th>
-                <th>Responsável</th>
-                <th className="text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredViaturas.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                    <Truck className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Nenhuma viatura encontrada</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredViaturas.map((viatura) => (
-                  <tr key={viatura.id} className="animate-fade-in">
-                    <td className="font-medium">{viatura.municipio}</td>
-                    <td>
-                      <span className="badge-status bg-primary/10 text-primary">
-                        {viatura.orgao_responsavel}
-                      </span>
-                    </td>
-                    <td className="font-semibold">{viatura.quantidade}</td>
-                    <td>
-                      {format(new Date(viatura.data_implantacao), 'dd/MM/yyyy', { locale: ptBR })}
-                    </td>
-                    <td className="text-xs">
-                      {viatura.vinculada_equipamento
-                        ? getEquipamentoNome(viatura.equipamento_id)
-                        : 'Não vinculada'}
-                    </td>
-                    <td>{viatura.responsavel || '-'}</td>
-                    <td>
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(viatura)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            setDeletingId(viatura.id);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
+      {/* Tabs for different views */}
+      <Tabs defaultValue="pmce" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="pmce" className="gap-2">
+            <Truck className="w-4 h-4" />
+            Viaturas PMCE ({filteredViaturas.length})
+          </TabsTrigger>
+          <TabsTrigger value="casas" className="gap-2">
+            <Building2 className="w-4 h-4" />
+            Patrulhas das Casas ({patrulhasDasCasas.length})
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Viaturas PMCE Table */}
+        <TabsContent value="pmce">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Município</th>
+                    <th>Órgão</th>
+                    <th>Qtd</th>
+                    <th>Implantação</th>
+                    <th>Vinculada</th>
+                    <th>Responsável</th>
+                    <th className="text-right">Ações</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {filteredViaturas.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <Truck className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>Nenhuma viatura encontrada</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredViaturas.map((viatura) => (
+                      <tr key={viatura.id} className="animate-fade-in">
+                        <td className="font-medium">{viatura.municipio}</td>
+                        <td>
+                          <span className="badge-status bg-primary/10 text-primary">
+                            {viatura.orgao_responsavel}
+                          </span>
+                        </td>
+                        <td className="font-semibold">{viatura.quantidade}</td>
+                        <td>
+                          {format(new Date(viatura.data_implantacao), 'dd/MM/yyyy', { locale: ptBR })}
+                        </td>
+                        <td className="text-xs">
+                          {viatura.vinculada_equipamento
+                            ? getEquipamentoNome(viatura.equipamento_id)
+                            : 'Não vinculada'}
+                        </td>
+                        <td>{viatura.responsavel || '-'}</td>
+                        <td>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(viatura)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                setDeletingId(viatura.id);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Patrulhas das Casas Table */}
+        <TabsContent value="casas">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Município</th>
+                    <th>Tipo de Equipamento</th>
+                    <th>Endereço</th>
+                    <th>Responsável</th>
+                    <th>Telefone</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {patrulhasDasCasas.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <Building2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>Nenhum equipamento com Patrulha Maria da Penha</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    patrulhasDasCasas.map((equipamento) => (
+                      <tr key={equipamento.id} className="animate-fade-in">
+                        <td className="font-medium">{equipamento.municipio}</td>
+                        <td>
+                          <span className="badge-status bg-emerald-500/10 text-emerald-600">
+                            {equipamento.tipo}
+                          </span>
+                        </td>
+                        <td className="text-sm">{equipamento.endereco || '-'}</td>
+                        <td>{equipamento.responsavel || '-'}</td>
+                        <td>{equipamento.telefone || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground mt-3">
+            * Estas patrulhas são gerenciadas através do cadastro de Equipamentos. Para editar, acesse a página de Equipamentos.
+          </p>
+        </TabsContent>
+      </Tabs>
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
