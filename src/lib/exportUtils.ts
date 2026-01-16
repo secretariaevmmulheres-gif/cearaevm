@@ -2,6 +2,370 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Equipamento, Viatura, Solicitacao } from '@/types';
+import { regioesList, getRegiao, getMunicipiosPorRegiao, RegiaoPlanejamento } from '@/data/municipios';
+
+// Regional Dashboard export types
+export interface RegionStatsExport {
+  regiao: RegiaoPlanejamento;
+  totalMunicipios: number;
+  municipiosComEquipamento: number;
+  totalEquipamentos: number;
+  totalViaturas: number;
+  viaturasVinculadas: number;
+  viaturasNaoVinculadas: number;
+  patrulhasEmEquipamentos: number;
+  totalSolicitacoes: number;
+  solicitacoesEmAndamento: number;
+  cobertura: number;
+  equipamentosPorTipo?: {
+    brasileira: number;
+    cearense: number;
+    municipal: number;
+    lilas: number;
+  };
+}
+
+// Export single region to PDF
+export function exportRegionalToPDF(
+  regionStats: RegionStatsExport,
+  equipamentos: Equipamento[],
+  viaturas: Viatura[],
+  solicitacoes: Solicitacao[]
+) {
+  const doc = new jsPDF();
+  let currentY = 22;
+
+  // Header
+  doc.setFontSize(16);
+  doc.text(`Relatório Regional - ${regionStats.regiao}`, 14, currentY);
+  currentY += 8;
+  doc.setFontSize(10);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, currentY);
+  currentY += 12;
+
+  // Summary
+  doc.setFontSize(12);
+  doc.text('Resumo da Região:', 14, currentY);
+  currentY += 8;
+  doc.setFontSize(10);
+  doc.text(`• Total de Municípios: ${regionStats.totalMunicipios}`, 14, currentY);
+  currentY += 6;
+  doc.text(`• Municípios com Equipamento: ${regionStats.municipiosComEquipamento}`, 14, currentY);
+  currentY += 6;
+  doc.text(`• Cobertura: ${regionStats.cobertura.toFixed(2)}%`, 14, currentY);
+  currentY += 8;
+  doc.text(`• Total de Equipamentos: ${regionStats.totalEquipamentos}`, 14, currentY);
+  currentY += 6;
+  doc.text(`• Total de Patrulhas M.P.: ${regionStats.totalViaturas}`, 14, currentY);
+  currentY += 6;
+  doc.text(`  - Em equipamentos: ${regionStats.patrulhasEmEquipamentos}`, 14, currentY);
+  currentY += 6;
+  doc.text(`  - PMCE: ${regionStats.viaturasNaoVinculadas}`, 14, currentY);
+  currentY += 6;
+  doc.text(`• Total de Solicitações: ${regionStats.totalSolicitacoes}`, 14, currentY);
+  currentY += 6;
+  doc.text(`• Solicitações em Andamento: ${regionStats.solicitacoesEmAndamento}`, 14, currentY);
+  currentY += 12;
+
+  // Equipamentos table
+  const regionEquipamentos = equipamentos.filter(e => getRegiao(e.municipio) === regionStats.regiao);
+  if (regionEquipamentos.length > 0) {
+    doc.setFontSize(12);
+    doc.text('Equipamentos:', 14, currentY);
+    
+    const eqData = regionEquipamentos.map((e) => [
+      e.municipio,
+      e.tipo,
+      e.responsavel || '-',
+      e.telefone || '-',
+      e.possui_patrulha ? 'Sim' : 'Não',
+    ]);
+
+    autoTable(doc, {
+      head: [['Município', 'Tipo', 'Responsável', 'Telefone', 'Patrulha']],
+      body: eqData,
+      startY: currentY + 5,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [31, 81, 140] },
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Viaturas table
+  const regionViaturas = viaturas.filter(v => getRegiao(v.municipio) === regionStats.regiao);
+  if (regionViaturas.length > 0) {
+    if (currentY > 200) {
+      doc.addPage();
+      currentY = 22;
+    }
+    
+    doc.setFontSize(12);
+    doc.text('Viaturas:', 14, currentY);
+    
+    const vData = regionViaturas.map((v) => [
+      v.municipio,
+      v.tipo_patrulha,
+      v.orgao_responsavel,
+      v.quantidade.toString(),
+      v.vinculada_equipamento ? 'Sim' : 'Não',
+    ]);
+
+    autoTable(doc, {
+      head: [['Município', 'Tipo', 'Órgão', 'Qtd', 'Vinculada']],
+      body: vData,
+      startY: currentY + 5,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [31, 81, 140] },
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Solicitações table
+  const regionSolicitacoes = solicitacoes.filter(s => getRegiao(s.municipio) === regionStats.regiao);
+  if (regionSolicitacoes.length > 0) {
+    if (currentY > 200) {
+      doc.addPage();
+      currentY = 22;
+    }
+    
+    doc.setFontSize(12);
+    doc.text('Solicitações:', 14, currentY);
+    
+    const sData = regionSolicitacoes.map((s) => [
+      s.municipio,
+      s.tipo_equipamento,
+      s.status,
+      new Date(s.data_solicitacao).toLocaleDateString('pt-BR'),
+    ]);
+
+    autoTable(doc, {
+      head: [['Município', 'Tipo', 'Status', 'Data']],
+      body: sData,
+      startY: currentY + 5,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [31, 81, 140] },
+    });
+  }
+
+  doc.save(`dashboard-regional-${regionStats.regiao.toLowerCase().replace(/\s+/g, '-')}.pdf`);
+}
+
+// Export ALL regions to single PDF
+export function exportAllRegionsToPDF(
+  regionStats: RegionStatsExport[],
+  equipamentos: Equipamento[],
+  viaturas: Viatura[],
+  solicitacoes: Solicitacao[]
+) {
+  const doc = new jsPDF();
+  let currentY = 22;
+
+  // Cover page
+  doc.setFontSize(20);
+  doc.text('Dashboard Regional Consolidado', 14, currentY);
+  currentY += 10;
+  doc.setFontSize(12);
+  doc.text('EVM - Enfrentamento à Violência contra as Mulheres', 14, currentY);
+  currentY += 8;
+  doc.setFontSize(10);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, currentY);
+  currentY += 15;
+
+  // Overall summary
+  const totalEquipamentos = equipamentos.length;
+  const totalViaturas = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
+  const patrulhasEmCasas = equipamentos.filter(e => e.possui_patrulha).length;
+  const totalSolicitacoes = solicitacoes.length;
+  const mediaCobertura = regionStats.reduce((sum, r) => sum + r.cobertura, 0) / regionStats.length;
+
+  doc.setFontSize(12);
+  doc.text('Resumo Geral - Estado do Ceará:', 14, currentY);
+  currentY += 8;
+  doc.setFontSize(10);
+  doc.text(`• Total de Equipamentos: ${totalEquipamentos}`, 14, currentY);
+  currentY += 6;
+  doc.text(`• Total de Patrulhas M.P.: ${totalViaturas + patrulhasEmCasas}`, 14, currentY);
+  currentY += 6;
+  doc.text(`• Total de Solicitações: ${totalSolicitacoes}`, 14, currentY);
+  currentY += 6;
+  doc.text(`• Média de Cobertura: ${mediaCobertura.toFixed(2)}%`, 14, currentY);
+  currentY += 12;
+
+  // Ranking table
+  doc.setFontSize(12);
+  doc.text('Ranking das Regiões por Cobertura:', 14, currentY);
+
+  const rankingData = regionStats.map((r, idx) => [
+    (idx + 1).toString(),
+    r.regiao,
+    r.totalMunicipios.toString(),
+    r.totalEquipamentos.toString(),
+    r.totalViaturas.toString(),
+    r.totalSolicitacoes.toString(),
+    `${r.cobertura.toFixed(2)}%`,
+  ]);
+
+  autoTable(doc, {
+    head: [['#', 'Região', 'Municípios', 'Equip.', 'Viaturas', 'Solic.', 'Cobertura']],
+    body: rankingData,
+    startY: currentY + 5,
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [31, 81, 140] },
+  });
+
+  // Individual region pages
+  regionStats.forEach((region, index) => {
+    doc.addPage();
+    currentY = 22;
+
+    // Region header
+    doc.setFontSize(16);
+    doc.text(`${index + 1}. ${region.regiao}`, 14, currentY);
+    currentY += 10;
+    
+    // Region stats
+    doc.setFontSize(10);
+    doc.text(`Municípios: ${region.totalMunicipios} | Com Equipamento: ${region.municipiosComEquipamento} | Cobertura: ${region.cobertura.toFixed(2)}%`, 14, currentY);
+    currentY += 6;
+    doc.text(`Equipamentos: ${region.totalEquipamentos} | Patrulhas M.P.: ${region.totalViaturas} | Solicitações: ${region.totalSolicitacoes}`, 14, currentY);
+    currentY += 10;
+
+    // Equipamentos da região
+    const regionEquipamentos = equipamentos.filter(e => getRegiao(e.municipio) === region.regiao);
+    if (regionEquipamentos.length > 0) {
+      doc.setFontSize(11);
+      doc.text('Equipamentos:', 14, currentY);
+      
+      const eqData = regionEquipamentos.map((e) => [
+        e.municipio,
+        e.tipo,
+        e.responsavel || '-',
+        e.possui_patrulha ? 'Sim' : 'Não',
+      ]);
+
+      autoTable(doc, {
+        head: [['Município', 'Tipo', 'Responsável', 'Patrulha']],
+        body: eqData,
+        startY: currentY + 4,
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [31, 81, 140] },
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 8;
+    } else {
+      doc.setFontSize(10);
+      doc.text('Nenhum equipamento cadastrado nesta região.', 14, currentY);
+      currentY += 8;
+    }
+
+    // Viaturas da região
+    const regionViaturas = viaturas.filter(v => getRegiao(v.municipio) === region.regiao);
+    if (regionViaturas.length > 0) {
+      if (currentY > 220) {
+        doc.addPage();
+        currentY = 22;
+      }
+      
+      doc.setFontSize(11);
+      doc.text('Viaturas:', 14, currentY);
+      
+      const vData = regionViaturas.map((v) => [
+        v.municipio,
+        v.tipo_patrulha,
+        v.orgao_responsavel,
+        v.quantidade.toString(),
+      ]);
+
+      autoTable(doc, {
+        head: [['Município', 'Tipo', 'Órgão', 'Qtd']],
+        body: vData,
+        startY: currentY + 4,
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [31, 81, 140] },
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // Solicitações da região
+    const regionSolicitacoes = solicitacoes.filter(s => getRegiao(s.municipio) === region.regiao);
+    if (regionSolicitacoes.length > 0) {
+      if (currentY > 220) {
+        doc.addPage();
+        currentY = 22;
+      }
+      
+      doc.setFontSize(11);
+      doc.text('Solicitações:', 14, currentY);
+      
+      const sData = regionSolicitacoes.map((s) => [
+        s.municipio,
+        s.tipo_equipamento,
+        s.status,
+        new Date(s.data_solicitacao).toLocaleDateString('pt-BR'),
+      ]);
+
+      autoTable(doc, {
+        head: [['Município', 'Tipo', 'Status', 'Data']],
+        body: sData,
+        startY: currentY + 4,
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [31, 81, 140] },
+      });
+    }
+  });
+
+  doc.save('dashboard-regional-consolidado.pdf');
+}
+
+// Export ALL regions to Excel
+export function exportAllRegionsToExcel(
+  regionStats: RegionStatsExport[],
+  equipamentos: Equipamento[],
+  viaturas: Viatura[],
+  solicitacoes: Solicitacao[]
+) {
+  const wb = XLSX.utils.book_new();
+
+  // Summary sheet
+  const summaryData = regionStats.map((r, idx) => ({
+    'Posição': idx + 1,
+    'Região': r.regiao,
+    'Total Municípios': r.totalMunicipios,
+    'Municípios c/ Equipamento': r.municipiosComEquipamento,
+    'Cobertura (%)': Number(r.cobertura.toFixed(2)),
+    'Equipamentos': r.totalEquipamentos,
+    'Patrulhas M.P.': r.totalViaturas,
+    'Patrulhas em Casas': r.patrulhasEmEquipamentos,
+    'Viaturas PMCE': r.viaturasNaoVinculadas,
+    'Solicitações': r.totalSolicitacoes,
+    'Em Andamento': r.solicitacoesEmAndamento,
+  }));
+  const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(wb, summaryWs, 'Resumo Regiões');
+
+  // Equipamentos by region
+  regioesList.forEach((regiao) => {
+    const regionEquipamentos = equipamentos.filter(e => getRegiao(e.municipio) === regiao);
+    if (regionEquipamentos.length > 0) {
+      const eqData = regionEquipamentos.map((e) => ({
+        'Município': e.municipio,
+        'Tipo': e.tipo,
+        'Responsável': e.responsavel || '',
+        'Telefone': e.telefone || '',
+        'Endereço': e.endereco || '',
+        'Patrulha M.P.': e.possui_patrulha ? 'Sim' : 'Não',
+      }));
+      const sheetName = regiao.length > 28 ? regiao.substring(0, 28) + '...' : regiao;
+      const ws = XLSX.utils.json_to_sheet(eqData);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+  });
+
+  XLSX.writeFile(wb, 'dashboard-regional-consolidado.xlsx');
+}
 
 // Patrulhas das Casas export
 export function exportPatrulhasCasasToPDF(equipamentos: Equipamento[]) {

@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Building2, Truck, FileText, MapPin, CheckCircle2, Clock, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Building2, Truck, FileText, MapPin, CheckCircle2, Clock, TrendingUp, TrendingDown, Minus, Download, FileDown, ChevronDown } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -27,8 +27,26 @@ import {
   PolarRadiusAxis,
   Radar,
   Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
+import {
+  exportRegionalToPDF,
+  exportAllRegionsToPDF,
+  exportAllRegionsToExcel,
+  RegionStatsExport,
+} from '@/lib/exportUtils';
 
 interface RegionStats {
   regiao: RegiaoPlanejamento;
@@ -141,6 +159,62 @@ export default function DashboardRegional() {
     }];
   }, [regionStats, selectedRegiao]);
 
+  // Dados para gráfico de pizza - Equipamentos por tipo
+  const pieChartData = useMemo(() => {
+    const targetStats = selectedRegiao === 'all' ? null : regionStats.find(r => r.regiao === selectedRegiao);
+    const filteredEquipamentos = targetStats 
+      ? equipamentos.filter(e => getRegiao(e.municipio) === selectedRegiao)
+      : equipamentos;
+    
+    const counts = {
+      'Casa da Mulher Brasileira': 0,
+      'Casa da Mulher Cearense': 0,
+      'Casa da Mulher Municipal': 0,
+      'Sala Lilás': 0,
+    };
+
+    filteredEquipamentos.forEach(e => {
+      if (counts[e.tipo as keyof typeof counts] !== undefined) {
+        counts[e.tipo as keyof typeof counts]++;
+      }
+    });
+
+    return [
+      { name: 'Brasileira', value: counts['Casa da Mulher Brasileira'], color: '#0d9488' },
+      { name: 'Cearense', value: counts['Casa da Mulher Cearense'], color: '#7c3aed' },
+      { name: 'Municipal', value: counts['Casa da Mulher Municipal'], color: '#ea580c' },
+      { name: 'Sala Lilás', value: counts['Sala Lilás'], color: '#d946ef' },
+    ].filter(item => item.value > 0);
+  }, [equipamentos, selectedRegiao, regionStats]);
+
+  // Dados para gráfico de status de solicitações
+  const statusChartData = useMemo(() => {
+    const targetStats = selectedRegiao === 'all' ? null : regionStats.find(r => r.regiao === selectedRegiao);
+    const filteredSolicitacoes = targetStats 
+      ? solicitacoes.filter(s => getRegiao(s.municipio) === selectedRegiao)
+      : solicitacoes;
+    
+    const statusCounts: Record<string, number> = {};
+    filteredSolicitacoes.forEach(s => {
+      statusCounts[s.status] = (statusCounts[s.status] || 0) + 1;
+    });
+
+    const statusColors: Record<string, string> = {
+      'Recebida': '#f59e0b',
+      'Em análise': '#3b82f6',
+      'Aprovada': '#22c55e',
+      'Em implantação': '#8b5cf6',
+      'Inaugurada': '#10b981',
+      'Cancelada': '#ef4444',
+    };
+
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      name: status,
+      value: count,
+      color: statusColors[status] || '#6b7280',
+    }));
+  }, [solicitacoes, selectedRegiao, regionStats]);
+
   // Estatísticas totais
   const patrulhasEmEquipamentos = equipamentos.filter(e => e.possui_patrulha).length;
   const totals = useMemo(() => ({
@@ -163,6 +237,26 @@ export default function DashboardRegional() {
     return <Minus className="w-4 h-4 text-muted-foreground" />;
   };
 
+  // Export handlers
+  const handleExportSingleRegion = () => {
+    if (!selectedStats) {
+      toast.error('Selecione uma região para exportar');
+      return;
+    }
+    exportRegionalToPDF(selectedStats as RegionStatsExport, equipamentos, viaturas, solicitacoes);
+    toast.success(`Relatório da região ${selectedStats.regiao} exportado!`);
+  };
+
+  const handleExportAllRegionsPDF = () => {
+    exportAllRegionsToPDF(regionStats as RegionStatsExport[], equipamentos, viaturas, solicitacoes);
+    toast.success('Relatório consolidado de todas as regiões exportado!');
+  };
+
+  const handleExportAllRegionsExcel = () => {
+    exportAllRegionsToExcel(regionStats as RegionStatsExport[], equipamentos, viaturas, solicitacoes);
+    toast.success('Relatório consolidado em Excel exportado!');
+  };
+
   return (
     <AppLayout>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -170,19 +264,50 @@ export default function DashboardRegional() {
           title="Dashboard Regional"
           description="Estatísticas comparativas entre as 14 regiões de planejamento do Ceará"
         />
-        <Select value={selectedRegiao} onValueChange={setSelectedRegiao}>
-          <SelectTrigger className="w-[250px]">
-            <SelectValue placeholder="Selecione uma região" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as Regiões</SelectItem>
-            {regioesList.map((regiao) => (
-              <SelectItem key={regiao} value={regiao}>
-                {regiao}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-3">
+          <Select value={selectedRegiao} onValueChange={setSelectedRegiao}>
+            <SelectTrigger className="w-[250px]">
+              <SelectValue placeholder="Selecione uma região" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Regiões</SelectItem>
+              {regioesList.map((regiao) => (
+                <SelectItem key={regiao} value={regiao}>
+                  {regiao}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Download className="w-4 h-4" />
+                Exportar
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {selectedStats && (
+                <>
+                  <DropdownMenuItem onClick={handleExportSingleRegion} className="gap-2">
+                    <FileDown className="w-4 h-4" />
+                    Exportar {selectedStats.regiao} (PDF)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onClick={handleExportAllRegionsPDF} className="gap-2">
+                <FileDown className="w-4 h-4" />
+                Todas as Regiões (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportAllRegionsExcel} className="gap-2">
+                <FileDown className="w-4 h-4" />
+                Todas as Regiões (Excel)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Cards de Resumo */}
@@ -367,6 +492,86 @@ export default function DashboardRegional() {
                 />
               </RadarChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Gráfico de Pizza - Equipamentos por Tipo */}
+        <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
+          <h3 className="font-display font-semibold text-lg mb-4">
+            Equipamentos por Tipo {selectedRegiao !== 'all' && `(${selectedRegiao})`}
+          </h3>
+          <div className="h-80">
+            {pieChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                    outerRadius={100}
+                    dataKey="value"
+                  >
+                    {pieChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Nenhum equipamento nesta seleção
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Gráfico de Pizza - Status de Solicitações */}
+        <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
+          <h3 className="font-display font-semibold text-lg mb-4">
+            Solicitações por Status {selectedRegiao !== 'all' && `(${selectedRegiao})`}
+          </h3>
+          <div className="h-80">
+            {statusChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    label={({ name, value, percent }) => `${name}: ${value}`}
+                    outerRadius={100}
+                    dataKey="value"
+                  >
+                    {statusChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Nenhuma solicitação nesta seleção
+              </div>
+            )}
           </div>
         </div>
       </div>
