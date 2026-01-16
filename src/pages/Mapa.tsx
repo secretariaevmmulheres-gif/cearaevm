@@ -203,6 +203,47 @@ export default function Mapa() {
     return dataMap;
   }, [equipamentos, viaturas, solicitacoes, filterTipoEquipamento, filterStatusSolicitacao, filterApenasComViatura, filterRegiao]);
 
+  // Contagem de equipamentos por tipo (contagem real, não por prioridade de município)
+  const equipmentCounts = useMemo(() => {
+    const counts = {
+      brasileira: 0,
+      cearense: 0,
+      municipal: 0,
+      lilas: 0,
+    };
+
+    // Filtrar equipamentos visíveis baseado nos filtros ativos
+    let visibleEquipamentos = equipamentos;
+    
+    if (filterRegiao !== 'all') {
+      visibleEquipamentos = visibleEquipamentos.filter(e => getRegiao(e.municipio) === filterRegiao);
+    }
+    
+    if (filterTipoEquipamento !== 'all') {
+      visibleEquipamentos = visibleEquipamentos.filter(e => e.tipo === filterTipoEquipamento);
+    }
+
+    visibleEquipamentos.forEach((e) => {
+      switch (e.tipo) {
+        case 'Casa da Mulher Brasileira':
+          counts.brasileira++;
+          break;
+        case 'Casa da Mulher Cearense':
+          counts.cearense++;
+          break;
+        case 'Casa da Mulher Municipal':
+          counts.municipal++;
+          break;
+        case 'Sala Lilás':
+          counts.lilas++;
+          break;
+      }
+    });
+
+    return counts;
+  }, [equipamentos, filterRegiao, filterTipoEquipamento]);
+
+  // Contagem de municípios por prioridade (para visualização do mapa)
   const stats = useMemo(() => {
     const counts = {
       brasileira: 0,
@@ -461,31 +502,31 @@ export default function Mapa() {
           </div>
 
           <div className="bg-card rounded-xl p-4 border border-border shadow-sm">
-            <h3 className="font-display font-semibold mb-4">Legenda</h3>
+            <h3 className="font-display font-semibold mb-4">Legenda (Equipamentos)</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[1] }} />
-                <span className="text-sm">Casa da Mulher Brasileira ({stats.brasileira})</span>
+                <span className="text-sm">Casa da Mulher Brasileira ({equipmentCounts.brasileira})</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[2] }} />
-                <span className="text-sm">Casa da Mulher Cearense ({stats.cearense})</span>
+                <span className="text-sm">Casa da Mulher Cearense ({equipmentCounts.cearense})</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[3] }} />
-                <span className="text-sm">Casa da Mulher Municipal ({stats.municipal})</span>
+                <span className="text-sm">Casa da Mulher Municipal ({equipmentCounts.municipal})</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[4] }} />
-                <span className="text-sm">Sala Lilás ({stats.lilas})</span>
+                <span className="text-sm">Sala Lilás ({equipmentCounts.lilas})</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded" style={{ backgroundColor: priorityColors[5] }} />
-                <span className="text-sm">Só Viatura ({stats.viaturaOnly})</span>
+                <span className="text-sm">Só Viatura ({stats.viaturaOnly} municípios)</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: priorityColors[6] }} />
-                <span className="text-sm">Sem Cobertura ({stats.semCobertura})</span>
+                <span className="text-sm">Sem Cobertura ({stats.semCobertura} municípios)</span>
               </div>
             </div>
           </div>
