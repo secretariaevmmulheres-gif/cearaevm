@@ -47,6 +47,7 @@ import {
   exportAllRegionsToExcel,
   RegionStatsExport,
 } from '@/lib/exportUtils';
+import { MonthlyComparisonReport } from '@/components/dashboard/MonthlyComparisonReport';
 
 interface RegionStats {
   regiao: RegiaoPlanejamento;
@@ -655,6 +656,15 @@ export default function DashboardRegional() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Relatório Mensal Comparativo */}
+      <div className="mt-8">
+        <MonthlyComparisonReport 
+          equipamentos={equipamentos}
+          viaturas={viaturas}
+          solicitacoes={solicitacoes}
+        />
       </div>
     </AppLayout>
   );
