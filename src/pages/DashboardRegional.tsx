@@ -48,6 +48,7 @@ import {
   RegionStatsExport,
 } from '@/lib/exportUtils';
 import { MonthlyComparisonReport } from '@/components/dashboard/MonthlyComparisonReport';
+import { RegionalGoalsPanel } from '@/components/dashboard/RegionalGoalsPanel';
 
 interface RegionStats {
   regiao: RegiaoPlanejamento;
@@ -655,6 +656,17 @@ export default function DashboardRegional() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Painel de Metas Mensais */}
+      <div className="mt-8">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
+          <RegionalGoalsPanel 
+            equipamentos={equipamentos}
+            viaturas={viaturas}
+            solicitacoes={solicitacoes}
+          />
         </div>
       </div>
 
