@@ -767,6 +767,112 @@ export interface MapExportStats {
   semCobertura: number;
 }
 
+// Regional goals (monthly) export types
+export interface RegionalGoalsExportRow {
+  regiao: string;
+  status: string;
+  equipamentos: { current: number; goal: number; progress: number };
+  viaturas: { current: number; goal: number; progress: number };
+  cobertura: { current: number; goal: number; progress: number };
+  overallProgress: number;
+  expectedProgress: number;
+}
+
+export interface RegionalGoalsExportPayload {
+  monthLabel: string;
+  generatedAt: Date;
+  summary: {
+    achieved: number;
+    onTrack: number;
+    atRisk: number;
+    behind: number;
+    avgProgress: number;
+  };
+  rows: RegionalGoalsExportRow[];
+}
+
+export function exportRegionalGoalsToPDF(payload: RegionalGoalsExportPayload) {
+  const doc = new jsPDF('landscape');
+
+  doc.setFontSize(16);
+  doc.text('Painel de Metas Mensais - Regiões (Consolidado)', 14, 18);
+  doc.setFontSize(10);
+  doc.text(`Mês: ${payload.monthLabel}`, 14, 26);
+  doc.text(
+    `Gerado em: ${payload.generatedAt.toLocaleDateString('pt-BR')} às ${payload.generatedAt.toLocaleTimeString('pt-BR')}`,
+    14,
+    32
+  );
+
+  // Summary badges
+  doc.setFontSize(10);
+  doc.text(
+    `Resumo: ${payload.summary.achieved} atingidas • ${payload.summary.onTrack} no caminho • ${payload.summary.atRisk} em risco • ${payload.summary.behind} atrasadas • Média ${payload.summary.avgProgress.toFixed(0)}%`,
+    14,
+    40
+  );
+
+  autoTable(doc, {
+    startY: 46,
+    head: [[
+      'Região',
+      'Status',
+      'Equip. (atual/meta)',
+      'Equip. %',
+      'Viaturas (atual/meta)',
+      'Viaturas %',
+      'Cobertura (atual/meta)',
+      'Cobertura %',
+      'Geral %',
+      'Esperado %',
+    ]],
+    body: payload.rows.map((r) => [
+      r.regiao,
+      r.status,
+      `${r.equipamentos.current}/${r.equipamentos.goal}`,
+      `${Math.round(r.equipamentos.progress)}%`,
+      `${r.viaturas.current}/${r.viaturas.goal}`,
+      `${Math.round(r.viaturas.progress)}%`,
+      `${r.cobertura.current.toFixed(1)}%/${r.cobertura.goal}%`,
+      `${Math.round(r.cobertura.progress)}%`,
+      `${Math.round(r.overallProgress)}%`,
+      `${Math.round(r.expectedProgress)}%`,
+    ]),
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [31, 81, 140] },
+    didDrawCell: (data) => {
+      // Render mini progress bars in percentage columns
+      const col = data.column.index;
+      const isPercentCol = [3, 5, 7, 8].includes(col);
+      if (!isPercentCol || data.section !== 'body') return;
+
+      const text = String(data.cell.text?.[0] ?? '').replace('%', '');
+      const pct = Math.max(0, Math.min(100, Number(text)));
+      if (Number.isNaN(pct)) return;
+
+      const barX = data.cell.x + 1;
+      const barY = data.cell.y + data.cell.height - 2.5;
+      const barW = data.cell.width - 2;
+      const fillW = (barW * pct) / 100;
+
+      // background
+      doc.setFillColor(229, 231, 235);
+      doc.rect(barX, barY, barW, 1.5, 'F');
+
+      // fill (green >=100, blue >=75, amber >=50, red <50)
+      if (pct >= 100) doc.setFillColor(16, 185, 129);
+      else if (pct >= 75) doc.setFillColor(59, 130, 246);
+      else if (pct >= 50) doc.setFillColor(245, 158, 11);
+      else doc.setFillColor(239, 68, 68);
+
+      doc.rect(barX, barY, fillW, 1.5, 'F');
+    },
+  });
+
+  doc.save(`metas-regionais-${payload.monthLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`);
+}
+
+
 export async function exportMapToPDF(
   mapElement: HTMLElement,
   filters: MapExportFilters,
@@ -786,51 +892,31 @@ export async function exportMapToPDF(
   // Capture map screenshot - use the SVG overlay for proper colors
   let mapCaptured = false;
   try {
-    // Find the leaflet map pane that contains the SVG
-    const leafletContainer = mapElement.querySelector('.leaflet-container') as HTMLElement;
-    const targetElement = leafletContainer || mapElement;
-    
-    // Get the bounds of the map container
-    const bounds = targetElement.getBoundingClientRect();
-    
+    // Prefer capturing the wrapper element (stable positioning) and let html2canvas compute bounds
+    const targetElement = mapElement;
+
     // Wait for tiles to fully render
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
+    await new Promise(resolve => setTimeout(resolve, 900));
+
     const canvas = await html2canvas(targetElement, {
       useCORS: true,
       allowTaint: true,
       scale: 2,
       logging: false,
       backgroundColor: '#f8fafc',
-      width: bounds.width,
-      height: bounds.height,
-      x: 0,
-      y: 0,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: bounds.width,
-      windowHeight: bounds.height,
-      onclone: (clonedDoc, clonedElement) => {
-        // Reset any transforms that might affect positioning
-        const clonedContainer = clonedElement.querySelector('.leaflet-container') as HTMLElement;
-        if (clonedContainer) {
-          clonedContainer.style.transform = 'none';
-          clonedContainer.style.position = 'relative';
-        }
-        
+      // Critical to avoid offset/skew when the page is scrolled or the element isn't at (0,0)
+      scrollX: -window.scrollX,
+      scrollY: -window.scrollY,
+      onclone: (clonedDoc) => {
         // Ensure SVG paths render with correct colors
         const paths = clonedDoc.querySelectorAll('path');
         paths.forEach(path => {
           const fill = path.getAttribute('fill');
-          if (fill) {
-            path.style.fill = fill;
-          }
+          if (fill) path.style.fill = fill;
           const stroke = path.getAttribute('stroke');
-          if (stroke) {
-            path.style.stroke = stroke;
-          }
+          if (stroke) path.style.stroke = stroke;
         });
-      }
+      },
     });
     
     const imgData = canvas.toDataURL('image/png');
