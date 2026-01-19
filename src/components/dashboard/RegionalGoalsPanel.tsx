@@ -20,10 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Target, TrendingUp, Award, AlertTriangle, Settings2, Save, RotateCcw } from 'lucide-react';
+import { Target, TrendingUp, Award, AlertTriangle, Settings2, Save, RotateCcw, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Equipamento, Viatura, Solicitacao } from '@/types';
+import { exportRegionalGoalsToPDF, type RegionalGoalsExportPayload } from '@/lib/exportUtils';
 
 interface RegionalGoalsPanelProps {
   equipamentos: Equipamento[];
@@ -233,6 +234,44 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
     return 'bg-destructive';
   };
 
+  const handleExportGoalsPDF = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const monthLabel = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const payload: RegionalGoalsExportPayload = {
+      monthLabel,
+      generatedAt: new Date(),
+      summary,
+      rows: regionProgress.map((r) => ({
+        regiao: r.regiao,
+        status: getStatusLabel(r.status),
+        equipamentos: {
+          current: r.current.equipamentos,
+          goal: r.goals.equipamentos,
+          progress: r.progress.equipamentos,
+        },
+        viaturas: {
+          current: r.current.viaturas,
+          goal: r.goals.viaturas,
+          progress: r.progress.viaturas,
+        },
+        cobertura: {
+          current: r.current.cobertura,
+          goal: r.goals.cobertura,
+          progress: r.progress.cobertura,
+        },
+        overallProgress: r.progress.overall,
+        expectedProgress: r.monthProgress,
+      })),
+    };
+
+    exportRegionalGoalsToPDF(payload);
+    toast.success('PDF do painel de metas exportado!');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -259,6 +298,11 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
               ))}
             </SelectContent>
           </Select>
+
+          <Button variant="outline" size="sm" className="gap-2" onClick={handleExportGoalsPDF}>
+            <FileDown className="w-4 h-4" />
+            Exportar PDF
+          </Button>
           
           <Dialog open={goalsDialogOpen} onOpenChange={setGoalsDialogOpen}>
             <DialogTrigger asChild>
