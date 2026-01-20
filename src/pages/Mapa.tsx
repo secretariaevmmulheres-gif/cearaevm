@@ -82,6 +82,10 @@ export default function Mapa() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[]>([]);
 
+  // Export options state
+  const [exportHighRes, setExportHighRes] = useState(false);
+  const [exportEmbedLegend, setExportEmbedLegend] = useState(true);
+
   // Export handler
   const handleExportMap = async () => {
     if (!mapContainerRef.current) {
@@ -99,7 +103,12 @@ export default function Mapa() {
           apenasComViatura: filterApenasComViatura,
           regiao: filterRegiao,
         },
-        stats
+        stats,
+        {
+          highResolution: exportHighRes,
+          embedLegend: exportEmbedLegend,
+        },
+        equipmentCounts
       );
       toast.success('Mapa exportado com sucesso!');
     } catch (error) {
@@ -542,19 +551,38 @@ export default function Mapa() {
           </div>
 
           {/* Exportar Mapa */}
-          <Button
-            onClick={handleExportMap}
-            disabled={isExporting || isLoadingGeoJson}
-            className="w-full gap-2"
-            variant="outline"
-          >
-            {isExporting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            Exportar Mapa PDF
-          </Button>
+          <div className="bg-card rounded-xl p-4 border border-border shadow-sm space-y-3">
+            <h3 className="font-display font-semibold text-sm">Exportar Mapa</h3>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Alta Resolução</Label>
+                <Switch
+                  checked={exportHighRes}
+                  onCheckedChange={setExportHighRes}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Legenda Embutida</Label>
+                <Switch
+                  checked={exportEmbedLegend}
+                  onCheckedChange={setExportEmbedLegend}
+                />
+              </div>
+            </div>
+            <Button
+              onClick={handleExportMap}
+              disabled={isExporting || isLoadingGeoJson}
+              className="w-full gap-2"
+              variant="outline"
+            >
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Exportar Mapa PDF
+            </Button>
+          </div>
         </div>
 
         {/* Mapa Leaflet */}

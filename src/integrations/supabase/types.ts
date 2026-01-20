@@ -110,6 +110,45 @@ export type Database = {
         }
         Relationships: []
       }
+      regional_goals: {
+        Row: {
+          ano: number
+          created_at: string
+          created_by: string | null
+          id: string
+          mes: number
+          meta_cobertura: number
+          meta_equipamentos: number
+          meta_viaturas: number
+          regiao: string
+          updated_at: string
+        }
+        Insert: {
+          ano: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mes: number
+          meta_cobertura?: number
+          meta_equipamentos?: number
+          meta_viaturas?: number
+          regiao: string
+          updated_at?: string
+        }
+        Update: {
+          ano?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mes?: number
+          meta_cobertura?: number
+          meta_equipamentos?: number
+          meta_viaturas?: number
+          regiao?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       solicitacoes: {
         Row: {
           anexos: string[] | null
