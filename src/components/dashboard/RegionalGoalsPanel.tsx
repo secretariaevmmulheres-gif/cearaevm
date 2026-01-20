@@ -377,12 +377,12 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
             </SelectContent>
           </Select>
 
-          <Select value={compareMonth} onValueChange={setCompareMonth}>
+          <Select value={compareMonth || 'none'} onValueChange={(val) => setCompareMonth(val === 'none' ? '' : val)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Comparar com..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sem comparação</SelectItem>
+              <SelectItem value="none">Sem comparação</SelectItem>
               {monthOptions.filter(opt => opt.value !== selectedMonth).map(opt => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
