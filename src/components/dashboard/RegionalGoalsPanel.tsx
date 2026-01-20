@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { regioesList, getRegiao, getMunicipiosPorRegiao } from '@/data/municipios';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -20,11 +20,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Target, TrendingUp, Award, AlertTriangle, Settings2, Save, RotateCcw, FileDown } from 'lucide-react';
+import { Target, TrendingUp, Award, AlertTriangle, Settings2, Save, RotateCcw, FileDown, History, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 import { exportRegionalGoalsToPDF, type RegionalGoalsExportPayload } from '@/lib/exportUtils';
+import { useRegionalGoals, RegionalGoalInput } from '@/hooks/useRegionalGoals';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface RegionalGoalsPanelProps {
   equipamentos: Equipamento[];
@@ -44,29 +46,41 @@ const DEFAULT_GOALS: RegionGoals = {
   cobertura: 50,
 };
 
-const STORAGE_KEY = 'evm-regional-goals';
-
 export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: RegionalGoalsPanelProps) {
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   
+  const [year, month] = selectedMonth.split('-').map(Number);
+  
   const [goalsDialogOpen, setGoalsDialogOpen] = useState(false);
   const [editingGoals, setEditingGoals] = useState<Record<string, RegionGoals>>({});
+  const [compareMonth, setCompareMonth] = useState<string>('');
 
-  // Load goals from localStorage
+  // Use backend hook for goals
+  const { 
+    goals, 
+    isLoading: isLoadingGoals, 
+    getGoalsWithDefaults, 
+    upsertMultipleGoals, 
+    isUpsertingGoals,
+    availableMonths,
+    historicalGoals 
+  } = useRegionalGoals(year, month);
+
+  // Get goals from backend or defaults
   const savedGoals = useMemo(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored) as Record<string, RegionGoals>;
-      }
-    } catch (e) {
-      console.error('Error loading goals:', e);
-    }
-    return {};
-  }, []);
+    const goalsForMonth = getGoalsWithDefaults(year, month);
+    return goalsForMonth.reduce((acc, g) => {
+      acc[g.regiao] = {
+        equipamentos: g.meta_equipamentos,
+        viaturas: g.meta_viaturas,
+        cobertura: g.meta_cobertura,
+      };
+      return acc;
+    }, {} as Record<string, RegionGoals>);
+  }, [goals, year, month, getGoalsWithDefaults]);
 
   const getGoalsForRegion = (regiao: string): RegionGoals => {
     return savedGoals[regiao] || DEFAULT_GOALS;
@@ -75,7 +89,6 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
   // Calculate progress for each region
   const regionProgress = useMemo(() => {
     const currentDate = new Date();
-    const [year, month] = selectedMonth.split('-').map(Number);
     const isCurrentMonth = currentDate.getFullYear() === year && currentDate.getMonth() + 1 === month;
     const daysInMonth = new Date(year, month, 0).getDate();
     const dayOfMonth = currentDate.getDate();
@@ -151,7 +164,53 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
         monthProgress,
       };
     });
-  }, [equipamentos, viaturas, selectedMonth, savedGoals]);
+  }, [equipamentos, viaturas, selectedMonth, savedGoals, year, month]);
+
+  // Get comparison data if compare month is selected
+  const comparisonData = useMemo(() => {
+    if (!compareMonth) return null;
+    
+    const [compYear, compMonth] = compareMonth.split('-').map(Number);
+    
+    return regioesList.map(regiao => {
+      const municipiosDaRegiao = getMunicipiosPorRegiao(regiao);
+      
+      const equipamentosDaRegiao = equipamentos.filter(e => {
+        const regiaoEquip = getRegiao(e.municipio);
+        const createdDate = new Date(e.created_at);
+        return regiaoEquip === regiao && 
+          createdDate.getFullYear() === compYear && 
+          createdDate.getMonth() + 1 === compMonth;
+      });
+
+      const viaturasDaRegiao = viaturas.filter(v => {
+        const regiaoViatura = getRegiao(v.municipio);
+        const createdDate = new Date(v.created_at);
+        return regiaoViatura === regiao && 
+          createdDate.getFullYear() === compYear && 
+          createdDate.getMonth() + 1 === compMonth;
+      });
+
+      // Coverage at that point in time
+      const equipamentosAteData = equipamentos.filter(e => {
+        const regiaoEquip = getRegiao(e.municipio);
+        const createdDate = new Date(e.created_at);
+        const endOfMonth = new Date(compYear, compMonth, 0);
+        return regiaoEquip === regiao && createdDate <= endOfMonth;
+      });
+      const municipiosComEquipamento = new Set(equipamentosAteData.map(e => e.municipio)).size;
+      const cobertura = municipiosDaRegiao.length > 0 
+        ? (municipiosComEquipamento / municipiosDaRegiao.length) * 100 
+        : 0;
+
+      return {
+        regiao,
+        equipamentos: equipamentosDaRegiao.length,
+        viaturas: viaturasDaRegiao.reduce((sum, v) => sum + v.quantidade, 0),
+        cobertura,
+      };
+    });
+  }, [compareMonth, equipamentos, viaturas]);
 
   // Summary statistics
   const summary = useMemo(() => {
@@ -178,23 +237,36 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
   }, []);
 
   const handleSaveGoals = () => {
-    try {
-      const merged = { ...savedGoals, ...editingGoals };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-      setGoalsDialogOpen(false);
-      setEditingGoals({});
-      toast.success('Metas salvas com sucesso!');
-      window.location.reload();
-    } catch (e) {
-      toast.error('Erro ao salvar metas');
-    }
+    const goalsToSave: RegionalGoalInput[] = regioesList.map(regiao => {
+      const currentGoals = editingGoals[regiao] || getGoalsForRegion(regiao);
+      return {
+        regiao,
+        ano: year,
+        mes: month,
+        meta_equipamentos: currentGoals.equipamentos,
+        meta_viaturas: currentGoals.viaturas,
+        meta_cobertura: currentGoals.cobertura,
+      };
+    });
+    
+    upsertMultipleGoals(goalsToSave);
+    setGoalsDialogOpen(false);
+    setEditingGoals({});
   };
 
   const handleResetGoals = () => {
-    localStorage.removeItem(STORAGE_KEY);
+    const defaultGoals: RegionalGoalInput[] = regioesList.map(regiao => ({
+      regiao,
+      ano: year,
+      mes: month,
+      meta_equipamentos: DEFAULT_GOALS.equipamentos,
+      meta_viaturas: DEFAULT_GOALS.viaturas,
+      meta_cobertura: DEFAULT_GOALS.cobertura,
+    }));
+    
+    upsertMultipleGoals(defaultGoals);
     setGoalsDialogOpen(false);
-    toast.success('Metas restauradas para valores padrão');
-    window.location.reload();
+    setEditingGoals({});
   };
 
   const getStatusColor = (status: string) => {
@@ -227,15 +299,7 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
     }
   };
 
-  const getProgressColor = (progress: number) => {
-    if (progress >= 100) return 'bg-success';
-    if (progress >= 75) return 'bg-info';
-    if (progress >= 50) return 'bg-warning';
-    return 'bg-destructive';
-  };
-
   const handleExportGoalsPDF = () => {
-    const [year, month] = selectedMonth.split('-').map(Number);
     const monthLabel = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
       month: 'long',
       year: 'numeric',
@@ -272,6 +336,20 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
     toast.success('PDF do painel de metas exportado!');
   };
 
+  // Calculate variation for comparison
+  const getVariation = (regiao: string, metric: 'equipamentos' | 'viaturas' | 'cobertura') => {
+    if (!comparisonData) return null;
+    const current = regionProgress.find(r => r.regiao === regiao);
+    const compare = comparisonData.find(c => c.regiao === regiao);
+    if (!current || !compare) return null;
+    
+    const currentVal = current.current[metric];
+    const compareVal = compare[metric];
+    
+    if (compareVal === 0) return currentVal > 0 ? 100 : 0;
+    return ((currentVal - compareVal) / compareVal) * 100;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -282,16 +360,30 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
             Painel de Metas Mensais por Região
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Acompanhe o progresso das metas de cada região
+            Acompanhe o progresso das metas de cada região (salvo no servidor)
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Selecione o mês" />
             </SelectTrigger>
             <SelectContent>
               {monthOptions.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={compareMonth} onValueChange={setCompareMonth}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Comparar com..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Sem comparação</SelectItem>
+              {monthOptions.filter(opt => opt.value !== selectedMonth).map(opt => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>
@@ -315,7 +407,8 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
               <DialogHeader>
                 <DialogTitle>Configurar Metas por Região</DialogTitle>
                 <DialogDescription>
-                  Defina as metas mensais para cada região. As metas são salvas localmente.
+                  Defina as metas mensais para {new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}. 
+                  As metas são salvas no servidor.
                 </DialogDescription>
               </DialogHeader>
               
@@ -370,12 +463,12 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
               </div>
 
               <DialogFooter className="flex gap-2">
-                <Button variant="outline" onClick={handleResetGoals} className="gap-2">
+                <Button variant="outline" onClick={handleResetGoals} disabled={isUpsertingGoals} className="gap-2">
                   <RotateCcw className="w-4 h-4" />
                   Restaurar Padrão
                 </Button>
-                <Button onClick={handleSaveGoals} className="gap-2">
-                  <Save className="w-4 h-4" />
+                <Button onClick={handleSaveGoals} disabled={isUpsertingGoals} className="gap-2">
+                  {isUpsertingGoals ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Salvar Metas
                 </Button>
               </DialogFooter>
@@ -410,96 +503,112 @@ export function RegionalGoalsPanel({ equipamentos, viaturas, solicitacoes }: Reg
 
       {/* Region Progress Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {regionProgress.map(region => (
-          <div 
-            key={region.regiao} 
-            className="bg-card rounded-xl p-5 border border-border shadow-sm space-y-4"
-          >
-            {/* Header */}
-            <div className="flex items-start justify-between">
-              <div>
-                <h4 className="font-display font-semibold text-sm">{region.regiao}</h4>
-                <p className="text-xs text-muted-foreground">{region.totalMunicipios} municípios</p>
-              </div>
-              <span className={cn(
-                "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border",
-                getStatusColor(region.status)
-              )}>
-                {getStatusIcon(region.status)}
-                {getStatusLabel(region.status)}
-              </span>
-            </div>
-
-            {/* Overall Progress */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Progresso Geral</span>
-                <span className="font-medium">{region.progress.overall.toFixed(0)}%</span>
-              </div>
-              <div className="relative">
-                <Progress value={region.progress.overall} className="h-3" />
-                {/* Time indicator */}
-                <div 
-                  className="absolute top-0 h-3 w-0.5 bg-foreground/50 rounded"
-                  style={{ left: `${region.monthProgress}%` }}
-                  title={`Progresso esperado: ${region.monthProgress.toFixed(0)}%`}
-                />
-              </div>
-            </div>
-
-            {/* Individual Metrics */}
-            <div className="space-y-3">
-              {/* Equipamentos */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Equipamentos</span>
-                  <span className="font-medium">
-                    {region.current.equipamentos} / {region.goals.equipamentos}
-                  </span>
+        {regionProgress.map(region => {
+          const equipVar = getVariation(region.regiao, 'equipamentos');
+          const viatVar = getVariation(region.regiao, 'viaturas');
+          const cobVar = getVariation(region.regiao, 'cobertura');
+          
+          return (
+            <div 
+              key={region.regiao} 
+              className="bg-card rounded-xl p-5 border border-border shadow-sm space-y-4"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="font-display font-semibold text-sm">{region.regiao}</h4>
+                  <p className="text-xs text-muted-foreground">{region.totalMunicipios} municípios</p>
                 </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <span className={cn(
+                  "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border",
+                  getStatusColor(region.status)
+                )}>
+                  {getStatusIcon(region.status)}
+                  {getStatusLabel(region.status)}
+                </span>
+              </div>
+
+              {/* Overall Progress */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Progresso Geral</span>
+                  <span className="font-medium">{region.progress.overall.toFixed(0)}%</span>
+                </div>
+                <div className="relative">
+                  <Progress value={region.progress.overall} className="h-3" />
+                  {/* Time indicator */}
                   <div 
-                    className={cn("h-full transition-all duration-500 rounded-full", getProgressColor(region.progress.equipamentos))}
-                    style={{ width: `${region.progress.equipamentos}%` }}
+                    className="absolute top-0 h-3 w-0.5 bg-foreground/50 rounded"
+                    style={{ left: `${region.monthProgress}%` }}
+                    title={`Progresso esperado: ${region.monthProgress.toFixed(0)}%`}
                   />
                 </div>
               </div>
 
-              {/* Viaturas */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Viaturas</span>
-                  <span className="font-medium">
-                    {region.current.viaturas} / {region.goals.viaturas}
-                  </span>
+              {/* Individual Metrics */}
+              <div className="space-y-3 pt-2 border-t border-border">
+                {/* Equipamentos */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Equipamentos</span>
+                    <span className="font-medium flex items-center gap-1">
+                      {region.current.equipamentos}/{region.goals.equipamentos}
+                      {equipVar !== null && (
+                        <span className={cn("text-[10px]", equipVar >= 0 ? "text-success" : "text-destructive")}>
+                          ({equipVar >= 0 ? '+' : ''}{equipVar.toFixed(0)}%)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <Progress value={region.progress.equipamentos} className="h-2" />
                 </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div 
-                    className={cn("h-full transition-all duration-500 rounded-full", getProgressColor(region.progress.viaturas))}
-                    style={{ width: `${region.progress.viaturas}%` }}
-                  />
-                </div>
-              </div>
 
-              {/* Cobertura */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Cobertura</span>
-                  <span className="font-medium">
-                    {region.current.cobertura.toFixed(1)}% / {region.goals.cobertura}%
-                  </span>
+                {/* Viaturas */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Viaturas</span>
+                    <span className="font-medium flex items-center gap-1">
+                      {region.current.viaturas}/{region.goals.viaturas}
+                      {viatVar !== null && (
+                        <span className={cn("text-[10px]", viatVar >= 0 ? "text-success" : "text-destructive")}>
+                          ({viatVar >= 0 ? '+' : ''}{viatVar.toFixed(0)}%)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <Progress value={region.progress.viaturas} className="h-2" />
                 </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div 
-                    className={cn("h-full transition-all duration-500 rounded-full", getProgressColor(region.progress.cobertura))}
-                    style={{ width: `${region.progress.cobertura}%` }}
-                  />
+
+                {/* Cobertura */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Cobertura</span>
+                    <span className="font-medium flex items-center gap-1">
+                      {region.current.cobertura.toFixed(1)}%/{region.goals.cobertura}%
+                      {cobVar !== null && (
+                        <span className={cn("text-[10px]", cobVar >= 0 ? "text-success" : "text-destructive")}>
+                          ({cobVar >= 0 ? '+' : ''}{cobVar.toFixed(1)}%)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <Progress value={region.progress.cobertura} className="h-2" />
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {/* History info */}
+      {availableMonths.length > 0 && (
+        <div className="bg-muted/50 rounded-lg p-4 flex items-center gap-3">
+          <History className="w-5 h-5 text-muted-foreground" />
+          <div className="text-sm text-muted-foreground">
+            <strong>Histórico disponível:</strong> {availableMonths.length} mês(es) com metas configuradas no servidor
+          </div>
+        </div>
+      )}
     </div>
   );
 }

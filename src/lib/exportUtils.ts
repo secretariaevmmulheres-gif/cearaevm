@@ -767,6 +767,19 @@ export interface MapExportStats {
   semCobertura: number;
 }
 
+export interface MapExportOptions {
+  highResolution?: boolean;
+  embedLegend?: boolean;
+}
+
+// Equipment counts for legend (real counts, not municipality priority)
+export interface MapEquipmentCounts {
+  brasileira: number;
+  cearense: number;
+  municipal: number;
+  lilas: number;
+}
+
 // Regional goals (monthly) export types
 export interface RegionalGoalsExportRow {
   regiao: string;
@@ -876,8 +889,12 @@ export function exportRegionalGoalsToPDF(payload: RegionalGoalsExportPayload) {
 export async function exportMapToPDF(
   mapElement: HTMLElement,
   filters: MapExportFilters,
-  stats: MapExportStats
+  stats: MapExportStats,
+  options: MapExportOptions = {},
+  equipmentCounts?: MapEquipmentCounts
 ) {
+  const { highResolution = false, embedLegend = false } = options;
+  
   // Dynamic import of html2canvas
   const html2canvas = (await import('html2canvas')).default;
   
@@ -888,25 +905,29 @@ export async function exportMapToPDF(
   doc.text('Mapa do Ceará - EVM - Enfrentamento à Violência contra as Mulheres', 14, 22);
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+  if (highResolution) {
+    doc.text('(Alta Resolução)', 14, 36);
+  }
   
-  // Capture map screenshot - use the SVG overlay for proper colors
+  // Capture map screenshot
   let mapCaptured = false;
   try {
-    // Prefer capturing the wrapper element (stable positioning) and let html2canvas compute bounds
-    const targetElement = mapElement;
-
     // Wait for tiles to fully render
-    await new Promise(resolve => setTimeout(resolve, 900));
+    await new Promise(resolve => setTimeout(resolve, 1200));
 
-    const canvas = await html2canvas(targetElement, {
+    const scale = highResolution ? 3 : 2;
+    
+    const canvas = await html2canvas(mapElement, {
       useCORS: true,
       allowTaint: true,
-      scale: 2,
+      scale: scale,
       logging: false,
       backgroundColor: '#f8fafc',
       // Critical to avoid offset/skew when the page is scrolled or the element isn't at (0,0)
       scrollX: -window.scrollX,
       scrollY: -window.scrollY,
+      windowWidth: mapElement.scrollWidth,
+      windowHeight: mapElement.scrollHeight,
       onclone: (clonedDoc) => {
         // Ensure SVG paths render with correct colors
         const paths = clonedDoc.querySelectorAll('path');
@@ -919,44 +940,121 @@ export async function exportMapToPDF(
       },
     });
     
-    const imgData = canvas.toDataURL('image/png');
-    const imgWidth = 155;
-    const imgHeight = (canvas.height / canvas.width) * imgWidth;
+    const imgData = canvas.toDataURL('image/png', 1.0);
     
-    doc.addImage(imgData, 'PNG', 135, 35, imgWidth, Math.min(imgHeight, 160));
-    mapCaptured = true;
+    if (embedLegend) {
+      // Full-page map with embedded legend
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginTop = 42;
+      const marginBottom = 10;
+      const marginLeft = 14;
+      const marginRight = 14;
+      
+      const availableWidth = pageWidth - marginLeft - marginRight;
+      const availableHeight = pageHeight - marginTop - marginBottom;
+      
+      // Calculate image dimensions maintaining aspect ratio
+      const imgAspect = canvas.width / canvas.height;
+      let imgWidth = availableWidth;
+      let imgHeight = imgWidth / imgAspect;
+      
+      if (imgHeight > availableHeight) {
+        imgHeight = availableHeight;
+        imgWidth = imgHeight * imgAspect;
+      }
+      
+      // Center the image
+      const imgX = marginLeft + (availableWidth - imgWidth) / 2;
+      
+      doc.addImage(imgData, 'PNG', imgX, marginTop, imgWidth, imgHeight);
+      
+      // Draw legend overlay on the image
+      const legendX = imgX + imgWidth - 75;
+      const legendY = marginTop + 5;
+      const legendWidth = 70;
+      const legendHeight = 85;
+      
+      // Legend background with transparency effect
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(200, 200, 200);
+      doc.roundedRect(legendX, legendY, legendWidth, legendHeight, 3, 3, 'FD');
+      
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Legenda (Equipamentos)', legendX + 3, legendY + 6);
+      
+      const legendItems = [
+        { color: [13, 148, 136], label: 'Casa Brasileira', count: equipmentCounts?.brasileira ?? stats.brasileira },
+        { color: [124, 58, 237], label: 'Casa Cearense', count: equipmentCounts?.cearense ?? stats.cearense },
+        { color: [234, 88, 12], label: 'Casa Municipal', count: equipmentCounts?.municipal ?? stats.municipal },
+        { color: [217, 70, 239], label: 'Sala Lilás', count: equipmentCounts?.lilas ?? stats.lilas },
+        { color: [6, 182, 212], label: 'Só Viatura', count: stats.viaturaOnly },
+        { color: [229, 231, 235], label: 'Sem Cobertura', count: stats.semCobertura },
+      ];
+      
+      let legendItemY = legendY + 12;
+      doc.setFontSize(7);
+      legendItems.forEach(item => {
+        doc.setFillColor(item.color[0], item.color[1], item.color[2]);
+        doc.rect(legendX + 3, legendItemY, 4, 4, 'F');
+        doc.text(`${item.label} (${item.count})`, legendX + 9, legendItemY + 3);
+        legendItemY += 7;
+      });
+      
+      // Coverage info
+      const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilas;
+      doc.setFontSize(7);
+      doc.text(`Cobertura: ${(totalComEquipamento / 184 * 100).toFixed(1)}%`, legendX + 3, legendItemY + 3);
+      
+      // Filters info at bottom
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      const filtersText = `Filtros: Região=${filters.regiao && filters.regiao !== 'all' ? filters.regiao : 'Todas'} | Tipo=${filters.tipoEquipamento === 'all' ? 'Todos' : filters.tipoEquipamento} | Viatura=${filters.apenasComViatura ? 'Sim' : 'Não'}`;
+      doc.text(filtersText, marginLeft, pageHeight - 5);
+      
+      mapCaptured = true;
+    } else {
+      // Original layout with map on right and info on left
+      const imgWidth = 155;
+      const imgHeight = (canvas.height / canvas.width) * imgWidth;
+      
+      doc.addImage(imgData, 'PNG', 135, 35, imgWidth, Math.min(imgHeight, 160));
+      mapCaptured = true;
+      
+      // Filters applied
+      doc.setFontSize(12);
+      doc.text('Filtros Aplicados:', 14, 42);
+      doc.setFontSize(10);
+      doc.text(`• Região: ${filters.regiao && filters.regiao !== 'all' ? filters.regiao : 'Todas'}`, 14, 50);
+      doc.text(`• Tipo de Equipamento: ${filters.tipoEquipamento === 'all' ? 'Todos' : filters.tipoEquipamento}`, 14, 56);
+      doc.text(`• Status de Solicitação: ${filters.statusSolicitacao === 'all' ? 'Todos' : filters.statusSolicitacao}`, 14, 62);
+      doc.text(`• Apenas com Viatura: ${filters.apenasComViatura ? 'Sim' : 'Não'}`, 14, 68);
+      
+      // Stats
+      doc.setFontSize(12);
+      doc.text('Estatísticas:', 14, 81);
+      doc.setFontSize(10);
+      doc.text(`• Casa da Mulher Brasileira: ${equipmentCounts?.brasileira ?? stats.brasileira}`, 14, 89);
+      doc.text(`• Casa da Mulher Cearense: ${equipmentCounts?.cearense ?? stats.cearense}`, 14, 95);
+      doc.text(`• Casa da Mulher Municipal: ${equipmentCounts?.municipal ?? stats.municipal}`, 14, 101);
+      doc.text(`• Sala Lilás: ${equipmentCounts?.lilas ?? stats.lilas}`, 14, 107);
+      doc.text(`• Apenas Viatura: ${stats.viaturaOnly}`, 14, 113);
+      doc.text(`• Sem Cobertura: ${stats.semCobertura}`, 14, 119);
+      
+      const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilas;
+      doc.setFontSize(12);
+      doc.text(`Cobertura Total: ${(totalComEquipamento / 184 * 100).toFixed(2)}% (${totalComEquipamento}/184 municípios)`, 14, 131);
+    }
   } catch (error) {
     console.error('Error capturing map:', error);
   }
-  
-  // Filters applied
-  doc.setFontSize(12);
-  doc.text('Filtros Aplicados:', 14, 42);
-  doc.setFontSize(10);
-  doc.text(`• Região: ${filters.regiao && filters.regiao !== 'all' ? filters.regiao : 'Todas'}`, 14, 50);
-  doc.text(`• Tipo de Equipamento: ${filters.tipoEquipamento === 'all' ? 'Todos' : filters.tipoEquipamento}`, 14, 56);
-  doc.text(`• Status de Solicitação: ${filters.statusSolicitacao === 'all' ? 'Todos' : filters.statusSolicitacao}`, 14, 62);
-  doc.text(`• Apenas com Viatura: ${filters.apenasComViatura ? 'Sim' : 'Não'}`, 14, 68);
-  
-  // Stats
-  doc.setFontSize(12);
-  doc.text('Estatísticas:', 14, 81);
-  doc.setFontSize(10);
-  doc.text(`• Casa da Mulher Brasileira: ${stats.brasileira}`, 14, 89);
-  doc.text(`• Casa da Mulher Cearense: ${stats.cearense}`, 14, 95);
-  doc.text(`• Casa da Mulher Municipal: ${stats.municipal}`, 14, 101);
-  doc.text(`• Sala Lilás: ${stats.lilas}`, 14, 107);
-  doc.text(`• Apenas Viatura: ${stats.viaturaOnly}`, 14, 113);
-  doc.text(`• Sem Cobertura: ${stats.semCobertura}`, 14, 119);
-  
-  const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilas;
-  doc.setFontSize(12);
-  doc.text(`Cobertura Total: ${(totalComEquipamento / 184 * 100).toFixed(2)}% (${totalComEquipamento}/184 municípios)`, 14, 131);
   
   if (!mapCaptured) {
     doc.setFontSize(10);
     doc.text('(Não foi possível capturar a imagem do mapa)', 180, 105);
   }
   
-  doc.save('mapa-ceara.pdf');
+  const filename = highResolution ? 'mapa-ceara-alta-resolucao.pdf' : 'mapa-ceara.pdf';
+  doc.save(filename);
 }
