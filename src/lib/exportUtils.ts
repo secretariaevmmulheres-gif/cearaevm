@@ -917,9 +917,6 @@ export async function exportMapToPDF(
 
     const scale = highResolution ? 3 : 2;
     
-    // Get element's bounding rect for accurate positioning
-    const rect = mapElement.getBoundingClientRect();
-    
     const canvas = await html2canvas(mapElement, {
       useCORS: true,
       allowTaint: true,
@@ -929,12 +926,9 @@ export async function exportMapToPDF(
       // Use width/height from element for consistency
       width: mapElement.offsetWidth,
       height: mapElement.offsetHeight,
-      // Ignore scroll position - capture just the element
-      scrollX: 0,
-      scrollY: 0,
-      // Position at origin for clean capture
-      x: rect.left,
-      y: rect.top,
+      // Evita offset quando a página está rolada
+      scrollX: -window.scrollX,
+      scrollY: -window.scrollY,
       foreignObjectRendering: false,
       removeContainer: true,
       onclone: (clonedDoc, clonedElement) => {
