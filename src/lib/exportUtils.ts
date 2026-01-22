@@ -917,18 +917,33 @@ export async function exportMapToPDF(
 
     const scale = highResolution ? 3 : 2;
     
+    // Get element's bounding rect for accurate positioning
+    const rect = mapElement.getBoundingClientRect();
+    
     const canvas = await html2canvas(mapElement, {
       useCORS: true,
       allowTaint: true,
       scale: scale,
       logging: false,
       backgroundColor: '#f8fafc',
-      // Critical to avoid offset/skew when the page is scrolled or the element isn't at (0,0)
-      scrollX: -window.scrollX,
-      scrollY: -window.scrollY,
-      windowWidth: mapElement.scrollWidth,
-      windowHeight: mapElement.scrollHeight,
-      onclone: (clonedDoc) => {
+      // Use width/height from element for consistency
+      width: mapElement.offsetWidth,
+      height: mapElement.offsetHeight,
+      // Ignore scroll position - capture just the element
+      scrollX: 0,
+      scrollY: 0,
+      // Position at origin for clean capture
+      x: rect.left,
+      y: rect.top,
+      foreignObjectRendering: false,
+      removeContainer: true,
+      onclone: (clonedDoc, clonedElement) => {
+        // Reset any transforms or positions that could cause offset
+        clonedElement.style.transform = 'none';
+        clonedElement.style.position = 'relative';
+        clonedElement.style.left = '0';
+        clonedElement.style.top = '0';
+        
         // Ensure SVG paths render with correct colors
         const paths = clonedDoc.querySelectorAll('path');
         paths.forEach(path => {
