@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
-import type { Layer, PathOptions } from 'leaflet';
+import type { Layer, PathOptions, Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
@@ -71,6 +71,7 @@ export default function Mapa() {
   const [isLoadingGeoJson, setIsLoadingGeoJson] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const leafletMapRef = useRef<LeafletMap | null>(null);
 
   // Filters
   const [filterTipoEquipamento, setFilterTipoEquipamento] = useState<string>('all');
@@ -95,6 +96,10 @@ export default function Mapa() {
     
     setIsExporting(true);
     try {
+      // Garantir que o Leaflet recalculou o tamanho do container antes do print
+      leafletMapRef.current?.invalidateSize(true);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
       await exportMapToPDF(
         mapContainerRef.current,
         {
@@ -616,6 +621,7 @@ export default function Mapa() {
                 }
               >
                 <MapContainer
+                  ref={leafletMapRef as any}
                   center={[-5.2, -39.5]}
                   zoom={7}
                   style={{ height: '100%', width: '100%' }}
