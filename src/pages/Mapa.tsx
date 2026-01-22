@@ -161,9 +161,15 @@ export default function Mapa() {
         if (!hasSolStatus) visible = false;
       }
       
-      // Filter only with viatura
-      if (filterApenasComViatura && viats.length === 0) {
-        visible = false;
+      // Filter only with viatura (includes patrulhas das casas from equipamentos and solicitações)
+      if (filterApenasComViatura) {
+        const hasViatura = viats.length > 0;
+        const hasPatrulhaEquipamento = eqs.some((e) => e.possui_patrulha);
+        const hasPatrulhaSolicitacao = sols.some((s) => s.recebeu_patrulha);
+        
+        if (!hasViatura && !hasPatrulhaEquipamento && !hasPatrulhaSolicitacao) {
+          visible = false;
+        }
       }
 
       // Determinar prioridade e cor
@@ -679,17 +685,36 @@ export default function Mapa() {
                 <div className="flex items-center gap-2 mb-2">
                   <Truck className="w-4 h-4 text-info" />
                   <h3 className="font-semibold text-sm">
-                    Viaturas (
-                    {selectedMunicipio.viaturas.reduce((sum, v) => sum + v.quantidade, 0)})
+                    Viaturas ({(() => {
+                      const viaturasCount = selectedMunicipio.viaturas.reduce((sum, v) => sum + v.quantidade, 0);
+                      const patrulhasEquip = selectedMunicipio.equipamentos.filter(e => e.possui_patrulha).length;
+                      const patrulhasSolic = selectedMunicipio.solicitacoes.filter(s => s.recebeu_patrulha).length;
+                      return viaturasCount + patrulhasEquip + patrulhasSolic;
+                    })()})
                   </h3>
                 </div>
-                {selectedMunicipio.viaturas.length === 0 ? (
+                {selectedMunicipio.viaturas.length === 0 && 
+                 !selectedMunicipio.equipamentos.some(e => e.possui_patrulha) && 
+                 !selectedMunicipio.solicitacoes.some(s => s.recebeu_patrulha) ? (
                   <p className="text-sm text-muted-foreground pl-6">Nenhuma viatura</p>
                 ) : (
                   <ul className="space-y-1 pl-6">
                     {selectedMunicipio.viaturas.map((v) => (
                       <li key={v.id} className="text-sm">
                         • {v.quantidade}x {v.orgao_responsavel}
+                        {v.vinculada_equipamento && (
+                          <span className="text-muted-foreground ml-1">(vinculada a equipamento)</span>
+                        )}
+                      </li>
+                    ))}
+                    {selectedMunicipio.equipamentos.filter(e => e.possui_patrulha).map((e) => (
+                      <li key={`patrulha-equip-${e.id}`} className="text-sm">
+                        • 1x Patrulha das Casas <span className="text-success">(via {e.tipo})</span>
+                      </li>
+                    ))}
+                    {selectedMunicipio.solicitacoes.filter(s => s.recebeu_patrulha).map((s) => (
+                      <li key={`patrulha-solic-${s.id}`} className="text-sm">
+                        • 1x Patrulha das Casas <span className="text-warning">(via Solicitação - {s.status})</span>
                       </li>
                     ))}
                   </ul>
