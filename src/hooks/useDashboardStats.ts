@@ -45,8 +45,18 @@ export function useDashboardStats(): DashboardStats {
       }
     });
 
-    // Patrulhas das Casas = equipamentos com possui_patrulha = true
-    const viaturasPatrulhasCasas = equipamentos.filter((e) => e.possui_patrulha).length;
+    // Patrulhas das Casas = equipamentos com possui_patrulha OU solicitações com recebeu_patrulha
+    // Conta equipamentos inaugurados com patrulha
+    const patrulhasEquipamentos = equipamentos.filter((e) => e.possui_patrulha).length;
+    // Conta solicitações que receberam patrulha mas ainda não viraram equipamento
+    const municipiosComEquipamentoPatrulha = new Set(
+      equipamentos.filter((e) => e.possui_patrulha).map((e) => e.municipio)
+    );
+    const patrulhasSolicitacoes = solicitacoes.filter(
+      (s) => s.recebeu_patrulha && !municipiosComEquipamentoPatrulha.has(s.municipio)
+    ).length;
+    const viaturasPatrulhasCasas = patrulhasEquipamentos + patrulhasSolicitacoes;
+    
     // Viaturas PMCE = soma das quantidades de todas as viaturas cadastradas
     const viaturasPMCE = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
 
