@@ -33,8 +33,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
+import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { municipiosCeara, orgaosResponsaveis, OrgaoResponsavel, regioesList, getRegiao } from '@/data/municipios';
-import { Viatura } from '@/types';
+import { Viatura, Equipamento, Solicitacao } from '@/types';
 import { Plus, Pencil, Trash2, Search, Truck, Download, FileSpreadsheet, FileText as FilePdf, Building2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
@@ -50,6 +51,7 @@ import {
 export default function Viaturas() {
   const { viaturas, addViatura, updateViatura, deleteViatura, isAdding, isUpdating } = useViaturas();
   const { equipamentos } = useEquipamentos();
+  const { solicitacoes } = useSolicitacoes();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOrgao, setFilterOrgao] = useState<string>('all');
   const [filterVinculada, setFilterVinculada] = useState<string>('all');
@@ -90,7 +92,7 @@ export default function Viaturas() {
   });
 
   // Patrulhas Maria da Penha das Casas (equipamentos com possui_patrulha = true)
-  const patrulhasDasCasas = equipamentos
+  const patrulhasDeEquipamentos = equipamentos
     .filter((e) => e.possui_patrulha)
     .filter((e) => {
       const matchesSearch =
@@ -99,6 +101,53 @@ export default function Viaturas() {
       const matchesRegiao = filterRegiao === 'all' || getRegiao(e.municipio) === filterRegiao;
       return matchesSearch && matchesRegiao;
     });
+
+  // Patrulhas de Solicitações (solicitações com recebeu_patrulha = true)
+  // Exclui municípios que já têm patrulha em equipamentos para evitar duplicidade
+  const municipiosComPatrulhaEquip = new Set(patrulhasDeEquipamentos.map(e => e.municipio));
+  
+  const patrulhasDeSolicitacoes = solicitacoes
+    .filter((s) => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio))
+    .filter((s) => {
+      const matchesSearch =
+        s.municipio.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRegiao = filterRegiao === 'all' || getRegiao(s.municipio) === filterRegiao;
+      return matchesSearch && matchesRegiao;
+    });
+
+  // Combinar para exibição unificada
+  type PatrulhaCasa = {
+    id: string;
+    municipio: string;
+    tipo: string;
+    endereco: string;
+    responsavel: string;
+    telefone: string;
+    origem: 'equipamento' | 'solicitacao';
+    status?: string;
+  };
+
+  const patrulhasDasCasas: PatrulhaCasa[] = [
+    ...patrulhasDeEquipamentos.map((e) => ({
+      id: e.id,
+      municipio: e.municipio,
+      tipo: e.tipo,
+      endereco: e.endereco || '',
+      responsavel: e.responsavel || '',
+      telefone: e.telefone || '',
+      origem: 'equipamento' as const,
+    })),
+    ...patrulhasDeSolicitacoes.map((s) => ({
+      id: s.id,
+      municipio: s.municipio,
+      tipo: s.tipo_equipamento,
+      endereco: '',
+      responsavel: '',
+      telefone: '',
+      origem: 'solicitacao' as const,
+      status: s.status,
+    })),
+  ];
 
   const openCreateDialog = () => {
     setEditingViatura(null);
@@ -354,11 +403,11 @@ export default function Viaturas() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => exportPatrulhasCasasToPDF(patrulhasDasCasas)}>
+                <DropdownMenuItem onClick={() => exportPatrulhasCasasToPDF(patrulhasDeEquipamentos)}>
                   <FilePdf className="w-4 h-4 mr-2" />
                   Exportar PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportPatrulhasCasasToExcel(patrulhasDasCasas)}>
+                <DropdownMenuItem onClick={() => exportPatrulhasCasasToExcel(patrulhasDeEquipamentos)}>
                   <FileSpreadsheet className="w-4 h-4 mr-2" />
                   Exportar Excel
                 </DropdownMenuItem>
@@ -372,6 +421,7 @@ export default function Viaturas() {
                   <tr>
                     <th>Município</th>
                     <th>Tipo de Equipamento</th>
+                    <th>Origem</th>
                     <th>Endereço</th>
                     <th>Responsável</th>
                     <th>Telefone</th>
@@ -380,23 +430,34 @@ export default function Viaturas() {
                 <tbody>
                   {patrulhasDasCasas.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={6} className="text-center py-8 text-muted-foreground">
                         <Building2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
                         <p>Nenhum equipamento com Patrulha Maria da Penha</p>
                       </td>
                     </tr>
                   ) : (
-                    patrulhasDasCasas.map((equipamento) => (
-                      <tr key={equipamento.id} className="animate-fade-in">
-                        <td className="font-medium">{equipamento.municipio}</td>
+                    patrulhasDasCasas.map((patrulha) => (
+                      <tr key={patrulha.id} className="animate-fade-in">
+                        <td className="font-medium">{patrulha.municipio}</td>
                         <td>
                           <span className="badge-status bg-emerald-500/10 text-emerald-600">
-                            {equipamento.tipo}
+                            {patrulha.tipo}
                           </span>
                         </td>
-                        <td className="text-sm">{equipamento.endereco || '-'}</td>
-                        <td>{equipamento.responsavel || '-'}</td>
-                        <td>{equipamento.telefone || '-'}</td>
+                        <td>
+                          {patrulha.origem === 'equipamento' ? (
+                            <span className="badge-status bg-primary/10 text-primary">
+                              Equipamento
+                            </span>
+                          ) : (
+                            <span className="badge-status bg-warning/10 text-warning">
+                              Solicitação ({patrulha.status})
+                            </span>
+                          )}
+                        </td>
+                        <td className="text-sm">{patrulha.endereco || '-'}</td>
+                        <td>{patrulha.responsavel || '-'}</td>
+                        <td>{patrulha.telefone || '-'}</td>
                       </tr>
                     ))
                   )}
@@ -405,7 +466,7 @@ export default function Viaturas() {
             </div>
           </div>
           <p className="text-sm text-muted-foreground mt-3">
-            * Estas patrulhas são gerenciadas através do cadastro de Equipamentos. Para editar, acesse a página de Equipamentos.
+            * Patrulhas de Equipamentos são gerenciadas na página de Equipamentos. Patrulhas de Solicitações são gerenciadas na página de Solicitações.
           </p>
         </TabsContent>
       </Tabs>
