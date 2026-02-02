@@ -885,18 +885,69 @@ export function exportRegionalGoalsToPDF(payload: RegionalGoalsExportPayload) {
   doc.save(`metas-regionais-${payload.monthLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`);
 }
 
+// Captured map image data type
+export interface CapturedMapImage {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+// Capture map image for preview
+export async function captureMapImage(
+  mapElement: HTMLElement,
+  highResolution: boolean = false
+): Promise<CapturedMapImage> {
+  const html2canvas = (await import('html2canvas')).default;
+  
+  // Wait for tiles to fully render
+  await new Promise(resolve => setTimeout(resolve, 1200));
+
+  const scale = highResolution ? 3 : 2;
+  
+  const canvas = await html2canvas(mapElement, {
+    useCORS: true,
+    allowTaint: true,
+    scale: scale,
+    logging: false,
+    backgroundColor: '#f8fafc',
+    width: mapElement.offsetWidth,
+    height: mapElement.offsetHeight,
+    scrollX: -window.scrollX,
+    scrollY: -window.scrollY,
+    foreignObjectRendering: false,
+    removeContainer: true,
+    onclone: (clonedDoc, clonedElement) => {
+      clonedElement.style.transform = 'none';
+      clonedElement.style.position = 'relative';
+      clonedElement.style.left = '0';
+      clonedElement.style.top = '0';
+      
+      const paths = clonedDoc.querySelectorAll('path');
+      paths.forEach(path => {
+        const fill = path.getAttribute('fill');
+        if (fill) path.style.fill = fill;
+        const stroke = path.getAttribute('stroke');
+        if (stroke) path.style.stroke = stroke;
+      });
+    },
+  });
+  
+  return {
+    dataUrl: canvas.toDataURL('image/png', 1.0),
+    width: canvas.width,
+    height: canvas.height,
+  };
+}
 
 export async function exportMapToPDF(
   mapElement: HTMLElement,
   filters: MapExportFilters,
   stats: MapExportStats,
   options: MapExportOptions = {},
-  equipmentCounts?: MapEquipmentCounts
+  equipmentCounts?: MapEquipmentCounts,
+  preCapturedImage?: CapturedMapImage
 ) {
   const { highResolution = false, embedLegend = false } = options;
-  
-  // Dynamic import of html2canvas
-  const html2canvas = (await import('html2canvas')).default;
   
   const doc = new jsPDF('landscape');
   
@@ -909,47 +960,25 @@ export async function exportMapToPDF(
     doc.text('(Alta Resolução)', 14, 36);
   }
   
-  // Capture map screenshot
+  // Capture map screenshot or use pre-captured image
   let mapCaptured = false;
+  let imgData: string;
+  let canvasWidth: number;
+  let canvasHeight: number;
+  
   try {
-    // Wait for tiles to fully render
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    const scale = highResolution ? 3 : 2;
-    
-    const canvas = await html2canvas(mapElement, {
-      useCORS: true,
-      allowTaint: true,
-      scale: scale,
-      logging: false,
-      backgroundColor: '#f8fafc',
-      // Use width/height from element for consistency
-      width: mapElement.offsetWidth,
-      height: mapElement.offsetHeight,
-      // Evita offset quando a página está rolada
-      scrollX: -window.scrollX,
-      scrollY: -window.scrollY,
-      foreignObjectRendering: false,
-      removeContainer: true,
-      onclone: (clonedDoc, clonedElement) => {
-        // Reset any transforms or positions that could cause offset
-        clonedElement.style.transform = 'none';
-        clonedElement.style.position = 'relative';
-        clonedElement.style.left = '0';
-        clonedElement.style.top = '0';
-        
-        // Ensure SVG paths render with correct colors
-        const paths = clonedDoc.querySelectorAll('path');
-        paths.forEach(path => {
-          const fill = path.getAttribute('fill');
-          if (fill) path.style.fill = fill;
-          const stroke = path.getAttribute('stroke');
-          if (stroke) path.style.stroke = stroke;
-        });
-      },
-    });
-    
-    const imgData = canvas.toDataURL('image/png', 1.0);
+    if (preCapturedImage) {
+      // Use pre-captured image
+      imgData = preCapturedImage.dataUrl;
+      canvasWidth = preCapturedImage.width;
+      canvasHeight = preCapturedImage.height;
+    } else {
+      // Capture new image (fallback for backward compatibility)
+      const captured = await captureMapImage(mapElement, highResolution);
+      imgData = captured.dataUrl;
+      canvasWidth = captured.width;
+      canvasHeight = captured.height;
+    }
     
     if (embedLegend) {
       // Full-page map with embedded legend
@@ -964,7 +993,7 @@ export async function exportMapToPDF(
       const availableHeight = pageHeight - marginTop - marginBottom;
       
       // Calculate image dimensions maintaining aspect ratio
-      const imgAspect = canvas.width / canvas.height;
+      const imgAspect = canvasWidth / canvasHeight;
       let imgWidth = availableWidth;
       let imgHeight = imgWidth / imgAspect;
       
@@ -1026,7 +1055,7 @@ export async function exportMapToPDF(
     } else {
       // Original layout with map on right and info on left
       const imgWidth = 155;
-      const imgHeight = (canvas.height / canvas.width) * imgWidth;
+      const imgHeight = (canvasHeight / canvasWidth) * imgWidth;
       
       doc.addImage(imgData, 'PNG', 135, 35, imgWidth, Math.min(imgHeight, 160));
       mapCaptured = true;

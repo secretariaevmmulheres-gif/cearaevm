@@ -24,8 +24,16 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { exportMapToPDF } from '@/lib/exportUtils';
+import { exportMapToPDF, captureMapImage, CapturedMapImage } from '@/lib/exportUtils';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 import { TipoEquipamento, StatusSolicitacao } from '@/data/municipios';
@@ -86,20 +94,51 @@ export default function Mapa() {
   // Export options state
   const [exportHighRes, setExportHighRes] = useState(false);
   const [exportEmbedLegend, setExportEmbedLegend] = useState(true);
+  
+  // Export preview state
+  const [showExportPreview, setShowExportPreview] = useState(false);
+  const [previewImageData, setPreviewImageData] = useState<CapturedMapImage | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
 
-  // Export handler
-  const handleExportMap = async () => {
+  // Capture map for preview
+  const handleCaptureForPreview = async () => {
     if (!mapContainerRef.current) {
       toast.error('Não foi possível capturar o mapa');
       return;
     }
     
-    setIsExporting(true);
+    setIsCapturing(true);
     try {
       // Garantir que o Leaflet recalculou o tamanho do container antes do print
       leafletMapRef.current?.invalidateSize(true);
       await new Promise((resolve) => setTimeout(resolve, 350));
 
+      const captured = await captureMapImage(mapContainerRef.current, exportHighRes);
+      setPreviewImageData(captured);
+      setShowExportPreview(true);
+    } catch (error) {
+      console.error('Capture error:', error);
+      toast.error('Erro ao capturar o mapa');
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  // Recapture
+  const handleRecapture = async () => {
+    setPreviewImageData(null);
+    await handleCaptureForPreview();
+  };
+
+  // Confirm export with captured image
+  const handleConfirmExport = async () => {
+    if (!mapContainerRef.current || !previewImageData) {
+      toast.error('Erro ao exportar');
+      return;
+    }
+    
+    setIsExporting(true);
+    try {
       await exportMapToPDF(
         mapContainerRef.current,
         {
@@ -113,9 +152,12 @@ export default function Mapa() {
           highResolution: exportHighRes,
           embedLegend: exportEmbedLegend,
         },
-        equipmentCounts
+        equipmentCounts,
+        previewImageData
       );
       toast.success('Mapa exportado com sucesso!');
+      setShowExportPreview(false);
+      setPreviewImageData(null);
     } catch (error) {
       console.error('Export error:', error);
       toast.error('Erro ao exportar o mapa');
@@ -123,6 +165,7 @@ export default function Mapa() {
       setIsExporting(false);
     }
   };
+  
   // Fetch GeoJSON data
   useEffect(() => {
     fetch(CEARA_GEOJSON_URL)
@@ -581,17 +624,17 @@ export default function Mapa() {
               </div>
             </div>
             <Button
-              onClick={handleExportMap}
-              disabled={isExporting || isLoadingGeoJson}
+              onClick={handleCaptureForPreview}
+              disabled={isCapturing || isExporting || isLoadingGeoJson}
               className="w-full gap-2"
               variant="outline"
             >
-              {isExporting ? (
+              {isCapturing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              Exportar Mapa PDF
+              {isCapturing ? 'Capturando...' : 'Exportar Mapa PDF'}
             </Button>
           </div>
         </div>
@@ -643,6 +686,66 @@ export default function Mapa() {
           </p>
         </div>
       </div>
+
+      {/* Modal de preview da exportação */}
+      <Dialog open={showExportPreview} onOpenChange={setShowExportPreview}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Preview da Exportação</DialogTitle>
+            <DialogDescription>
+              Verifique se o mapa está alinhado corretamente antes de exportar.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex justify-center items-center p-2 bg-muted/30 rounded-lg min-h-[300px]">
+            {previewImageData ? (
+              <img
+                src={previewImageData.dataUrl}
+                alt="Preview do mapa"
+                className="max-w-full max-h-[50vh] rounded-lg shadow-md object-contain"
+              />
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Capturando imagem...</span>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={handleRecapture}
+              disabled={isCapturing}
+              className="gap-2"
+            >
+              <RefreshCw className={cn("w-4 h-4", isCapturing && "animate-spin")} />
+              Recapturar
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowExportPreview(false);
+                setPreviewImageData(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmExport}
+              disabled={isExporting || !previewImageData}
+              className="gap-2"
+            >
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Exportar PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de detalhes */}
       {selectedMunicipio && (
