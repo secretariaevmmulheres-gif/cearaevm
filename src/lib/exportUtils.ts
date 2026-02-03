@@ -367,48 +367,96 @@ export function exportAllRegionsToExcel(
   XLSX.writeFile(wb, 'dashboard-regional-consolidado.xlsx');
 }
 
-// Patrulhas das Casas export
-export function exportPatrulhasCasasToPDF(equipamentos: Equipamento[]) {
-  const patrulhas = equipamentos.filter((e) => e.possui_patrulha);
-  const doc = new jsPDF();
+// Patrulhas das Casas export - Combines equipamentos with patrulha AND solicitacoes with recebeu_patrulha
+export function exportPatrulhasCasasToPDF(equipamentos: Equipamento[], solicitacoes: Solicitacao[]) {
+  // Patrulhas de equipamentos
+  const patrulhasEquip = equipamentos.filter((e) => e.possui_patrulha);
+  const municipiosComPatrulhaEquip = new Set(patrulhasEquip.map(e => e.municipio));
+  
+  // Patrulhas de solicitações (exclui duplicidade)
+  const patrulhasSolic = solicitacoes.filter(
+    (s) => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)
+  );
+  
+  const doc = new jsPDF('landscape');
   
   doc.setFontSize(18);
   doc.text('Relatório de Patrulhas Maria da Penha das Casas', 14, 22);
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
-  doc.text(`Total de registros: ${patrulhas.length}`, 14, 38);
+  doc.text(`Total de registros: ${patrulhasEquip.length + patrulhasSolic.length} (${patrulhasEquip.length} de Equipamentos + ${patrulhasSolic.length} de Solicitações)`, 14, 38);
   
-  const tableData = patrulhas.map((e) => [
-    e.municipio,
-    e.tipo,
-    e.endereco || '-',
-    e.responsavel || '-',
-    e.telefone || '-',
-  ]);
+  // Combine both sources
+  const tableData = [
+    ...patrulhasEquip.map((e) => [
+      e.municipio,
+      getRegiao(e.municipio) || '-',
+      e.tipo,
+      'Equipamento',
+      '-',
+      e.endereco || '-',
+      e.responsavel || '-',
+      e.telefone || '-',
+    ]),
+    ...patrulhasSolic.map((s) => [
+      s.municipio,
+      getRegiao(s.municipio) || '-',
+      s.tipo_equipamento,
+      'Solicitação',
+      s.status,
+      '-',
+      '-',
+      '-',
+    ]),
+  ];
 
   autoTable(doc, {
-    head: [['Município', 'Tipo de Equipamento', 'Endereço', 'Responsável', 'Telefone']],
+    head: [['Município', 'Região', 'Tipo Equipamento', 'Origem', 'Status', 'Endereço', 'Responsável', 'Telefone']],
     body: tableData,
     startY: 45,
-    styles: { fontSize: 8 },
+    styles: { fontSize: 7 },
     headStyles: { fillColor: [16, 185, 129] },
   });
 
   doc.save('patrulhas-casas.pdf');
 }
 
-export function exportPatrulhasCasasToExcel(equipamentos: Equipamento[]) {
-  const patrulhas = equipamentos.filter((e) => e.possui_patrulha);
+export function exportPatrulhasCasasToExcel(equipamentos: Equipamento[], solicitacoes: Solicitacao[]) {
+  // Patrulhas de equipamentos
+  const patrulhasEquip = equipamentos.filter((e) => e.possui_patrulha);
+  const municipiosComPatrulhaEquip = new Set(patrulhasEquip.map(e => e.municipio));
   
-  const data = patrulhas.map((e) => ({
-    'Município': e.municipio,
-    'Tipo de Equipamento': e.tipo,
-    'Endereço': e.endereco || '',
-    'Responsável': e.responsavel || '',
-    'Telefone': e.telefone || '',
-    'Observações': e.observacoes || '',
-    'Data de Criação': new Date(e.created_at).toLocaleDateString('pt-BR'),
-  }));
+  // Patrulhas de solicitações (exclui duplicidade)
+  const patrulhasSolic = solicitacoes.filter(
+    (s) => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)
+  );
+  
+  const data = [
+    ...patrulhasEquip.map((e) => ({
+      'Município': e.municipio,
+      'Região': getRegiao(e.municipio) || '',
+      'Tipo de Equipamento': e.tipo,
+      'Origem': 'Equipamento',
+      'Status': '-',
+      'Endereço': e.endereco || '',
+      'Responsável': e.responsavel || '',
+      'Telefone': e.telefone || '',
+      'Observações': e.observacoes || '',
+      'Data de Criação': new Date(e.created_at).toLocaleDateString('pt-BR'),
+    })),
+    ...patrulhasSolic.map((s) => ({
+      'Município': s.municipio,
+      'Região': getRegiao(s.municipio) || '',
+      'Tipo de Equipamento': s.tipo_equipamento,
+      'Origem': 'Solicitação',
+      'Status': s.status,
+      'Endereço': '',
+      'Responsável': '',
+      'Telefone': '',
+      'Observações': s.observacoes || '',
+      'Data de Criação': new Date(s.created_at).toLocaleDateString('pt-BR'),
+    })),
+  ];
 
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
@@ -418,33 +466,36 @@ export function exportPatrulhasCasasToExcel(equipamentos: Equipamento[]) {
 
 // Equipamentos export
 export function exportEquipamentosToPDF(equipamentos: Equipamento[], filterRegiao?: string) {
-  const doc = new jsPDF();
+  const doc = new jsPDF('landscape');
   
   doc.setFontSize(18);
   doc.text('Relatório de Equipamentos', 14, 22);
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+  doc.text(`Total de registros: ${equipamentos.length}`, 14, 38);
   
-  let startY = 35;
+  let startY = 43;
   if (filterRegiao && filterRegiao !== 'all') {
     doc.setFontSize(11);
-    doc.text(`Região: ${filterRegiao}`, 14, 38);
-    startY = 45;
+    doc.text(`Região: ${filterRegiao}`, 14, startY);
+    startY = 50;
   }
   
   const tableData = equipamentos.map((e) => [
     e.municipio,
+    getRegiao(e.municipio) || '-',
     e.tipo,
+    e.possui_patrulha ? 'Sim' : 'Não',
+    e.endereco || '-',
     e.responsavel || '-',
     e.telefone || '-',
-    e.possui_patrulha ? 'Sim' : 'Não',
   ]);
 
   autoTable(doc, {
-    head: [['Município', 'Tipo', 'Responsável', 'Telefone', 'Patrulha']],
+    head: [['Município', 'Região', 'Tipo', 'Patrulha M.P.', 'Endereço', 'Responsável', 'Telefone']],
     body: tableData,
     startY: startY,
-    styles: { fontSize: 8 },
+    styles: { fontSize: 7 },
     headStyles: { fillColor: [31, 81, 140] },
   });
 
@@ -454,11 +505,12 @@ export function exportEquipamentosToPDF(equipamentos: Equipamento[], filterRegia
 export function exportEquipamentosToExcel(equipamentos: Equipamento[]) {
   const data = equipamentos.map((e) => ({
     'Município': e.municipio,
+    'Região': getRegiao(e.municipio) || '',
     'Tipo': e.tipo,
+    'Patrulha M.P.': e.possui_patrulha ? 'Sim' : 'Não',
+    'Endereço': e.endereco || '',
     'Responsável': e.responsavel || '',
     'Telefone': e.telefone || '',
-    'Endereço': e.endereco || '',
-    'Possui Patrulha': e.possui_patrulha ? 'Sim' : 'Não',
     'Observações': e.observacoes || '',
     'Data de Criação': new Date(e.created_at).toLocaleDateString('pt-BR'),
   }));
@@ -471,49 +523,52 @@ export function exportEquipamentosToExcel(equipamentos: Equipamento[]) {
 
 // Viaturas export
 export function exportViaturasToPDF(viaturas: Viatura[]) {
-  const doc = new jsPDF();
+  const doc = new jsPDF('landscape');
   
   doc.setFontSize(18);
-  doc.text('Relatório de Viaturas', 14, 22);
+  doc.text('Relatório de Viaturas PMCE', 14, 22);
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+  doc.text(`Total de registros: ${viaturas.length}`, 14, 38);
   
   const tableData = viaturas.map((v) => [
     v.municipio,
-    v.tipo_patrulha,
+    getRegiao(v.municipio) || '-',
     v.orgao_responsavel,
     v.quantidade.toString(),
-    v.responsavel || '-',
     new Date(v.data_implantacao).toLocaleDateString('pt-BR'),
+    v.vinculada_equipamento ? 'Sim' : 'Não',
+    v.responsavel || '-',
   ]);
 
   autoTable(doc, {
-    head: [['Município', 'Tipo', 'Órgão', 'Qtd', 'Responsável', 'Data Implantação']],
+    head: [['Município', 'Região', 'Órgão', 'Qtd', 'Implantação', 'Vinculada', 'Responsável']],
     body: tableData,
-    startY: 35,
-    styles: { fontSize: 8 },
+    startY: 45,
+    styles: { fontSize: 7 },
     headStyles: { fillColor: [31, 81, 140] },
   });
 
-  doc.save('viaturas.pdf');
+  doc.save('viaturas-pmce.pdf');
 }
 
 export function exportViaturasToExcel(viaturas: Viatura[]) {
   const data = viaturas.map((v) => ({
     'Município': v.municipio,
+    'Região': getRegiao(v.municipio) || '',
     'Tipo de Patrulha': v.tipo_patrulha,
     'Órgão Responsável': v.orgao_responsavel,
     'Quantidade': v.quantidade,
-    'Responsável': v.responsavel || '',
     'Vinculada a Equipamento': v.vinculada_equipamento ? 'Sim' : 'Não',
     'Data de Implantação': new Date(v.data_implantacao).toLocaleDateString('pt-BR'),
+    'Responsável': v.responsavel || '',
     'Observações': v.observacoes || '',
   }));
 
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Viaturas');
-  XLSX.writeFile(wb, 'viaturas.xlsx');
+  XLSX.writeFile(wb, 'viaturas-pmce.xlsx');
 }
 
 // Solicitações export
@@ -524,20 +579,18 @@ export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[], filterRegia
   doc.text('Relatório de Solicitações', 14, 22);
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+  doc.text(`Total de registros: ${solicitacoes.length}`, 14, 38);
   
-  let startY = 35;
+  let startY = 43;
   if (filterRegiao && filterRegiao !== 'all') {
     doc.setFontSize(11);
-    doc.text(`Região: ${filterRegiao}`, 14, 38);
-    startY = 45;
+    doc.text(`Região: ${filterRegiao}`, 14, startY);
+    startY = 50;
   }
-  
-  doc.setFontSize(10);
-  doc.text(`Total de registros: ${solicitacoes.length}`, 14, startY);
-  startY += 8;
   
   const tableData = solicitacoes.map((s) => [
     s.municipio,
+    getRegiao(s.municipio) || '-',
     s.tipo_equipamento,
     s.status,
     new Date(s.data_solicitacao).toLocaleDateString('pt-BR'),
@@ -546,14 +599,13 @@ export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[], filterRegia
     s.recebeu_patrulha ? 'Sim' : 'Não',
     s.kit_athena_entregue ? 'Sim' : 'Não',
     s.capacitacao_realizada ? 'Sim' : 'Não',
-    s.observacoes ? (s.observacoes.length > 30 ? s.observacoes.substring(0, 30) + '...' : s.observacoes) : '-',
   ]);
 
   autoTable(doc, {
-    head: [['Município', 'Tipo Equipamento', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Capacitação', 'Observações']],
+    head: [['Município', 'Região', 'Tipo', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Capacitação']],
     body: tableData,
     startY: startY,
-    styles: { fontSize: 7 },
+    styles: { fontSize: 6.5 },
     headStyles: { fillColor: [31, 81, 140] },
   });
 
@@ -563,6 +615,7 @@ export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[], filterRegia
 export function exportSolicitacoesToExcel(solicitacoes: Solicitacao[]) {
   const data = solicitacoes.map((s) => ({
     'Município': s.municipio,
+    'Região': getRegiao(s.municipio) || '',
     'Tipo de Equipamento': s.tipo_equipamento,
     'Status': s.status,
     'Data da Solicitação': new Date(s.data_solicitacao).toLocaleDateString('pt-BR'),
@@ -586,7 +639,7 @@ export function exportAllToPDF(
   viaturas: Viatura[],
   solicitacoes: Solicitacao[]
 ) {
-  const doc = new jsPDF();
+  const doc = new jsPDF('landscape');
   let currentY = 22;
   
   // Title
@@ -600,6 +653,7 @@ export function exportAllToPDF(
   // Calculate stats
   const totalEquipamentos = equipamentos.length;
   const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
+  const patrulhasSolicPendentes = solicitacoes.filter(s => s.recebeu_patrulha).length;
   const viaturasVinculadas = viaturas.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
   const viaturasNaoVinculadas = viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
   const totalViaturas = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
@@ -621,26 +675,30 @@ export function exportAllToPDF(
   currentY += 6;
   doc.text(`  - Não vinculadas (PMCE/Polícia): ${viaturasNaoVinculadas}`, 14, currentY);
   currentY += 8;
+  doc.text(`• Patrulhas das Casas Total: ${equipamentosComPatrulha + patrulhasSolicPendentes}`, 14, currentY);
+  currentY += 6;
   doc.text(`• Total de Solicitações: ${solicitacoes.length}`, 14, currentY);
   currentY += 12;
   
-  // Equipamentos table - ALL
+  // Equipamentos table - ALL with Região
   doc.setFontSize(12);
   doc.text('Equipamentos:', 14, currentY);
   
   const eqData = equipamentos.map((e) => [
     e.municipio,
+    getRegiao(e.municipio) || '-',
     e.tipo,
+    e.endereco || '-',
     e.responsavel || '-',
     e.telefone || '-',
     e.possui_patrulha ? 'Sim' : 'Não',
   ]);
 
   autoTable(doc, {
-    head: [['Município', 'Tipo', 'Responsável', 'Telefone', 'Patrulha M.P.']],
+    head: [['Município', 'Região', 'Tipo', 'Endereço', 'Responsável', 'Telefone', 'Patrulha M.P.']],
     body: eqData,
     startY: currentY + 5,
-    styles: { fontSize: 7 },
+    styles: { fontSize: 6.5 },
     headStyles: { fillColor: [31, 81, 140] },
   });
 
@@ -649,20 +707,20 @@ export function exportAllToPDF(
   currentY = 22;
   
   doc.setFontSize(12);
-  doc.text('Viaturas (Patrulha Maria da Penha):', 14, currentY);
+  doc.text('Viaturas PMCE:', 14, currentY);
   
   const vData = viaturas.map((v) => [
     v.municipio,
-    v.tipo_patrulha,
+    getRegiao(v.municipio) || '-',
     v.orgao_responsavel,
     v.quantidade.toString(),
+    new Date(v.data_implantacao).toLocaleDateString('pt-BR'),
     v.vinculada_equipamento ? 'Sim' : 'Não',
     v.responsavel || '-',
-    new Date(v.data_implantacao).toLocaleDateString('pt-BR'),
   ]);
 
   autoTable(doc, {
-    head: [['Município', 'Tipo', 'Órgão', 'Qtd', 'Vinculada', 'Responsável', 'Data Impl.']],
+    head: [['Município', 'Região', 'Órgão', 'Qtd', 'Data Impl.', 'Vinculada', 'Responsável']],
     body: vData,
     startY: currentY + 5,
     styles: { fontSize: 7 },
@@ -678,18 +736,22 @@ export function exportAllToPDF(
   
   const sData = solicitacoes.map((s) => [
     s.municipio,
+    getRegiao(s.municipio) || '-',
     s.tipo_equipamento,
     s.status,
     new Date(s.data_solicitacao).toLocaleDateString('pt-BR'),
     s.suite_implantada || '-',
     s.guarda_municipal_estruturada ? 'Sim' : 'Não',
+    s.recebeu_patrulha ? 'Sim' : 'Não',
+    s.kit_athena_entregue ? 'Sim' : 'Não',
+    s.capacitacao_realizada ? 'Sim' : 'Não',
   ]);
 
   autoTable(doc, {
-    head: [['Município', 'Tipo Equip.', 'Status', 'Data', 'NUP', 'Guarda']],
+    head: [['Município', 'Região', 'Tipo', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Capacitação']],
     body: sData,
     startY: currentY + 5,
-    styles: { fontSize: 7 },
+    styles: { fontSize: 6.5 },
     headStyles: { fillColor: [31, 81, 140] },
   });
 
@@ -703,37 +765,40 @@ export function exportAllToExcel(
 ) {
   const wb = XLSX.utils.book_new();
 
-  // Equipamentos sheet - Complete data
+  // Equipamentos sheet - Complete data with Região
   const eqData = equipamentos.map((e) => ({
     'Município': e.municipio,
+    'Região': getRegiao(e.municipio) || '',
     'Tipo': e.tipo,
+    'Patrulha M.P.': e.possui_patrulha ? 'Sim' : 'Não',
+    'Endereço': e.endereco || '',
     'Responsável': e.responsavel || '',
     'Telefone': e.telefone || '',
-    'Endereço': e.endereco || '',
-    'Possui Patrulha': e.possui_patrulha ? 'Sim' : 'Não',
     'Observações': e.observacoes || '',
     'Data Criação': new Date(e.created_at).toLocaleDateString('pt-BR'),
   }));
   const eqWs = XLSX.utils.json_to_sheet(eqData);
   XLSX.utils.book_append_sheet(wb, eqWs, 'Equipamentos');
 
-  // Viaturas sheet - Complete data
+  // Viaturas sheet - Complete data with Região
   const vData = viaturas.map((v) => ({
     'Município': v.municipio,
+    'Região': getRegiao(v.municipio) || '',
     'Tipo de Patrulha': v.tipo_patrulha,
     'Órgão Responsável': v.orgao_responsavel,
     'Quantidade': v.quantidade,
-    'Responsável': v.responsavel || '',
     'Vinculada a Equipamento': v.vinculada_equipamento ? 'Sim' : 'Não',
     'Data de Implantação': new Date(v.data_implantacao).toLocaleDateString('pt-BR'),
+    'Responsável': v.responsavel || '',
     'Observações': v.observacoes || '',
   }));
   const vWs = XLSX.utils.json_to_sheet(vData);
   XLSX.utils.book_append_sheet(wb, vWs, 'Viaturas');
 
-  // Solicitações sheet - Complete data
+  // Solicitações sheet - Complete data with Região
   const sData = solicitacoes.map((s) => ({
     'Município': s.municipio,
+    'Região': getRegiao(s.municipio) || '',
     'Tipo de Equipamento': s.tipo_equipamento,
     'Status': s.status,
     'Data da Solicitação': new Date(s.data_solicitacao).toLocaleDateString('pt-BR'),

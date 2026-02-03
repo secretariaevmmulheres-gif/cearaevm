@@ -403,11 +403,11 @@ export default function Viaturas() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => exportPatrulhasCasasToPDF(patrulhasDeEquipamentos)}>
+              <DropdownMenuItem onClick={() => exportPatrulhasCasasToPDF(equipamentos, solicitacoes)}>
                   <FilePdf className="w-4 h-4 mr-2" />
                   Exportar PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportPatrulhasCasasToExcel(patrulhasDeEquipamentos)}>
+                <DropdownMenuItem onClick={() => exportPatrulhasCasasToExcel(equipamentos, solicitacoes)}>
                   <FileSpreadsheet className="w-4 h-4 mr-2" />
                   Exportar Excel
                 </DropdownMenuItem>
