@@ -1,101 +1,190 @@
 
-# Preview de Captura do Mapa antes de Exportar PDF
+# Ajuste Completo das Exportações
 
 ## Resumo
 
-Implementar um modal de pré-visualização que mostra uma miniatura da captura do mapa antes de gerar o PDF final. Isso permite ao usuário verificar se o alinhamento está correto e confirmar ou cancelar a exportação.
+Todas as funcionalidades de exportação serão atualizadas para incluir informações completas e consistentes em todos os módulos (Equipamentos, Viaturas, Solicitações, Patrulhas das Casas, Dashboard e Relatórios Regionais).
 
-## Como vai funcionar
+## Problemas Identificados
 
-1. O usuário clica em "Exportar Mapa PDF"
-2. O sistema captura uma imagem do mapa (usando html2canvas)
-3. Um modal abre mostrando a miniatura da captura
-4. O usuário pode:
-   - **Confirmar**: Gera o PDF com a imagem capturada
-   - **Cancelar**: Fecha o modal sem exportar
-   - **Recapturar**: Tenta capturar novamente caso a imagem não esteja boa
+### 1. Patrulhas das Casas (Prioridade Alta)
+- Atualmente exporta APENAS equipamentos com patrulha
+- Faltam as patrulhas vindas de solicitacoes (recebeu_patrulha = true)
+- Total esperado: 52 registros | Atual: apenas 31
 
-## Fluxo Visual
+### 2. Equipamentos
+- PDF faltando: Endereco, Observacoes, Regiao
+- Excel esta mais completo, mas falta Regiao
 
-```text
-┌─────────────────────────────────────────────────┐
-│           Preview da Exportação                  │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ┌─────────────────────────────────────────┐    │
-│  │                                         │    │
-│  │          [Miniatura do Mapa]            │    │
-│  │           (imagem capturada)            │    │
-│  │                                         │    │
-│  └─────────────────────────────────────────┘    │
-│                                                 │
-│  "Verifique se o mapa está alinhado            │
-│   corretamente antes de exportar."             │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│  [Recapturar]     [Cancelar]    [Exportar PDF] │
-└─────────────────────────────────────────────────┘
+### 3. Viaturas PMCE
+- PDF faltando: Observacoes
+- Falta Regiao em ambos (PDF e Excel)
+
+### 4. Solicitacoes
+- PDF e Excel ja estao razoavelmente completos
+- Falta Regiao do municipio
+
+### 5. Exportacao Geral (Dashboard)
+- Falta Regiao em todas as tabelas
+- PDF de Solicitacoes faltando alguns campos de acompanhamento
+
+---
+
+## Mudancas Detalhadas
+
+### Arquivo: `src/lib/exportUtils.ts`
+
+#### 1. Nova funcao para Patrulhas das Casas (Completa)
+
+```typescript
+// Novo tipo para patrulhas unificadas
+interface PatrulhaCasaExport {
+  municipio: string;
+  regiao: string;
+  tipo: string;
+  origem: 'Equipamento' | 'Solicitacao';
+  status?: string;
+  endereco?: string;
+  responsavel?: string;
+  telefone?: string;
+}
+
+// Atualizar exportPatrulhasCasasToPDF
+// - Receber equipamentos E solicitacoes
+// - Combinar patrulhas de ambas fontes
+// - Adicionar coluna Regiao e Origem
+// - Evitar duplicidade por municipio
+```
+
+**Colunas do PDF/Excel:**
+| Municipio | Regiao | Tipo Equipamento | Origem | Status | Endereco | Responsavel | Telefone |
+
+#### 2. Equipamentos - Adicionar Regiao e mais campos
+
+**PDF - Colunas atualizadas:**
+| Municipio | Regiao | Tipo | Patrulha M.P. | Endereco | Responsavel | Telefone |
+
+**Excel - Colunas atualizadas:**
+| Municipio | Regiao | Tipo | Patrulha M.P. | Endereco | Responsavel | Telefone | Observacoes | Data Criacao |
+
+#### 3. Viaturas PMCE - Adicionar Regiao
+
+**PDF - Colunas atualizadas:**
+| Municipio | Regiao | Orgao | Qtd | Implantacao | Vinculada | Responsavel |
+
+**Excel - Colunas atualizadas:**
+| Municipio | Regiao | Tipo | Orgao | Qtd | Vinculada | Data Implantacao | Responsavel | Observacoes |
+
+#### 4. Solicitacoes - Adicionar Regiao
+
+**PDF - Colunas atualizadas:**
+| Municipio | Regiao | Tipo | Status | Data | NUP | Guarda | Patrulha | Kit Athena | Capacitacao |
+
+**Excel - Colunas atualizadas:**
+| Municipio | Regiao | Tipo | Status | Data | NUP | Guarda | Patrulha | Kit Athena | Capacitacao | Observacoes |
+
+#### 5. Exportacao Geral (exportAllToPDF e exportAllToExcel)
+
+- Adicionar coluna Regiao em todas as tabelas
+- Completar campos faltantes nas Solicitacoes
+
+---
+
+### Arquivo: `src/pages/Viaturas.tsx`
+
+Atualizar chamadas de exportacao para passar tanto `equipamentos` quanto `solicitacoes` para as funcoes de exportacao de Patrulhas das Casas:
+
+```typescript
+// Antes
+onClick={() => exportPatrulhasCasasToPDF(patrulhasDeEquipamentos)}
+
+// Depois  
+onClick={() => exportPatrulhasCasasToPDF(equipamentos, solicitacoes)}
 ```
 
 ---
 
-## Detalhes Técnicos
+## Resumo das Colunas por Exportacao
 
-### Arquivos a serem modificados
+### Equipamentos
+| Campo | PDF | Excel |
+|-------|-----|-------|
+| Municipio | Sim | Sim |
+| Regiao | NOVO | NOVO |
+| Tipo | Sim | Sim |
+| Patrulha M.P. | Sim | Sim |
+| Endereco | NOVO | Sim |
+| Responsavel | Sim | Sim |
+| Telefone | Sim | Sim |
+| Observacoes | - | Sim |
+| Data Criacao | - | Sim |
 
-**1. `src/pages/Mapa.tsx`**
-- Adicionar estado para controlar o modal de preview (`showExportPreview`)
-- Adicionar estado para armazenar a imagem capturada (`previewImageData`)
-- Modificar `handleExportMap` para:
-  - Capturar a imagem primeiro
-  - Abrir o modal de preview em vez de exportar diretamente
-- Criar nova função `handleConfirmExport` que:
-  - Usa a imagem já capturada para gerar o PDF
-- Criar nova função `handleRecapture` para recapturar a imagem
-- Adicionar componente Dialog para o modal de preview
+### Viaturas PMCE
+| Campo | PDF | Excel |
+|-------|-----|-------|
+| Municipio | Sim | Sim |
+| Regiao | NOVO | NOVO |
+| Tipo Patrulha | Sim | Sim |
+| Orgao | Sim | Sim |
+| Quantidade | Sim | Sim |
+| Vinculada | Sim | Sim |
+| Data Implantacao | Sim | Sim |
+| Responsavel | Sim | Sim |
+| Observacoes | - | Sim |
 
-**2. `src/lib/exportUtils.ts`**
-- Criar nova função auxiliar `captureMapImage` que:
-  - Faz apenas a captura html2canvas
-  - Retorna o dataURL da imagem e as dimensões do canvas
-- Modificar `exportMapToPDF` para aceitar opcionalmente uma imagem pré-capturada:
-  - Se receber imagem, usa ela diretamente
-  - Se não receber, captura normalmente (compatibilidade)
+### Patrulhas das Casas
+| Campo | PDF | Excel |
+|-------|-----|-------|
+| Municipio | Sim | Sim |
+| Regiao | NOVO | NOVO |
+| Tipo Equipamento | Sim | Sim |
+| Origem | NOVO | NOVO |
+| Status | NOVO | NOVO |
+| Endereco | Sim | Sim |
+| Responsavel | Sim | Sim |
+| Telefone | Sim | Sim |
+| Observacoes | - | Sim |
 
-### Novos estados no Mapa.tsx
-```typescript
-const [showExportPreview, setShowExportPreview] = useState(false);
-const [previewImageData, setPreviewImageData] = useState<{
-  dataUrl: string;
-  width: number;
-  height: number;
-} | null>(null);
-```
+### Solicitacoes
+| Campo | PDF | Excel |
+|-------|-----|-------|
+| Municipio | Sim | Sim |
+| Regiao | NOVO | NOVO |
+| Tipo | Sim | Sim |
+| Status | Sim | Sim |
+| Data | Sim | Sim |
+| NUP | Sim | Sim |
+| Guarda | Sim | Sim |
+| Patrulha | Sim | Sim |
+| Kit Athena | Sim | Sim |
+| Capacitacao | Sim | Sim |
+| Observacoes | - | Sim |
 
-### Nova função captureMapImage
-```typescript
-export async function captureMapImage(
-  mapElement: HTMLElement,
-  highResolution: boolean = false
-): Promise<{ dataUrl: string; width: number; height: number }>
-```
+---
 
-### Fluxo de exportação atualizado
-1. Usuário clica em "Exportar Mapa PDF"
-2. `handleExportMap`:
-   - Invalida o tamanho do mapa (leaflet)
-   - Aguarda tiles renderizarem
-   - Chama `captureMapImage` 
-   - Armazena resultado em `previewImageData`
-   - Abre modal (`setShowExportPreview(true)`)
-3. Usuário confirma no modal
-4. `handleConfirmExport`:
-   - Chama `exportMapToPDF` passando `previewImageData`
-   - Fecha modal
-   - Mostra toast de sucesso
+## Arquivos a Modificar
 
-### Interface do Modal
-- Imagem com borda arredondada e sombra
-- Máximo 80% da largura/altura da viewport
-- Texto explicativo: "Verifique se o mapa está alinhado corretamente"
-- 3 botões: Recapturar (outline), Cancelar (ghost), Exportar PDF (primary)
+1. **`src/lib/exportUtils.ts`**
+   - Atualizar `exportEquipamentosToPDF` - adicionar Regiao e Endereco
+   - Atualizar `exportEquipamentosToExcel` - adicionar Regiao
+   - Atualizar `exportViaturasToPDF` - adicionar Regiao
+   - Atualizar `exportViaturasToExcel` - adicionar Regiao
+   - Atualizar `exportSolicitacoesToPDF` - adicionar Regiao
+   - Atualizar `exportSolicitacoesToExcel` - adicionar Regiao
+   - Reescrever `exportPatrulhasCasasToPDF` - aceitar equipamentos E solicitacoes
+   - Reescrever `exportPatrulhasCasasToExcel` - aceitar equipamentos E solicitacoes
+   - Atualizar `exportAllToPDF` - adicionar Regiao e campos completos
+   - Atualizar `exportAllToExcel` - adicionar Regiao
+
+2. **`src/pages/Viaturas.tsx`**
+   - Atualizar chamadas de `exportPatrulhasCasasToPDF` e `exportPatrulhasCasasToExcel`
+   - Passar `equipamentos` e `solicitacoes` como parametros
+
+---
+
+## Resultado Esperado
+
+- Todas as exportacoes incluirao a Regiao do municipio
+- Patrulhas das Casas exportara os 52 registros (equipamentos + solicitacoes)
+- Informacoes consistentes entre tela e exportacao
+- PDFs em formato paisagem quando necessario para acomodar mais colunas
