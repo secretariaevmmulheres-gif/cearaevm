@@ -14,6 +14,8 @@ export interface RegionStatsExport {
   viaturasVinculadas: number;
   viaturasNaoVinculadas: number;
   patrulhasEmEquipamentos: number;
+  patrulhasDeSolicitacoes?: number;
+  totalPatrulhasCasas?: number;
   totalSolicitacoes: number;
   solicitacoesEmAndamento: number;
   cobertura: number;
@@ -173,23 +175,86 @@ export function exportAllRegionsToPDF(
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, currentY);
   currentY += 15;
 
-  // Overall summary
+  // Overall summary - Improved with clear sections
   const totalEquipamentos = equipamentos.length;
-  const totalViaturas = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
-  const patrulhasEmCasas = equipamentos.filter(e => e.possui_patrulha).length;
+  const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
+  const municipiosComPatrulhaEquip = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
+  const patrulhasSolicitacoes = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)).length;
+  const totalPatrulhasCasas = equipamentosComPatrulha + patrulhasSolicitacoes;
+  
+  const totalViaturasPMCE = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
+  const viaturasVinculadas = viaturas.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
+  const viaturasNaoVinculadas = viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
+  
   const totalSolicitacoes = solicitacoes.length;
+  const solicitacoesEmAndamento = solicitacoes.filter(s => ['Recebida', 'Em análise', 'Aprovada', 'Em implantação'].includes(s.status)).length;
+  const solicitacoesInauguradas = solicitacoes.filter(s => s.status === 'Inaugurada').length;
+  const solicitacoesCanceladas = solicitacoes.filter(s => s.status === 'Cancelada').length;
+  
   const mediaCobertura = regionStats.reduce((sum, r) => sum + r.cobertura, 0) / regionStats.length;
 
-  doc.setFontSize(12);
-  doc.text('Resumo Geral - Estado do Ceará:', 14, currentY);
-  currentY += 8;
+  doc.setFontSize(14);
+  doc.text('RESUMO GERAL - ESTADO DO CEARÁ', 14, currentY);
+  currentY += 12;
+  
+  // Equipamentos Section
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.text('EQUIPAMENTOS', 14, currentY);
+  doc.setFont(undefined, 'normal');
+  currentY += 6;
   doc.setFontSize(10);
   doc.text(`• Total de Equipamentos: ${totalEquipamentos}`, 14, currentY);
+  currentY += 5;
+  doc.text(`  - Com Patrulha M.P.: ${equipamentosComPatrulha}`, 14, currentY);
+  currentY += 5;
+  doc.text(`  - Sem Patrulha M.P.: ${totalEquipamentos - equipamentosComPatrulha}`, 14, currentY);
+  currentY += 8;
+  
+  // Viaturas PMCE Section
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.text('VIATURAS PMCE', 14, currentY);
+  doc.setFont(undefined, 'normal');
   currentY += 6;
-  doc.text(`• Total de Patrulhas M.P.: ${totalViaturas + patrulhasEmCasas}`, 14, currentY);
+  doc.setFontSize(10);
+  doc.text(`• Total de Viaturas PMCE: ${totalViaturasPMCE}`, 14, currentY);
+  currentY += 5;
+  doc.text(`  - Vinculadas a Equipamentos: ${viaturasVinculadas}`, 14, currentY);
+  currentY += 5;
+  doc.text(`  - Não Vinculadas: ${viaturasNaoVinculadas}`, 14, currentY);
+  currentY += 8;
+  
+  // Patrulhas das Casas Section
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.text('PATRULHAS DAS CASAS', 14, currentY);
+  doc.setFont(undefined, 'normal');
   currentY += 6;
+  doc.setFontSize(10);
+  doc.text(`• Total de Patrulhas das Casas: ${totalPatrulhasCasas}`, 14, currentY);
+  currentY += 5;
+  doc.text(`  - De Equipamentos: ${equipamentosComPatrulha}`, 14, currentY);
+  currentY += 5;
+  doc.text(`  - De Solicitações: ${patrulhasSolicitacoes}`, 14, currentY);
+  currentY += 8;
+  
+  // Solicitações Section
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.text('SOLICITAÇÕES', 14, currentY);
+  doc.setFont(undefined, 'normal');
+  currentY += 6;
+  doc.setFontSize(10);
   doc.text(`• Total de Solicitações: ${totalSolicitacoes}`, 14, currentY);
-  currentY += 6;
+  currentY += 5;
+  doc.text(`  - Em Andamento: ${solicitacoesEmAndamento}`, 14, currentY);
+  currentY += 5;
+  doc.text(`  - Inauguradas: ${solicitacoesInauguradas}`, 14, currentY);
+  currentY += 5;
+  doc.text(`  - Canceladas: ${solicitacoesCanceladas}`, 14, currentY);
+  currentY += 10;
+  
   doc.text(`• Média de Cobertura: ${mediaCobertura.toFixed(2)}%`, 14, currentY);
   currentY += 12;
 
@@ -653,32 +718,67 @@ export function exportAllToPDF(
   // Calculate stats
   const totalEquipamentos = equipamentos.length;
   const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
-  const patrulhasSolicPendentes = solicitacoes.filter(s => s.recebeu_patrulha).length;
+  const municipiosComPatrulhaEquip = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
+  const patrulhasSolicitacoes = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)).length;
+  const totalPatrulhasCasas = equipamentosComPatrulha + patrulhasSolicitacoes;
+  
+  const totalViaturasPMCE = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
   const viaturasVinculadas = viaturas.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
   const viaturasNaoVinculadas = viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
-  const totalViaturas = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
   
-  // Summary
-  doc.setFontSize(12);
-  doc.text('Resumo Geral:', 14, currentY);
-  currentY += 8;
-  doc.setFontSize(10);
-  doc.text(`• Total de Equipamentos: ${totalEquipamentos}`, 14, currentY);
-  currentY += 6;
-  doc.text(`  - Com Patrulha Maria da Penha vinculada: ${equipamentosComPatrulha}`, 14, currentY);
-  currentY += 6;
-  doc.text(`  - Sem Patrulha Maria da Penha vinculada: ${totalEquipamentos - equipamentosComPatrulha}`, 14, currentY);
-  currentY += 8;
-  doc.text(`• Total de Viaturas (Patrulha Maria da Penha): ${totalViaturas}`, 14, currentY);
-  currentY += 6;
-  doc.text(`  - Vinculadas a equipamentos (Casas): ${viaturasVinculadas}`, 14, currentY);
-  currentY += 6;
-  doc.text(`  - Não vinculadas (PMCE/Polícia): ${viaturasNaoVinculadas}`, 14, currentY);
-  currentY += 8;
-  doc.text(`• Patrulhas das Casas Total: ${equipamentosComPatrulha + patrulhasSolicPendentes}`, 14, currentY);
-  currentY += 6;
-  doc.text(`• Total de Solicitações: ${solicitacoes.length}`, 14, currentY);
-  currentY += 12;
+  const solicitacoesEmAndamento = solicitacoes.filter(s => ['Recebida', 'Em análise', 'Aprovada', 'Em implantação'].includes(s.status)).length;
+  const solicitacoesInauguradas = solicitacoes.filter(s => s.status === 'Inaugurada').length;
+  const solicitacoesCanceladas = solicitacoes.filter(s => s.status === 'Cancelada').length;
+  
+  // ========================================
+  // RESUMO GERAL - Structured in 4 sections
+  // ========================================
+  doc.setFontSize(14);
+  doc.text('RESUMO GERAL - ESTADO DO CEARÁ', 14, currentY);
+  currentY += 10;
+  
+  // Column 1 - EQUIPAMENTOS
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.text('EQUIPAMENTOS', 14, currentY);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.text(`• Total: ${totalEquipamentos}`, 14, currentY + 5);
+  doc.text(`  - Com Patrulha M.P.: ${equipamentosComPatrulha}`, 14, currentY + 9);
+  doc.text(`  - Sem Patrulha M.P.: ${totalEquipamentos - equipamentosComPatrulha}`, 14, currentY + 13);
+  
+  // Column 2 - VIATURAS PMCE
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.text('VIATURAS PMCE', 84, currentY);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.text(`• Total: ${totalViaturasPMCE}`, 84, currentY + 5);
+  doc.text(`  - Vinculadas a Equipamentos: ${viaturasVinculadas}`, 84, currentY + 9);
+  doc.text(`  - Não Vinculadas: ${viaturasNaoVinculadas}`, 84, currentY + 13);
+  
+  // Column 3 - PATRULHAS DAS CASAS
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.text('PATRULHAS DAS CASAS', 164, currentY);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.text(`• Total: ${totalPatrulhasCasas}`, 164, currentY + 5);
+  doc.text(`  - De Equipamentos: ${equipamentosComPatrulha}`, 164, currentY + 9);
+  doc.text(`  - De Solicitações: ${patrulhasSolicitacoes}`, 164, currentY + 13);
+  
+  // Column 4 - SOLICITAÇÕES
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.text('SOLICITAÇÕES', 234, currentY);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.text(`• Total: ${solicitacoes.length}`, 234, currentY + 5);
+  doc.text(`  - Em Andamento: ${solicitacoesEmAndamento}`, 234, currentY + 9);
+  doc.text(`  - Inauguradas: ${solicitacoesInauguradas}`, 234, currentY + 13);
+  doc.text(`  - Canceladas: ${solicitacoesCanceladas}`, 234, currentY + 17);
+  
+  currentY += 28;
   
   // Equipamentos table - ALL with Região
   doc.setFontSize(12);
@@ -702,7 +802,7 @@ export function exportAllToPDF(
     headStyles: { fillColor: [31, 81, 140] },
   });
 
-  // New page for Viaturas
+  // New page for Viaturas PMCE
   doc.addPage();
   currentY = 22;
   
@@ -725,6 +825,48 @@ export function exportAllToPDF(
     startY: currentY + 5,
     styles: { fontSize: 7 },
     headStyles: { fillColor: [31, 81, 140] },
+  });
+
+  // New page for Patrulhas das Casas
+  doc.addPage();
+  currentY = 22;
+  
+  doc.setFontSize(12);
+  doc.text(`Patrulhas das Casas (${totalPatrulhasCasas} registros: ${equipamentosComPatrulha} de Equipamentos + ${patrulhasSolicitacoes} de Solicitações):`, 14, currentY);
+  
+  // Combine patrulhas from equipamentos and solicitacoes
+  const patrulhasEquip = equipamentos.filter((e) => e.possui_patrulha);
+  const patrulhasSolic = solicitacoes.filter(
+    (s) => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)
+  );
+  
+  const patrulhasData = [
+    ...patrulhasEquip.map((e) => [
+      e.municipio,
+      getRegiao(e.municipio) || '-',
+      e.tipo,
+      'Equipamento',
+      '-',
+      e.endereco || '-',
+      e.responsavel || '-',
+    ]),
+    ...patrulhasSolic.map((s) => [
+      s.municipio,
+      getRegiao(s.municipio) || '-',
+      s.tipo_equipamento,
+      'Solicitação',
+      s.status,
+      '-',
+      '-',
+    ]),
+  ];
+
+  autoTable(doc, {
+    head: [['Município', 'Região', 'Tipo', 'Origem', 'Status', 'Endereço', 'Responsável']],
+    body: patrulhasData,
+    startY: currentY + 5,
+    styles: { fontSize: 7 },
+    headStyles: { fillColor: [16, 185, 129] },
   });
 
   // New page for Solicitações
@@ -780,7 +922,7 @@ export function exportAllToExcel(
   const eqWs = XLSX.utils.json_to_sheet(eqData);
   XLSX.utils.book_append_sheet(wb, eqWs, 'Equipamentos');
 
-  // Viaturas sheet - Complete data with Região
+  // Viaturas PMCE sheet - Complete data with Região
   const vData = viaturas.map((v) => ({
     'Município': v.municipio,
     'Região': getRegiao(v.municipio) || '',
@@ -793,7 +935,43 @@ export function exportAllToExcel(
     'Observações': v.observacoes || '',
   }));
   const vWs = XLSX.utils.json_to_sheet(vData);
-  XLSX.utils.book_append_sheet(wb, vWs, 'Viaturas');
+  XLSX.utils.book_append_sheet(wb, vWs, 'Viaturas PMCE');
+
+  // Patrulhas das Casas sheet - NEW
+  const patrulhasEquip = equipamentos.filter((e) => e.possui_patrulha);
+  const municipiosComPatrulhaEquip = new Set(patrulhasEquip.map(e => e.municipio));
+  const patrulhasSolic = solicitacoes.filter(
+    (s) => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)
+  );
+  
+  const patrulhasData = [
+    ...patrulhasEquip.map((e) => ({
+      'Município': e.municipio,
+      'Região': getRegiao(e.municipio) || '',
+      'Tipo de Equipamento': e.tipo,
+      'Origem': 'Equipamento',
+      'Status': '-',
+      'Endereço': e.endereco || '',
+      'Responsável': e.responsavel || '',
+      'Telefone': e.telefone || '',
+      'Observações': e.observacoes || '',
+      'Data Criação': new Date(e.created_at).toLocaleDateString('pt-BR'),
+    })),
+    ...patrulhasSolic.map((s) => ({
+      'Município': s.municipio,
+      'Região': getRegiao(s.municipio) || '',
+      'Tipo de Equipamento': s.tipo_equipamento,
+      'Origem': 'Solicitação',
+      'Status': s.status,
+      'Endereço': '',
+      'Responsável': '',
+      'Telefone': '',
+      'Observações': s.observacoes || '',
+      'Data Criação': new Date(s.created_at).toLocaleDateString('pt-BR'),
+    })),
+  ];
+  const pWs = XLSX.utils.json_to_sheet(patrulhasData);
+  XLSX.utils.book_append_sheet(wb, pWs, 'Patrulhas Casas');
 
   // Solicitações sheet - Complete data with Região
   const sData = solicitacoes.map((s) => ({
