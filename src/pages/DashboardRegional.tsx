@@ -59,6 +59,8 @@ interface RegionStats {
   viaturasVinculadas: number;
   viaturasNaoVinculadas: number;
   patrulhasEmEquipamentos: number;
+  patrulhasDeSolicitacoes: number;
+  totalPatrulhasCasas: number;
   totalSolicitacoes: number;
   solicitacoesEmAndamento: number;
   cobertura: number;
@@ -89,13 +91,25 @@ export default function DashboardRegional() {
       const viaturasDaRegiao = viaturas.filter(v => getRegiao(v.municipio) === regiao);
       const viaturasNaoVinculadas = viaturasDaRegiao.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
       const viaturasVinculadas = viaturasDaRegiao.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
-      // Total de viaturas inclui: viaturas cadastradas + patrulhas vinculadas aos equipamentos
-      const totalViaturas = viaturasDaRegiao.reduce((sum, v) => sum + v.quantidade, 0) + patrulhasEmEquipamentos;
       
       const solicitacoesDaRegiao = solicitacoes.filter(s => getRegiao(s.municipio) === regiao);
       const solicitacoesEmAndamento = solicitacoesDaRegiao.filter(s => 
         ['Recebida', 'Em análise', 'Aprovada', 'Em implantação'].includes(s.status)
       ).length;
+      
+      // Patrulhas de solicitações na região (exclui duplicidade com equipamentos)
+      const municipiosComPatrulhaEquip = new Set(
+        equipamentosDaRegiao.filter(e => e.possui_patrulha).map(e => e.municipio)
+      );
+      const patrulhasDeSolicitacoes = solicitacoesDaRegiao.filter(
+        s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)
+      ).length;
+      
+      // Total de patrulhas das casas = equipamentos + solicitações
+      const totalPatrulhasCasas = patrulhasEmEquipamentos + patrulhasDeSolicitacoes;
+      
+      // Total de viaturas inclui: viaturas PMCE + patrulhas das casas
+      const totalViaturas = viaturasDaRegiao.reduce((sum, v) => sum + v.quantidade, 0) + totalPatrulhasCasas;
 
       return {
         regiao,
@@ -106,6 +120,8 @@ export default function DashboardRegional() {
         viaturasVinculadas,
         viaturasNaoVinculadas,
         patrulhasEmEquipamentos,
+        patrulhasDeSolicitacoes,
+        totalPatrulhasCasas,
         totalSolicitacoes: solicitacoesDaRegiao.length,
         solicitacoesEmAndamento,
         cobertura: totalMunicipios > 0 ? (municipiosComEquipamento / totalMunicipios) * 100 : 0,
@@ -219,14 +235,25 @@ export default function DashboardRegional() {
 
   // Estatísticas totais
   const patrulhasEmEquipamentos = equipamentos.filter(e => e.possui_patrulha).length;
+  const municipiosComPatrulhaEquipGlobal = new Set(
+    equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio)
+  );
+  const patrulhasDeSolicitacoesGlobal = solicitacoes.filter(
+    s => s.recebeu_patrulha && !municipiosComPatrulhaEquipGlobal.has(s.municipio)
+  ).length;
+  const totalPatrulhasCasasGlobal = patrulhasEmEquipamentos + patrulhasDeSolicitacoesGlobal;
+  
   const totals = useMemo(() => ({
     equipamentos: equipamentos.length,
-    viaturas: viaturas.reduce((sum, v) => sum + v.quantidade, 0) + patrulhasEmEquipamentos,
-    viaturasNaoVinculadas: viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0),
+    viaturasPMCE: viaturas.reduce((sum, v) => sum + v.quantidade, 0),
+    totalPatrulhasCasas: totalPatrulhasCasasGlobal,
     patrulhasEmEquipamentos,
+    patrulhasDeSolicitacoes: patrulhasDeSolicitacoesGlobal,
+    viaturas: viaturas.reduce((sum, v) => sum + v.quantidade, 0) + totalPatrulhasCasasGlobal,
+    viaturasNaoVinculadas: viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0),
     solicitacoes: solicitacoes.length,
     mediaCobertura: regionStats.reduce((sum, r) => sum + r.cobertura, 0) / regionStats.length,
-  }), [equipamentos, viaturas, solicitacoes, regionStats, patrulhasEmEquipamentos]);
+  }), [equipamentos, viaturas, solicitacoes, regionStats, patrulhasEmEquipamentos, patrulhasDeSolicitacoesGlobal, totalPatrulhasCasasGlobal]);
 
   // Região selecionada
   const selectedStats = selectedRegiao !== 'all' 
@@ -332,8 +359,11 @@ export default function DashboardRegional() {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-display font-bold text-accent">{selectedStats.totalViaturas}</span>
-              <span className="text-sm text-muted-foreground">({selectedStats.patrulhasEmEquipamentos} em casas)</span>
+              <span className="text-sm text-muted-foreground">({selectedStats.totalPatrulhasCasas} em casas)</span>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {selectedStats.patrulhasEmEquipamentos} equip. + {selectedStats.patrulhasDeSolicitacoes} solic.
+            </p>
           </div>
           <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
             <div className="flex items-center justify-between mb-2">
@@ -371,7 +401,9 @@ export default function DashboardRegional() {
               <span className="text-sm text-muted-foreground">Total Patrulhas M.P.</span>
             </div>
             <span className="text-3xl font-display font-bold">{totals.viaturas}</span>
-            <p className="text-xs text-muted-foreground mt-1">{totals.patrulhasEmEquipamentos} em casas + {totals.viaturasNaoVinculadas} PMCE</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {totals.totalPatrulhasCasas} casas ({totals.patrulhasEmEquipamentos} equip. + {totals.patrulhasDeSolicitacoes} solic.) + {totals.viaturasPMCE} PMCE
+            </p>
           </div>
           <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
             <div className="flex items-center gap-3 mb-2">
