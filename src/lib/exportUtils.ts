@@ -1,8 +1,101 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Equipamento, Viatura, Solicitacao } from '@/types';
+import html2canvas from 'html2canvas';
+import { Equipamento, Viatura, Solicitacao, DashboardStats } from '@/types';
 import { regioesList, getRegiao, getMunicipiosPorRegiao, RegiaoPlanejamento } from '@/data/municipios';
+
+// Export Dashboard with charts as images
+export async function exportDashboardWithChartsToPDF(
+  chartsContainer: HTMLElement,
+  equipamentos: Equipamento[],
+  viaturas: Viatura[],
+  solicitacoes: Solicitacao[],
+  stats: DashboardStats
+) {
+  const doc = new jsPDF('landscape');
+  let currentY = 20;
+
+  // Header
+  doc.setFontSize(20);
+  doc.text('Dashboard - EVM Ceará', 14, currentY);
+  currentY += 8;
+  doc.setFontSize(10);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, currentY);
+  currentY += 12;
+
+  // Summary stats
+  doc.setFontSize(14);
+  doc.text('Resumo Geral', 14, currentY);
+  currentY += 8;
+
+  // Stats in columns
+  const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
+  const municipiosComPatrulhaEquip = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
+  const patrulhasSolicitacoes = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)).length;
+  const totalPatrulhasCasas = equipamentosComPatrulha + patrulhasSolicitacoes;
+  const totalViaturasPMCE = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
+
+  doc.setFontSize(10);
+  doc.text(`Equipamentos: ${stats.totalEquipamentos}`, 14, currentY);
+  doc.text(`Viaturas PMCE: ${totalViaturasPMCE}`, 84, currentY);
+  doc.text(`Patrulhas das Casas: ${totalPatrulhasCasas}`, 154, currentY);
+  doc.text(`Solicitações: ${stats.totalSolicitacoes}`, 224, currentY);
+  currentY += 5;
+  doc.text(`  - Com Patrulha: ${equipamentosComPatrulha}`, 14, currentY);
+  doc.text(`  - Vinculadas: ${viaturas.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0)}`, 84, currentY);
+  doc.text(`  - De Equipamentos: ${equipamentosComPatrulha}`, 154, currentY);
+  doc.text(`  - Inauguradas: ${stats.solicitacoesPorStatus['Inaugurada'] || 0}`, 224, currentY);
+  currentY += 5;
+  doc.text(`  - Sem Patrulha: ${stats.totalEquipamentos - equipamentosComPatrulha}`, 14, currentY);
+  doc.text(`  - Não Vinculadas: ${viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0)}`, 84, currentY);
+  doc.text(`  - De Solicitações: ${patrulhasSolicitacoes}`, 154, currentY);
+  doc.text(`  - Em Andamento: ${solicitacoes.filter(s => ['Recebida', 'Em análise', 'Aprovada', 'Em implantação'].includes(s.status)).length}`, 224, currentY);
+  currentY += 10;
+
+  doc.text(`Municípios com Equipamento: ${stats.municipiosComEquipamento} / 184 (${((stats.municipiosComEquipamento / 184) * 100).toFixed(1)}%)`, 14, currentY);
+  currentY += 10;
+
+  // Capture charts as image
+  try {
+    const canvas = await html2canvas(chartsContainer, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    
+    // Add new page for charts
+    doc.addPage();
+    currentY = 15;
+    
+    doc.setFontSize(14);
+    doc.text('Gráficos do Dashboard', 14, currentY);
+    currentY += 8;
+
+    // Calculate dimensions to fit the page
+    const pageWidth = doc.internal.pageSize.getWidth() - 28;
+    const pageHeight = doc.internal.pageSize.getHeight() - 40;
+    
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+    
+    const finalWidth = imgWidth * ratio;
+    const finalHeight = imgHeight * ratio;
+
+    doc.addImage(imgData, 'PNG', 14, currentY, finalWidth, finalHeight);
+  } catch (error) {
+    console.error('Error capturing charts:', error);
+    doc.text('Não foi possível capturar os gráficos.', 14, currentY);
+  }
+
+  doc.save('dashboard-com-graficos.pdf');
+}
+
+
 
 // Regional Dashboard export types
 export interface RegionStatsExport {
