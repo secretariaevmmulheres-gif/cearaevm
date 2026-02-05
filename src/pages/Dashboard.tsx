@@ -60,9 +60,11 @@ export default function Dashboard() {
     .filter(([_, value]) => value > 0)
     .map(([name, value]) => ({ name, value }));
 
-  const viaturasChartData = Object.entries(stats.viaturasPorOrgao)
-    .filter(([_, value]) => value > 0)
-    .map(([name, value]) => ({ name, value }));
+  // Gráfico de viaturas: PMCE + Patrulhas das Casas
+  const viaturasChartData = [
+    { name: 'PMCE', value: stats.viaturasPMCE },
+    { name: 'Patrulhas das Casas', value: stats.viaturasPatrulhasCasas },
+  ].filter(item => item.value > 0);
 
   // Evolução temporal - agrupa por mês
   const evolutionData = useMemo(() => {
