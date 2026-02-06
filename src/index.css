@@ -136,85 +136,125 @@
 }
 
 @layer components {
+  /* Modern stat card with glassmorphism */
   .stat-card {
-    @apply bg-card rounded-xl p-5 border border-border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5;
+    @apply bg-card/80 backdrop-blur-sm rounded-xl p-5 border border-border shadow-sm;
+    @apply transition-all duration-300 ease-out;
+    @apply hover:shadow-lg hover:-translate-y-1 hover:border-primary/20;
+  }
+
+  .stat-card-animate {
+    opacity: 0;
+    animation: fade-up 0.5s ease-out forwards;
   }
 
   .stat-value {
-    @apply text-3xl font-bold text-foreground;
+    @apply text-3xl font-bold tracking-tight;
     font-family: 'Plus Jakarta Sans', sans-serif;
+    background: linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(var(--foreground) / 0.8) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
   }
 
   .stat-label {
-    @apply text-sm text-muted-foreground font-medium;
+    @apply text-sm text-muted-foreground font-medium tracking-wide;
   }
 
+  /* Modern data tables */
   .data-table {
     @apply w-full border-collapse;
   }
 
   .data-table th {
-    @apply bg-muted/50 text-left px-4 py-3 text-sm font-semibold text-foreground border-b border-border;
+    @apply bg-muted/30 backdrop-blur-sm text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border;
+    @apply first:rounded-tl-lg last:rounded-tr-lg;
   }
 
   .data-table td {
-    @apply px-4 py-3 text-sm border-b border-border;
+    @apply px-4 py-3.5 text-sm border-b border-border/50 transition-colors duration-150;
   }
 
-  .data-table tr:hover td {
+  .data-table tbody tr {
+    @apply transition-all duration-200;
+  }
+
+  .data-table tbody tr:hover td {
     @apply bg-muted/30;
   }
 
+  .data-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* Animated table rows */
+  .data-table tbody tr.animate-fade-in {
+    animation: fade-up 0.3s ease-out forwards;
+  }
+
+  /* Status badges with modern styling */
   .badge-status {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold;
+    @apply shadow-sm transition-all duration-200 hover:scale-105;
   }
 
   .badge-recebida {
-    @apply bg-blue-100 text-blue-800;
+    @apply bg-blue-500/15 text-blue-600 ring-1 ring-blue-500/20;
   }
 
   .badge-analise {
-    @apply bg-yellow-100 text-yellow-800;
+    @apply bg-yellow-500/15 text-yellow-600 ring-1 ring-yellow-500/20;
   }
 
   .badge-aprovada {
-    @apply bg-green-100 text-green-800;
+    @apply bg-green-500/15 text-green-600 ring-1 ring-green-500/20;
   }
 
   .badge-implantacao {
-    @apply bg-purple-100 text-purple-800;
+    @apply bg-purple-500/15 text-purple-600 ring-1 ring-purple-500/20;
   }
 
   .badge-inaugurada {
-    @apply bg-emerald-100 text-emerald-800;
+    @apply bg-emerald-500/15 text-emerald-600 ring-1 ring-emerald-500/20;
   }
 
   .badge-cancelada {
-    @apply bg-red-100 text-red-800;
+    @apply bg-red-500/15 text-red-600 ring-1 ring-red-500/20;
   }
 
+  /* Equipment type badges */
   .equipment-badge {
-    @apply inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold;
+    @apply inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-semibold;
+    @apply shadow-sm transition-all duration-200 hover:scale-105;
   }
 
   .equipment-brasileira {
-    background-color: hsl(var(--casa-brasileira) / 0.15);
-    color: hsl(var(--casa-brasileira));
+    @apply bg-gradient-to-r from-pink-500/15 to-rose-500/15 text-pink-600 ring-1 ring-pink-500/20;
   }
 
   .equipment-cearense {
-    background-color: hsl(var(--casa-cearense) / 0.15);
-    color: hsl(var(--casa-cearense));
+    @apply bg-gradient-to-r from-violet-500/15 to-purple-500/15 text-violet-600 ring-1 ring-violet-500/20;
   }
 
   .equipment-municipal {
-    background-color: hsl(var(--casa-municipal) / 0.15);
-    color: hsl(var(--casa-municipal));
+    @apply bg-gradient-to-r from-sky-500/15 to-blue-500/15 text-sky-600 ring-1 ring-sky-500/20;
   }
 
   .equipment-lilas {
-    background-color: hsl(var(--sala-lilas) / 0.15);
-    color: hsl(var(--sala-lilas));
+    @apply bg-gradient-to-r from-fuchsia-500/15 to-pink-500/15 text-fuchsia-600 ring-1 ring-fuchsia-500/20;
+  }
+
+  /* Modern chart cards */
+  .chart-card {
+    @apply bg-card/80 backdrop-blur-sm rounded-2xl p-6 border border-border shadow-sm;
+    @apply transition-all duration-300 hover:shadow-lg hover:border-primary/20;
+  }
+
+  .chart-title {
+    @apply font-display font-semibold text-lg flex items-center gap-2;
+  }
+
+  .chart-title-dot {
+    @apply w-2.5 h-2.5 rounded-full;
   }
 }
 

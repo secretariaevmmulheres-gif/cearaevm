@@ -186,78 +186,96 @@ export default function Dashboard() {
         </DropdownMenu>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid with staggered animation */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <StatCard
-          title="Total de Equipamentos"
-          value={stats.totalEquipamentos}
-          icon={Building2}
-          variant="primary"
-          description="Unidades cadastradas"
-        />
-        <StatCard
-          title="Viaturas PMCE"
-          value={stats.viaturasPMCE}
-          icon={Truck}
-          variant="accent"
-          description="Batalhão PMCE"
-        />
-        <StatCard
-          title="Patrulhas das Casas"
-          value={stats.viaturasPatrulhasCasas}
-          icon={Truck}
-          variant="success"
-          description="Vinculadas a equipamentos"
-        />
-        <StatCard
-          title="Solicitações"
-          value={stats.totalSolicitacoes}
-          icon={FileText}
-          variant="warning"
-          description="Em acompanhamento"
-        />
-        <StatCard
-          title="Municípios Cobertos"
-          value={stats.municipiosComEquipamento}
-          icon={MapPin}
-          description={`de 184 municípios`}
-        />
+        <div className="animate-fade-up" style={{ animationDelay: '0ms' }}>
+          <StatCard
+            title="Total de Equipamentos"
+            value={stats.totalEquipamentos}
+            icon={Building2}
+            variant="primary"
+            description="Unidades cadastradas"
+          />
+        </div>
+        <div className="animate-fade-up" style={{ animationDelay: '50ms' }}>
+          <StatCard
+            title="Viaturas PMCE"
+            value={stats.viaturasPMCE}
+            icon={Truck}
+            variant="accent"
+            description="Batalhão PMCE"
+          />
+        </div>
+        <div className="animate-fade-up" style={{ animationDelay: '100ms' }}>
+          <StatCard
+            title="Patrulhas das Casas"
+            value={stats.viaturasPatrulhasCasas}
+            icon={Truck}
+            variant="success"
+            description="Vinculadas a equipamentos"
+          />
+        </div>
+        <div className="animate-fade-up" style={{ animationDelay: '150ms' }}>
+          <StatCard
+            title="Solicitações"
+            value={stats.totalSolicitacoes}
+            icon={FileText}
+            variant="warning"
+            description="Em acompanhamento"
+          />
+        </div>
+        <div className="animate-fade-up" style={{ animationDelay: '200ms' }}>
+          <StatCard
+            title="Municípios Cobertos"
+            value={stats.municipiosComEquipamento}
+            icon={MapPin}
+            description={`de 184 municípios`}
+          />
+        </div>
       </div>
 
       {/* Secondary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          title="Com Patrulha M.P."
-          value={stats.equipamentosComPatrulha}
-          icon={CheckCircle2}
-          description="Equipamentos com patrulha"
-        />
-        <StatCard
-          title="Viatura s/ Equipamento"
-          value={stats.municipiosComViaturaSemEquipamento}
-          icon={Truck}
-          description="Municípios"
-        />
-        <StatCard
-          title="Sem Cobertura"
-          value={stats.municipiosSemEquipamento}
-          icon={AlertCircle}
-          description="Municípios"
-        />
-        <StatCard
-          title="Inauguradas"
-          value={stats.solicitacoesPorStatus['Inaugurada'] || 0}
-          icon={Users}
-          description="Solicitações concluídas"
-        />
+        <div className="animate-fade-up" style={{ animationDelay: '250ms' }}>
+          <StatCard
+            title="Com Patrulha M.P."
+            value={stats.equipamentosComPatrulha}
+            icon={CheckCircle2}
+            description="Equipamentos com patrulha"
+          />
+        </div>
+        <div className="animate-fade-up" style={{ animationDelay: '300ms' }}>
+          <StatCard
+            title="Viatura s/ Equipamento"
+            value={stats.municipiosComViaturaSemEquipamento}
+            icon={Truck}
+            description="Municípios"
+          />
+        </div>
+        <div className="animate-fade-up" style={{ animationDelay: '350ms' }}>
+          <StatCard
+            title="Sem Cobertura"
+            value={stats.municipiosSemEquipamento}
+            icon={AlertCircle}
+            description="Municípios"
+          />
+        </div>
+        <div className="animate-fade-up" style={{ animationDelay: '400ms' }}>
+          <StatCard
+            title="Inauguradas"
+            value={stats.solicitacoesPorStatus['Inaugurada'] || 0}
+            icon={Users}
+            description="Solicitações concluídas"
+          />
+        </div>
       </div>
 
       {/* Charts - with ref for export */}
       <div ref={chartsRef} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Equipamentos por Tipo */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm hover:shadow-md transition-shadow">
-          <h3 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary" />
+        <div className="chart-card animate-fade-up" style={{ animationDelay: '450ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-primary" />
             Equipamentos por Tipo
           </h3>
           <div className="h-72">
@@ -265,27 +283,32 @@ export default function Dashboard() {
               <BarChart data={equipamentoChartData} layout="vertical" margin={{ left: 10, right: 30 }}>
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="hsl(280, 65%, 55%)" />
-                    <stop offset="100%" stopColor="hsl(250, 65%, 60%)" />
+                    <stop offset="0%" stopColor="hsl(320, 60%, 50%)" />
+                    <stop offset="100%" stopColor="hsl(280, 65%, 55%)" />
                   </linearGradient>
+                  <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="hsl(320, 60%, 50%)" floodOpacity="0.3"/>
+                  </filter>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis type="number" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} horizontal={true} vertical={false} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <YAxis 
                   dataKey="name" 
                   type="category" 
-                  tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }} 
+                  tick={{ fontSize: 11, fill: 'hsl(var(--foreground))', fontWeight: 500 }} 
                   width={85} 
                   axisLine={false}
                   tickLine={false}
                 />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--primary) / 0.05)', radius: 8 }} />
                 <Bar 
                   dataKey="value" 
                   fill="url(#barGradient)" 
-                  radius={[0, 8, 8, 0]} 
+                  radius={[0, 10, 10, 0]} 
                   name="Quantidade"
-                  animationDuration={800}
+                  animationDuration={1000}
+                  animationEasing="ease-out"
+                  filter="url(#barShadow)"
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -293,9 +316,9 @@ export default function Dashboard() {
         </div>
 
         {/* Solicitações por Status */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm hover:shadow-md transition-shadow">
-          <h3 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-accent" />
+        <div className="chart-card animate-fade-up" style={{ animationDelay: '500ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-accent" />
             Solicitações por Status
           </h3>
           <div className="h-72">
@@ -306,51 +329,60 @@ export default function Dashboard() {
                     {COLORS.map((color, index) => (
                       <linearGradient key={index} id={`pieGradient${index}`} x1="0" y1="0" x2="1" y2="1">
                         <stop offset="0%" stopColor={color} stopOpacity={1} />
-                        <stop offset="100%" stopColor={color} stopOpacity={0.7} />
+                        <stop offset="100%" stopColor={color} stopOpacity={0.75} />
                       </linearGradient>
                     ))}
+                    <filter id="pieShadow">
+                      <feDropShadow dx="0" dy="4" stdDeviation="4" floodOpacity="0.15"/>
+                    </filter>
                   </defs>
                   <Pie
                     data={solicitacoesChartData}
                     cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={90}
-                    paddingAngle={3}
+                    cy="45%"
+                    innerRadius={50}
+                    outerRadius={85}
+                    paddingAngle={4}
                     dataKey="value"
-                    label={({ name, value }) => `${value}`}
-                    labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
-                    animationDuration={800}
+                    label={({ value }) => value}
+                    labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
                   >
                     {solicitacoesChartData.map((_, index) => (
                       <Cell 
                         key={`cell-${index}`} 
                         fill={`url(#pieGradient${index % COLORS.length})`}
                         stroke="hsl(var(--background))"
-                        strokeWidth={2}
+                        strokeWidth={3}
+                        filter="url(#pieShadow)"
                       />
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                   <Legend 
                     verticalAlign="bottom" 
-                    height={36}
-                    formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
+                    height={40}
+                    formatter={(value) => <span className="text-xs font-medium text-foreground">{value}</span>}
+                    wrapperStyle={{ paddingTop: '10px' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground">
-                Nenhuma solicitação cadastrada
+                <div className="text-center">
+                  <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                  <p>Nenhuma solicitação cadastrada</p>
+                </div>
               </div>
             )}
           </div>
         </div>
 
         {/* Viaturas por Órgão */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm hover:shadow-md transition-shadow">
-          <h3 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-success" />
+        <div className="chart-card animate-fade-up" style={{ animationDelay: '550ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-success" />
             Viaturas por Órgão
           </h3>
           <div className="h-72">
@@ -359,154 +391,205 @@ export default function Dashboard() {
                 <PieChart>
                   <defs>
                     <linearGradient id="viatGradient0" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="hsl(280, 65%, 60%)" />
-                      <stop offset="100%" stopColor="hsl(280, 65%, 45%)" />
+                      <stop offset="0%" stopColor="hsl(215, 70%, 50%)" />
+                      <stop offset="100%" stopColor="hsl(215, 70%, 35%)" />
                     </linearGradient>
                     <linearGradient id="viatGradient1" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="hsl(160, 60%, 50%)" />
-                      <stop offset="100%" stopColor="hsl(160, 60%, 35%)" />
+                      <stop offset="0%" stopColor="hsl(160, 60%, 45%)" />
+                      <stop offset="100%" stopColor="hsl(160, 60%, 30%)" />
                     </linearGradient>
+                    <filter id="viatShadow">
+                      <feDropShadow dx="0" dy="4" stdDeviation="4" floodOpacity="0.15"/>
+                    </filter>
                   </defs>
                   <Pie
                     data={viaturasChartData}
                     cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={90}
-                    paddingAngle={4}
+                    cy="45%"
+                    innerRadius={50}
+                    outerRadius={85}
+                    paddingAngle={5}
                     dataKey="value"
-                    label={({ name, value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}
-                    labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
-                    animationDuration={800}
+                    label={({ value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}
+                    labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
                   >
                     {viaturasChartData.map((_, index) => (
                       <Cell 
                         key={`cell-${index}`} 
                         fill={`url(#viatGradient${index})`}
                         stroke="hsl(var(--background))"
-                        strokeWidth={2}
+                        strokeWidth={3}
+                        filter="url(#viatShadow)"
                       />
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                   <Legend 
                     verticalAlign="bottom" 
-                    height={36}
-                    formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
+                    height={40}
+                    formatter={(value) => <span className="text-xs font-medium text-foreground">{value}</span>}
+                    wrapperStyle={{ paddingTop: '10px' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground">
-                Nenhuma viatura cadastrada
+                <div className="text-center">
+                  <Truck className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                  <p>Nenhuma viatura cadastrada</p>
+                </div>
               </div>
             )}
           </div>
         </div>
 
         {/* Cobertura do Estado */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm hover:shadow-md transition-shadow">
-          <h3 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-info" />
+        <div className="chart-card animate-fade-up" style={{ animationDelay: '600ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-info" />
             Cobertura do Estado
           </h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
-              <span className="text-sm font-medium">Com Equipamento</span>
+          <div className="space-y-3">
+            <div className="group flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-xl border border-primary/20 transition-all duration-300 hover:border-primary/40 hover:shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-primary" />
+                </div>
+                <span className="text-sm font-medium">Com Equipamento</span>
+              </div>
               <span className="text-2xl font-display font-bold text-primary">
                 {stats.municipiosComEquipamento}
               </span>
             </div>
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-info/10 to-info/5 rounded-lg border border-info/20">
-              <span className="text-sm font-medium">Com Viatura (sem equipamento)</span>
+            <div className="group flex items-center justify-between p-4 bg-gradient-to-r from-info/10 via-info/5 to-transparent rounded-xl border border-info/20 transition-all duration-300 hover:border-info/40 hover:shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-info/15 flex items-center justify-center">
+                  <Truck className="w-5 h-5 text-info" />
+                </div>
+                <span className="text-sm font-medium">Com Viatura (sem equipamento)</span>
+              </div>
               <span className="text-2xl font-display font-bold text-info">
                 {stats.municipiosComViaturaSemEquipamento}
               </span>
             </div>
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border border-border">
-              <span className="text-sm font-medium">Sem Cobertura</span>
+            <div className="group flex items-center justify-between p-4 bg-gradient-to-r from-muted/40 via-muted/20 to-transparent rounded-xl border border-border transition-all duration-300 hover:border-muted-foreground/30 hover:shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <span className="text-sm font-medium">Sem Cobertura</span>
+              </div>
               <span className="text-2xl font-display font-bold text-muted-foreground">
                 {stats.municipiosSemEquipamento}
               </span>
             </div>
-            <div className="relative w-full h-4 bg-muted rounded-full overflow-hidden">
-              <div
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-accent to-primary rounded-full transition-all duration-700"
-                style={{
-                  width: `${(stats.municipiosComEquipamento / 184) * 100}%`,
-                }}
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.1)_50%,transparent_100%)] animate-pulse" />
+            <div className="relative mt-4">
+              <div className="relative w-full h-5 bg-muted/50 rounded-full overflow-hidden shadow-inner">
+                <div
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-accent to-primary rounded-full transition-all duration-1000 ease-out"
+                  style={{
+                    width: `${(stats.municipiosComEquipamento / 184) * 100}%`,
+                  }}
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.15)_50%,transparent_100%)] animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+              </div>
+              <p className="text-sm text-muted-foreground text-center font-medium mt-3">
+                <span className="text-xl font-bold text-primary">{((stats.municipiosComEquipamento / 184) * 100).toFixed(1)}%</span>
+                <span className="ml-2">do estado com equipamento</span>
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground text-center font-medium">
-              <span className="text-primary text-lg">{((stats.municipiosComEquipamento / 184) * 100).toFixed(1)}%</span> do estado com equipamento
-            </p>
           </div>
         </div>
 
         {/* Evolução Temporal */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm hover:shadow-md transition-shadow lg:col-span-2">
-          <h3 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-warning" />
+        <div className="chart-card animate-fade-up lg:col-span-2" style={{ animationDelay: '650ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-warning" />
             Evolução Temporal (Acumulado)
           </h3>
-          <div className="h-72">
+          <div className="h-80">
             {evolutionData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={evolutionData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                <LineChart data={evolutionData} margin={{ top: 20, right: 30, bottom: 10, left: 0 }}>
                   <defs>
                     <linearGradient id="lineGradient1" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="hsl(280, 65%, 55%)" />
-                      <stop offset="100%" stopColor="hsl(250, 65%, 60%)" />
+                      <stop offset="0%" stopColor="hsl(215, 70%, 50%)" />
+                      <stop offset="100%" stopColor="hsl(280, 65%, 55%)" />
                     </linearGradient>
                     <linearGradient id="lineGradient2" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="hsl(330, 75%, 60%)" />
-                      <stop offset="100%" stopColor="hsl(280, 65%, 60%)" />
+                      <stop offset="0%" stopColor="hsl(320, 60%, 50%)" />
+                      <stop offset="100%" stopColor="hsl(280, 65%, 55%)" />
                     </linearGradient>
+                    <linearGradient id="areaGradient1" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(215, 70%, 50%)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="hsl(215, 70%, 50%)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="areaGradient2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(320, 60%, 50%)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="hsl(320, 60%, 50%)" stopOpacity={0} />
+                    </linearGradient>
+                    <filter id="lineShadow1">
+                      <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="hsl(215, 70%, 50%)" floodOpacity="0.4"/>
+                    </filter>
+                    <filter id="lineShadow2">
+                      <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="hsl(320, 60%, 50%)" floodOpacity="0.4"/>
+                    </filter>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis 
                     dataKey="month" 
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} 
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))', fontWeight: 500 }} 
                     axisLine={false}
                     tickLine={false}
+                    dy={10}
                   />
                   <YAxis 
                     tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} 
                     axisLine={false}
                     tickLine={false}
+                    dx={-10}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend 
                     verticalAlign="top" 
-                    height={36}
-                    formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
+                    height={40}
+                    formatter={(value) => <span className="text-sm font-medium text-foreground">{value}</span>}
+                    wrapperStyle={{ paddingBottom: '10px' }}
                   />
                   <Line
                     type="monotone"
                     dataKey="equipamentos"
                     name="Equipamentos"
                     stroke="url(#lineGradient1)"
-                    strokeWidth={3}
-                    dot={{ fill: 'hsl(280, 65%, 55%)', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, fill: 'hsl(280, 65%, 55%)', stroke: 'white', strokeWidth: 2 }}
-                    animationDuration={1000}
+                    strokeWidth={4}
+                    dot={{ fill: 'hsl(215, 70%, 50%)', strokeWidth: 0, r: 5 }}
+                    activeDot={{ r: 8, fill: 'hsl(215, 70%, 50%)', stroke: 'white', strokeWidth: 3 }}
+                    animationDuration={1200}
+                    animationEasing="ease-out"
+                    filter="url(#lineShadow1)"
                   />
                   <Line
                     type="monotone"
                     dataKey="solicitacoes"
                     name="Solicitações"
                     stroke="url(#lineGradient2)"
-                    strokeWidth={3}
-                    dot={{ fill: 'hsl(330, 75%, 60%)', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, fill: 'hsl(330, 75%, 60%)', stroke: 'white', strokeWidth: 2 }}
-                    animationDuration={1000}
+                    strokeWidth={4}
+                    dot={{ fill: 'hsl(320, 60%, 50%)', strokeWidth: 0, r: 5 }}
+                    activeDot={{ r: 8, fill: 'hsl(320, 60%, 50%)', stroke: 'white', strokeWidth: 3 }}
+                    animationDuration={1200}
+                    animationEasing="ease-out"
+                    filter="url(#lineShadow2)"
                   />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground">
-                Nenhum dado para exibir evolução temporal
+                <div className="text-center">
+                  <Clock className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                  <p>Nenhum dado para exibir evolução temporal</p>
+                </div>
               </div>
             )}
           </div>
