@@ -342,82 +342,102 @@ export default function DashboardRegional() {
       {/* Cards de Resumo */}
       {selectedStats ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Equipamentos</span>
+          <div className="group bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-xl p-6 border border-primary/20 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/40 animate-fade-up" style={{ animationDelay: '0ms' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-primary" />
+              </div>
               {getComparisonIcon(selectedStats.totalEquipamentos, totals.equipamentos / 14)}
             </div>
-            <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Equipamentos</span>
+            <div className="flex items-baseline gap-2 mt-1">
               <span className="text-3xl font-display font-bold text-primary">{selectedStats.totalEquipamentos}</span>
-              <span className="text-sm text-muted-foreground">de {totals.equipamentos} total</span>
+              <span className="text-sm text-muted-foreground">de {totals.equipamentos}</span>
             </div>
           </div>
-          <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Patrulhas M.P.</span>
+          <div className="group bg-gradient-to-br from-accent/10 via-accent/5 to-transparent rounded-xl p-6 border border-accent/20 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-accent/40 animate-fade-up" style={{ animationDelay: '50ms' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-lg bg-accent/15 flex items-center justify-center">
+                <Truck className="w-5 h-5 text-accent" />
+              </div>
               {getComparisonIcon(selectedStats.totalViaturas, totals.viaturas / 14)}
             </div>
-            <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Patrulhas M.P.</span>
+            <div className="flex items-baseline gap-2 mt-1">
               <span className="text-3xl font-display font-bold text-accent">{selectedStats.totalViaturas}</span>
-              <span className="text-sm text-muted-foreground">({selectedStats.totalPatrulhasCasas} em casas)</span>
+              <span className="text-sm text-muted-foreground">({selectedStats.totalPatrulhasCasas} casas)</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {selectedStats.patrulhasEmEquipamentos} equip. + {selectedStats.patrulhasDeSolicitacoes} solic.
             </p>
           </div>
-          <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Solicitações</span>
+          <div className="group bg-gradient-to-br from-warning/10 via-warning/5 to-transparent rounded-xl p-6 border border-warning/20 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-warning/40 animate-fade-up" style={{ animationDelay: '100ms' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-lg bg-warning/15 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-warning" />
+              </div>
               {getComparisonIcon(selectedStats.totalSolicitacoes, totals.solicitacoes / 14)}
             </div>
-            <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Solicitações</span>
+            <div className="flex items-baseline gap-2 mt-1">
               <span className="text-3xl font-display font-bold text-warning">{selectedStats.totalSolicitacoes}</span>
-              <span className="text-sm text-muted-foreground">({selectedStats.solicitacoesEmAndamento} em andamento)</span>
+              <span className="text-sm text-muted-foreground">({selectedStats.solicitacoesEmAndamento} andamento)</span>
             </div>
           </div>
-          <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Cobertura</span>
+          <div className="group bg-gradient-to-br from-success/10 via-success/5 to-transparent rounded-xl p-6 border border-success/20 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-success/40 animate-fade-up" style={{ animationDelay: '150ms' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-lg bg-success/15 flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-success" />
+              </div>
               {getComparisonIcon(selectedStats.cobertura, totals.mediaCobertura)}
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-display font-bold text-success">{selectedStats.cobertura.toFixed(2)}%</span>
-              <span className="text-sm text-muted-foreground">({selectedStats.municipiosComEquipamento}/{selectedStats.totalMunicipios} municípios)</span>
+            <span className="text-sm font-medium text-muted-foreground">Cobertura</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-display font-bold text-success">{selectedStats.cobertura.toFixed(1)}%</span>
+              <span className="text-sm text-muted-foreground">({selectedStats.municipiosComEquipamento}/{selectedStats.totalMunicipios})</span>
             </div>
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <Building2 className="w-5 h-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Total Equipamentos</span>
+          <div className="group bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-xl p-6 border border-primary/20 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 animate-fade-up" style={{ animationDelay: '0ms' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-primary" />
+              </div>
+              <span className="text-sm font-medium text-muted-foreground">Total Equipamentos</span>
             </div>
-            <span className="text-3xl font-display font-bold">{totals.equipamentos}</span>
+            <span className="text-3xl font-display font-bold text-primary">{totals.equipamentos}</span>
           </div>
-          <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <Truck className="w-5 h-5 text-accent" />
-              <span className="text-sm text-muted-foreground">Total Patrulhas M.P.</span>
+          <div className="group bg-gradient-to-br from-accent/10 via-accent/5 to-transparent rounded-xl p-6 border border-accent/20 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 animate-fade-up" style={{ animationDelay: '50ms' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-accent/15 flex items-center justify-center">
+                <Truck className="w-5 h-5 text-accent" />
+              </div>
+              <span className="text-sm font-medium text-muted-foreground">Total Patrulhas M.P.</span>
             </div>
-            <span className="text-3xl font-display font-bold">{totals.viaturas}</span>
+            <span className="text-3xl font-display font-bold text-accent">{totals.viaturas}</span>
             <p className="text-xs text-muted-foreground mt-1">
-              {totals.totalPatrulhasCasas} casas ({totals.patrulhasEmEquipamentos} equip. + {totals.patrulhasDeSolicitacoes} solic.) + {totals.viaturasPMCE} PMCE
+              {totals.totalPatrulhasCasas} casas + {totals.viaturasPMCE} PMCE
             </p>
           </div>
-          <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <FileText className="w-5 h-5 text-warning" />
-              <span className="text-sm text-muted-foreground">Total Solicitações</span>
+          <div className="group bg-gradient-to-br from-warning/10 via-warning/5 to-transparent rounded-xl p-6 border border-warning/20 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 animate-fade-up" style={{ animationDelay: '100ms' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-warning/15 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-warning" />
+              </div>
+              <span className="text-sm font-medium text-muted-foreground">Total Solicitações</span>
             </div>
-            <span className="text-3xl font-display font-bold">{totals.solicitacoes}</span>
+            <span className="text-3xl font-display font-bold text-warning">{totals.solicitacoes}</span>
           </div>
-          <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <MapPin className="w-5 h-5 text-success" />
-              <span className="text-sm text-muted-foreground">Média de Cobertura</span>
+          <div className="group bg-gradient-to-br from-success/10 via-success/5 to-transparent rounded-xl p-6 border border-success/20 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 animate-fade-up" style={{ animationDelay: '150ms' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-success/15 flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-success" />
+              </div>
+              <span className="text-sm font-medium text-muted-foreground">Média de Cobertura</span>
             </div>
-            <span className="text-3xl font-display font-bold">{totals.mediaCobertura.toFixed(2)}%</span>
+            <span className="text-3xl font-display font-bold text-success">{totals.mediaCobertura.toFixed(1)}%</span>
           </div>
         </div>
       )}
@@ -425,33 +445,46 @@ export default function DashboardRegional() {
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Gráfico de Barras - Cobertura por Região */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm lg:col-span-2">
-          <h3 className="font-display font-semibold text-lg mb-4">Cobertura por Região (%)</h3>
+        <div className="chart-card lg:col-span-2 animate-fade-up" style={{ animationDelay: '200ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-primary" />
+            Cobertura por Região (%)
+          </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barChartData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <defs>
+                  <linearGradient id="coverageGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="hsl(215, 70%, 50%)" />
+                    <stop offset="100%" stopColor="hsl(280, 65%, 55%)" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} horizontal={true} vertical={false} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <YAxis 
                   dataKey="name" 
                   type="category" 
-                  tick={{ fontSize: 10 }} 
+                  tick={{ fontSize: 10, fill: 'hsl(var(--foreground))', fontWeight: 500 }} 
                   width={120}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
                   }}
-                  formatter={(value: number, name: string) => [`${value}%`, 'Cobertura']}
+                  formatter={(value: number) => [`${value}%`, 'Cobertura']}
                   labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
                 />
                 <Bar 
                   dataKey="cobertura" 
-                  fill="hsl(var(--primary))" 
-                  radius={[0, 4, 4, 0]}
-                  label={{ position: 'right', fontSize: 11, fill: 'hsl(var(--foreground))' }}
+                  fill="url(#coverageGradient)" 
+                  radius={[0, 8, 8, 0]}
+                  animationDuration={1000}
+                  label={{ position: 'right', fontSize: 11, fill: 'hsl(var(--foreground))', fontWeight: 600 }}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -459,40 +492,63 @@ export default function DashboardRegional() {
         </div>
 
         {/* Gráfico de Barras - Comparativo */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-          <h3 className="font-display font-semibold text-lg mb-4">Recursos por Região</h3>
+        <div className="chart-card animate-fade-up" style={{ animationDelay: '250ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-accent" />
+            Recursos por Região
+          </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <defs>
+                  <linearGradient id="equipGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(320, 60%, 50%)" />
+                    <stop offset="100%" stopColor="hsl(320, 60%, 40%)" />
+                  </linearGradient>
+                  <linearGradient id="viatGradientBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(200, 85%, 55%)" />
+                    <stop offset="100%" stopColor="hsl(200, 85%, 45%)" />
+                  </linearGradient>
+                  <linearGradient id="solicGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(38, 92%, 50%)" />
+                    <stop offset="100%" stopColor="hsl(38, 92%, 40%)" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                 <XAxis 
                   dataKey="name" 
-                  tick={{ fontSize: 9 }} 
+                  tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} 
                   interval={0}
                   height={80}
                   tickFormatter={(value) => value.length > 10 ? value.substring(0, 8) + '...' : value}
+                  axisLine={false}
+                  tickLine={false}
                 />
-                <YAxis tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
                   }}
                   labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
                 />
-                <Legend />
-                <Bar dataKey="equipamentos" name="Equipamentos" fill="#c026d3" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="viaturas" name="Viaturas" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="solicitacoes" name="Solicitações" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Legend 
+                  formatter={(value) => <span className="text-xs font-medium">{value}</span>}
+                />
+                <Bar dataKey="equipamentos" name="Equipamentos" fill="url(#equipGradient)" radius={[6, 6, 0, 0]} animationDuration={800} />
+                <Bar dataKey="viaturas" name="Viaturas" fill="url(#viatGradientBar)" radius={[6, 6, 0, 0]} animationDuration={800} />
+                <Bar dataKey="solicitacoes" name="Solicitações" fill="url(#solicGradient)" radius={[6, 6, 0, 0]} animationDuration={800} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Radar Chart */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-          <h3 className="font-display font-semibold text-lg mb-4">
+        <div className="chart-card animate-fade-up" style={{ animationDelay: '300ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-success" />
             {selectedRegiao === 'all' ? 'Perfil das Top 5 Regiões' : `Perfil: ${selectedRegiao}`}
           </h3>
           <div className="h-80">
@@ -503,9 +559,9 @@ export default function DashboardRegional() {
                 { metric: 'Solicitações', ...Object.fromEntries(radarData.map(r => [r.regiao, r.Solicitações])) },
                 { metric: 'Cobertura', ...Object.fromEntries(radarData.map(r => [r.regiao, r.Cobertura])) },
               ]}>
-                <PolarGrid stroke="hsl(var(--border))" />
-                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
-                <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: 'hsl(var(--foreground))', fontWeight: 500 }} />
+                <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                 {radarData.map((r, idx) => (
                   <Radar
                     key={r.regiao}
@@ -513,15 +569,18 @@ export default function DashboardRegional() {
                     dataKey={r.regiao}
                     stroke={COLORS[idx % COLORS.length]}
                     fill={COLORS[idx % COLORS.length]}
-                    fillOpacity={0.3}
+                    fillOpacity={0.25}
+                    strokeWidth={2}
+                    animationDuration={800}
                   />
                 ))}
-                <Legend />
+                <Legend formatter={(value) => <span className="text-xs font-medium">{value}</span>} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
                   }}
                 />
               </RadarChart>
@@ -530,80 +589,112 @@ export default function DashboardRegional() {
         </div>
 
         {/* Gráfico de Pizza - Equipamentos por Tipo */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-          <h3 className="font-display font-semibold text-lg mb-4">
+        <div className="chart-card animate-fade-up" style={{ animationDelay: '350ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-warning" />
             Equipamentos por Tipo {selectedRegiao !== 'all' && `(${selectedRegiao})`}
           </h3>
           <div className="h-80">
             {pieChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
+                  <defs>
+                    {pieChartData.map((entry, index) => (
+                      <linearGradient key={index} id={`pieEquipGrad${index}`} x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor={entry.color} stopOpacity={1} />
+                        <stop offset="100%" stopColor={entry.color} stopOpacity={0.7} />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <Pie
                     data={pieChartData}
                     cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
-                    outerRadius={100}
+                    cy="45%"
+                    labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
+                    label={({ value }) => value}
+                    innerRadius={45}
+                    outerRadius={85}
+                    paddingAngle={4}
                     dataKey="value"
+                    animationDuration={1000}
                   >
                     {pieChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={`url(#pieEquipGrad${index})`} stroke="hsl(var(--background))" strokeWidth={3} />
                     ))}
                   </Pie>
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
                     }}
                   />
-                  <Legend />
+                  <Legend formatter={(value) => <span className="text-xs font-medium">{value}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                Nenhum equipamento nesta seleção
+                <div className="text-center">
+                  <Building2 className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                  <p>Nenhum equipamento nesta seleção</p>
+                </div>
               </div>
             )}
           </div>
         </div>
 
         {/* Gráfico de Pizza - Status de Solicitações */}
-        <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-          <h3 className="font-display font-semibold text-lg mb-4">
+        <div className="chart-card animate-fade-up" style={{ animationDelay: '400ms' }}>
+          <h3 className="chart-title mb-4">
+            <div className="chart-title-dot bg-info" />
             Solicitações por Status {selectedRegiao !== 'all' && `(${selectedRegiao})`}
           </h3>
           <div className="h-80">
             {statusChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
+                  <defs>
+                    {statusChartData.map((entry, index) => (
+                      <linearGradient key={index} id={`pieStatusGrad${index}`} x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor={entry.color} stopOpacity={1} />
+                        <stop offset="100%" stopColor={entry.color} stopOpacity={0.7} />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <Pie
                     data={statusChartData}
                     cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, value, percent }) => `${name}: ${value}`}
-                    outerRadius={100}
+                    cy="45%"
+                    labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
+                    label={({ value }) => value}
+                    innerRadius={45}
+                    outerRadius={85}
+                    paddingAngle={4}
                     dataKey="value"
+                    animationDuration={1000}
                   >
                     {statusChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={`url(#pieStatusGrad${index})`} stroke="hsl(var(--background))" strokeWidth={3} />
                     ))}
                   </Pie>
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
                     }}
                   />
-                  <Legend />
+                  <Legend formatter={(value) => <span className="text-xs font-medium">{value}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                Nenhuma solicitação nesta seleção
+                <div className="text-center">
+                  <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                  <p>Nenhuma solicitação nesta seleção</p>
+                </div>
               </div>
             )}
           </div>
@@ -611,11 +702,12 @@ export default function DashboardRegional() {
       </div>
 
       {/* Tabela Comparativa */}
-      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border">
+      <div className="chart-card overflow-hidden animate-fade-up" style={{ animationDelay: '450ms' }}>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="chart-title-dot bg-primary" />
           <h3 className="font-display font-semibold text-lg">Ranking por Região</h3>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-border/50">
           <table className="data-table">
             <thead>
               <tr>
@@ -634,53 +726,65 @@ export default function DashboardRegional() {
                 <tr 
                   key={r.regiao} 
                   className={cn(
-                    "animate-fade-in",
-                    selectedRegiao === r.regiao && "bg-primary/5"
+                    selectedRegiao === r.regiao && "bg-primary/5 ring-1 ring-inset ring-primary/20"
                   )}
+                  style={{ animationDelay: `${450 + idx * 30}ms` }}
                 >
-                  <td className="font-bold text-muted-foreground">{idx + 1}</td>
+                  <td>
+                    <span className={cn(
+                      "inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
+                      idx === 0 && "bg-yellow-500/20 text-yellow-600",
+                      idx === 1 && "bg-gray-400/20 text-gray-600",
+                      idx === 2 && "bg-amber-600/20 text-amber-700",
+                      idx > 2 && "bg-muted text-muted-foreground"
+                    )}>
+                      {idx + 1}
+                    </span>
+                  </td>
                   <td className="font-medium">{r.regiao}</td>
-                  <td className="text-center">{r.totalMunicipios}</td>
+                  <td className="text-center text-muted-foreground">{r.totalMunicipios}</td>
                   <td className="text-center">
-                    <span className="inline-flex items-center gap-1">
-                      <Building2 className="w-4 h-4 text-primary" />
-                      {r.totalEquipamentos}
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10">
+                      <Building2 className="w-3.5 h-3.5 text-primary" />
+                      <span className="font-semibold text-primary">{r.totalEquipamentos}</span>
                     </span>
                   </td>
                   <td className="text-center">
-                    <span className="inline-flex items-center gap-1">
-                      <Truck className="w-4 h-4 text-accent" />
-                      {r.totalViaturas}
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-accent/10">
+                      <Truck className="w-3.5 h-3.5 text-accent" />
+                      <span className="font-semibold text-accent">{r.totalViaturas}</span>
                     </span>
                   </td>
                   <td className="text-center">
-                    <span className="inline-flex items-center gap-1">
-                      <FileText className="w-4 h-4 text-warning" />
-                      {r.totalSolicitacoes}
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-warning/10">
+                      <FileText className="w-3.5 h-3.5 text-warning" />
+                      <span className="font-semibold text-warning">{r.totalSolicitacoes}</span>
                     </span>
                   </td>
                   <td className="text-center">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="w-4 h-4 text-info" />
-                      {r.solicitacoesEmAndamento}
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-info/10">
+                      <Clock className="w-3.5 h-3.5 text-info" />
+                      <span className="font-semibold text-info">{r.solicitacoesEmAndamento}</span>
                     </span>
                   </td>
                   <td className="text-center">
                     <div className="flex items-center gap-2 justify-center">
-                      <div className="w-16 bg-muted rounded-full h-2 overflow-hidden">
+                      <div className="w-20 bg-muted/50 rounded-full h-2.5 overflow-hidden shadow-inner">
                         <div
                           className={cn(
-                            "h-full transition-all duration-500",
-                            r.cobertura >= 50 ? "bg-success" : r.cobertura >= 25 ? "bg-warning" : "bg-destructive"
+                            "h-full transition-all duration-700 rounded-full",
+                            r.cobertura >= 50 ? "bg-gradient-to-r from-success to-emerald-400" : 
+                            r.cobertura >= 25 ? "bg-gradient-to-r from-warning to-amber-400" : 
+                            "bg-gradient-to-r from-destructive to-red-400"
                           )}
                           style={{ width: `${r.cobertura}%` }}
                         />
                       </div>
                       <span className={cn(
-                        "text-sm font-medium",
+                        "text-sm font-bold tabular-nums",
                         r.cobertura >= 50 ? "text-success" : r.cobertura >= 25 ? "text-warning" : "text-destructive"
                       )}>
-                        {r.cobertura.toFixed(2)}%
+                        {r.cobertura.toFixed(1)}%
                       </span>
                     </div>
                   </td>
