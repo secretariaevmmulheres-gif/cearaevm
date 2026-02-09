@@ -144,24 +144,15 @@ export default function DashboardRegional() {
     }));
   }, [regionStats]);
 
-  // Dados para o radar chart
+  // Dados para o radar chart - valores absolutos
   const radarData = useMemo(() => {
-    const maxValues = {
-      equipamentos: Math.max(...regionStats.map(r => r.totalEquipamentos), 1),
-      viaturas: Math.max(...regionStats.map(r => r.totalViaturas), 1),
-      solicitacoes: Math.max(...regionStats.map(r => r.totalSolicitacoes), 1),
-      cobertura: 100,
-      municipios: Math.max(...regionStats.map(r => r.totalMunicipios), 1),
-    };
-
     if (selectedRegiao === 'all') {
-      // Mostra top 5 regiões no radar
       return regionStats.slice(0, 5).map(r => ({
         regiao: r.regiao,
-        Equipamentos: (r.totalEquipamentos / maxValues.equipamentos) * 100,
-        Viaturas: (r.totalViaturas / maxValues.viaturas) * 100,
-        Solicitações: (r.totalSolicitacoes / maxValues.solicitacoes) * 100,
-        Cobertura: r.cobertura,
+        Equipamentos: r.totalEquipamentos,
+        'Patrulhas M.P.': r.totalViaturas,
+        Solicitações: r.totalSolicitacoes,
+        'Cobertura (%)': Math.round(r.cobertura),
       }));
     }
 
@@ -170,10 +161,10 @@ export default function DashboardRegional() {
 
     return [{
       regiao: selected.regiao,
-      Equipamentos: (selected.totalEquipamentos / maxValues.equipamentos) * 100,
-      Viaturas: (selected.totalViaturas / maxValues.viaturas) * 100,
-      Solicitações: (selected.totalSolicitacoes / maxValues.solicitacoes) * 100,
-      Cobertura: selected.cobertura,
+      Equipamentos: selected.totalEquipamentos,
+      'Patrulhas M.P.': selected.totalViaturas,
+      Solicitações: selected.totalSolicitacoes,
+      'Cobertura (%)': Math.round(selected.cobertura),
     }];
   }, [regionStats, selectedRegiao]);
 
@@ -545,23 +536,23 @@ export default function DashboardRegional() {
           </div>
         </div>
 
-        {/* Radar Chart */}
+        {/* Radar Chart - valores absolutos */}
         <div className="chart-card animate-fade-up" style={{ animationDelay: '300ms' }}>
           <h3 className="chart-title mb-4">
             <div className="chart-title-dot bg-success" />
-            {selectedRegiao === 'all' ? 'Perfil das Top 5 Regiões' : `Perfil: ${selectedRegiao}`}
+            {selectedRegiao === 'all' ? 'Perfil das Top 5 Regiões (valores absolutos)' : `Perfil: ${selectedRegiao}`}
           </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={[
                 { metric: 'Equipamentos', ...Object.fromEntries(radarData.map(r => [r.regiao, r.Equipamentos])) },
-                { metric: 'Viaturas', ...Object.fromEntries(radarData.map(r => [r.regiao, r.Viaturas])) },
+                { metric: 'Patrulhas M.P.', ...Object.fromEntries(radarData.map(r => [r.regiao, r['Patrulhas M.P.']])) },
                 { metric: 'Solicitações', ...Object.fromEntries(radarData.map(r => [r.regiao, r.Solicitações])) },
-                { metric: 'Cobertura', ...Object.fromEntries(radarData.map(r => [r.regiao, r.Cobertura])) },
+                { metric: 'Cobertura (%)', ...Object.fromEntries(radarData.map(r => [r.regiao, r['Cobertura (%)']])) },
               ]}>
                 <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.5} />
                 <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: 'hsl(var(--foreground))', fontWeight: 500 }} />
-                <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                <PolarRadiusAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                 {radarData.map((r, idx) => (
                   <Radar
                     key={r.regiao}
