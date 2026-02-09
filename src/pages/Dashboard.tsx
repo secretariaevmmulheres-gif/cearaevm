@@ -1,7 +1,9 @@
 import { useMemo, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { StatCard } from '@/components/dashboard/StatCard';
+import { MotionStatCard } from '@/components/dashboard/MotionStatCard';
+import { ChartCard } from '@/components/dashboard/ChartCard';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useViaturas } from '@/hooks/useViaturas';
@@ -97,8 +99,8 @@ export default function Dashboard() {
   }));
 
   const solicitacoesChartData = Object.entries(stats.solicitacoesPorStatus)
-    .filter(([_, value]) => value > 0)
-    .map(([name, value]) => ({ name, value }));
+    .filter(([_, value]) => (value as number) > 0)
+    .map(([name, value]) => ({ name, value: value as number }));
 
   // Gráfico de viaturas: PMCE + Patrulhas das Casas
   const viaturasChartData = [
@@ -163,10 +165,12 @@ export default function Dashboard() {
         />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Download className="w-4 h-4" />
-              Exportar Tudo
-            </Button>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button variant="outline" className="gap-2">
+                <Download className="w-4 h-4" />
+                Exportar Tudo
+              </Button>
+            </motion.div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={handleExportWithCharts}>
@@ -186,98 +190,84 @@ export default function Dashboard() {
         </DropdownMenu>
       </div>
 
-      {/* Stats Grid with staggered animation */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <div className="animate-fade-up" style={{ animationDelay: '0ms' }}>
-          <StatCard
-            title="Total de Equipamentos"
-            value={stats.totalEquipamentos}
-            icon={Building2}
-            variant="primary"
-            description="Unidades cadastradas"
-          />
-        </div>
-        <div className="animate-fade-up" style={{ animationDelay: '50ms' }}>
-          <StatCard
-            title="Viaturas PMCE"
-            value={stats.viaturasPMCE}
-            icon={Truck}
-            variant="accent"
-            description="Batalhão PMCE"
-          />
-        </div>
-        <div className="animate-fade-up" style={{ animationDelay: '100ms' }}>
-          <StatCard
-            title="Patrulhas das Casas"
-            value={stats.viaturasPatrulhasCasas}
-            icon={Truck}
-            variant="success"
-            description="Vinculadas a equipamentos"
-          />
-        </div>
-        <div className="animate-fade-up" style={{ animationDelay: '150ms' }}>
-          <StatCard
-            title="Solicitações"
-            value={stats.totalSolicitacoes}
-            icon={FileText}
-            variant="warning"
-            description="Em acompanhamento"
-          />
-        </div>
-        <div className="animate-fade-up" style={{ animationDelay: '200ms' }}>
-          <StatCard
-            title="Municípios Cobertos"
-            value={stats.municipiosComEquipamento}
-            icon={MapPin}
-            description={`de 184 municípios`}
-          />
-        </div>
+        <MotionStatCard
+          title="Total de Equipamentos"
+          value={stats.totalEquipamentos}
+          icon={Building2}
+          variant="primary"
+          description="Unidades cadastradas"
+          index={0}
+        />
+        <MotionStatCard
+          title="Viaturas PMCE"
+          value={stats.viaturasPMCE}
+          icon={Truck}
+          variant="accent"
+          description="Batalhão PMCE"
+          index={1}
+        />
+        <MotionStatCard
+          title="Patrulhas das Casas"
+          value={stats.viaturasPatrulhasCasas}
+          icon={Truck}
+          variant="success"
+          description="Vinculadas a equipamentos"
+          index={2}
+        />
+        <MotionStatCard
+          title="Solicitações"
+          value={stats.totalSolicitacoes}
+          icon={FileText}
+          variant="warning"
+          description="Em acompanhamento"
+          index={3}
+        />
+        <MotionStatCard
+          title="Municípios Cobertos"
+          value={stats.municipiosComEquipamento}
+          icon={MapPin}
+          description="de 184 municípios"
+          index={4}
+        />
       </div>
 
       {/* Secondary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="animate-fade-up" style={{ animationDelay: '250ms' }}>
-          <StatCard
-            title="Com Patrulha M.P."
-            value={stats.equipamentosComPatrulha}
-            icon={CheckCircle2}
-            description="Equipamentos com patrulha"
-          />
-        </div>
-        <div className="animate-fade-up" style={{ animationDelay: '300ms' }}>
-          <StatCard
-            title="Viatura s/ Equipamento"
-            value={stats.municipiosComViaturaSemEquipamento}
-            icon={Truck}
-            description="Municípios"
-          />
-        </div>
-        <div className="animate-fade-up" style={{ animationDelay: '350ms' }}>
-          <StatCard
-            title="Sem Cobertura"
-            value={stats.municipiosSemEquipamento}
-            icon={AlertCircle}
-            description="Municípios"
-          />
-        </div>
-        <div className="animate-fade-up" style={{ animationDelay: '400ms' }}>
-          <StatCard
-            title="Inauguradas"
-            value={stats.solicitacoesPorStatus['Inaugurada'] || 0}
-            icon={Users}
-            description="Solicitações concluídas"
-          />
-        </div>
+        <MotionStatCard
+          title="Com Patrulha M.P."
+          value={stats.equipamentosComPatrulha}
+          icon={CheckCircle2}
+          description="Equipamentos com patrulha"
+          index={5}
+        />
+        <MotionStatCard
+          title="Viatura s/ Equipamento"
+          value={stats.municipiosComViaturaSemEquipamento}
+          icon={Truck}
+          description="Municípios"
+          index={6}
+        />
+        <MotionStatCard
+          title="Sem Cobertura"
+          value={stats.municipiosSemEquipamento}
+          icon={AlertCircle}
+          description="Municípios"
+          index={7}
+        />
+        <MotionStatCard
+          title="Inauguradas"
+          value={stats.solicitacoesPorStatus['Inaugurada'] || 0}
+          icon={Users}
+          description="Solicitações concluídas"
+          index={8}
+        />
       </div>
 
       {/* Charts - with ref for export */}
       <div ref={chartsRef} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Equipamentos por Tipo */}
-        <div className="chart-card animate-fade-up" style={{ animationDelay: '450ms' }}>
-          <h3 className="chart-title mb-4">
-            <div className="chart-title-dot bg-primary" />
-            Equipamentos por Tipo
-          </h3>
+        <ChartCard title="Equipamentos por Tipo" dotColor="bg-primary" delay={4}>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={equipamentoChartData} layout="vertical" margin={{ left: 10, right: 30 }}>
@@ -313,14 +303,9 @@ export default function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartCard>
 
-        {/* Solicitações por Status */}
-        <div className="chart-card animate-fade-up" style={{ animationDelay: '500ms' }}>
-          <h3 className="chart-title mb-4">
-            <div className="chart-title-dot bg-accent" />
-            Solicitações por Status
-          </h3>
+        <ChartCard title="Solicitações por Status" dotColor="bg-accent" delay={5}>
           <div className="h-72">
             {solicitacoesChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -377,14 +362,9 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        </div>
+        </ChartCard>
 
-        {/* Viaturas por Órgão */}
-        <div className="chart-card animate-fade-up" style={{ animationDelay: '550ms' }}>
-          <h3 className="chart-title mb-4">
-            <div className="chart-title-dot bg-success" />
-            Viaturas por Órgão
-          </h3>
+        <ChartCard title="Viaturas por Órgão" dotColor="bg-success" delay={6}>
           <div className="h-72">
             {viaturasChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -443,14 +423,9 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        </div>
+        </ChartCard>
 
-        {/* Cobertura do Estado */}
-        <div className="chart-card animate-fade-up" style={{ animationDelay: '600ms' }}>
-          <h3 className="chart-title mb-4">
-            <div className="chart-title-dot bg-info" />
-            Cobertura do Estado
-          </h3>
+        <ChartCard title="Cobertura do Estado" dotColor="bg-info" delay={7}>
           <div className="space-y-3">
             <div className="group flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-xl border border-primary/20 transition-all duration-300 hover:border-primary/40 hover:shadow-md">
               <div className="flex items-center gap-3">
@@ -489,9 +464,7 @@ export default function Dashboard() {
               <div className="relative w-full h-5 bg-muted/50 rounded-full overflow-hidden shadow-inner">
                 <div
                   className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-accent to-primary rounded-full transition-all duration-1000 ease-out"
-                  style={{
-                    width: `${(stats.municipiosComEquipamento / 184) * 100}%`,
-                  }}
+                  style={{ width: `${(stats.municipiosComEquipamento / 184) * 100}%` }}
                 />
                 <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.15)_50%,transparent_100%)] animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
               </div>
@@ -501,14 +474,9 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-        </div>
+        </ChartCard>
 
-        {/* Evolução Temporal */}
-        <div className="chart-card animate-fade-up lg:col-span-2" style={{ animationDelay: '650ms' }}>
-          <h3 className="chart-title mb-4">
-            <div className="chart-title-dot bg-warning" />
-            Evolução Temporal (Acumulado)
-          </h3>
+        <ChartCard title="Evolução Temporal (Acumulado)" dotColor="bg-warning" delay={8} colSpan={2}>
           <div className="h-80">
             {evolutionData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -521,14 +489,6 @@ export default function Dashboard() {
                     <linearGradient id="lineGradient2" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="hsl(320, 60%, 50%)" />
                       <stop offset="100%" stopColor="hsl(280, 65%, 55%)" />
-                    </linearGradient>
-                    <linearGradient id="areaGradient1" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(215, 70%, 50%)" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="hsl(215, 70%, 50%)" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="areaGradient2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(320, 60%, 50%)" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="hsl(320, 60%, 50%)" stopOpacity={0} />
                     </linearGradient>
                     <filter id="lineShadow1">
                       <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="hsl(215, 70%, 50%)" floodOpacity="0.4"/>
@@ -593,7 +553,7 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        </div>
+        </ChartCard>
       </div>
     </AppLayout>
   );

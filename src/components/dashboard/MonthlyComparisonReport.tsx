@@ -147,6 +147,20 @@ export function MonthlyComparisonReport({
       }
     });
 
+    // Patrulhas das Casas (from equipamentos + solicitações, avoid duplicates)
+    const patrulhasEmEquip = equipamentosAtePeriodo.filter(e => e.possui_patrulha).length;
+    const municipiosComPatrulhaEquip = new Set(
+      equipamentosAtePeriodo.filter(e => e.possui_patrulha).map(e => e.municipio)
+    );
+    const patrulhasDeSolic = solicitacoesAtePeriodo.filter(
+      s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)
+    ).length;
+    const totalPatrulhasCasas = patrulhasEmEquip + patrulhasDeSolic;
+    
+    // Total viaturas = PMCE (tabela viaturas) + Patrulhas das Casas
+    const viaturasTabela = viaturasAtePeriodo.reduce((sum, v) => sum + v.quantidade, 0);
+    const totalViaturas = viaturasTabela + totalPatrulhasCasas;
+
     // Stats by region
     const porRegiao: PeriodStats['porRegiao'] = {};
     regioesList.forEach(regiao => {
@@ -154,9 +168,17 @@ export function MonthlyComparisonReport({
       const regionViats = viaturasAtePeriodo.filter(v => getRegiao(v.municipio) === regiao);
       const regionSols = solicitacoesAtePeriodo.filter(s => getRegiao(s.municipio) === regiao);
       
+      // Regional patrulhas
+      const regionPatrulhasEquip = regionEqs.filter(e => e.possui_patrulha).length;
+      const regionMunicipiosPatrulha = new Set(regionEqs.filter(e => e.possui_patrulha).map(e => e.municipio));
+      const regionPatrulhasSolic = regionSols.filter(
+        s => s.recebeu_patrulha && !regionMunicipiosPatrulha.has(s.municipio)
+      ).length;
+      const regionViaturasTotal = regionViats.reduce((sum, v) => sum + v.quantidade, 0) + regionPatrulhasEquip + regionPatrulhasSolic;
+      
       porRegiao[regiao] = {
         equipamentos: regionEqs.length,
-        viaturas: regionViats.reduce((sum, v) => sum + v.quantidade, 0),
+        viaturas: regionViaturasTotal,
         solicitacoes: regionSols.length,
         novosEquipamentos: novosEquipamentos.filter(e => getRegiao(e.municipio) === regiao).length,
         novasViaturas: novasViaturas.filter(v => getRegiao(v.municipio) === regiao).reduce((sum, v) => sum + v.quantidade, 0),
@@ -167,7 +189,7 @@ export function MonthlyComparisonReport({
     return {
       totalEquipamentos: equipamentosAtePeriodo.length,
       novosEquipamentos: novosEquipamentos.length,
-      totalViaturas: viaturasAtePeriodo.reduce((sum, v) => sum + v.quantidade, 0),
+      totalViaturas,
       novasViaturas: novasViaturas.reduce((sum, v) => sum + v.quantidade, 0),
       totalSolicitacoes: solicitacoesAtePeriodo.length,
       novasSolicitacoes: novasSolicitacoes.length,
