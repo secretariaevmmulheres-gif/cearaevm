@@ -87,6 +87,10 @@ export default function Equipamentos() {
     return matchesSearch && matchesTipo && matchesPatrulha && matchesRegiao;
   });
 
+      const sortedEquipamentos = [...filteredEquipamentos].sort((a, b) =>
+      a.municipio.localeCompare(b.municipio, 'pt-BR')
+      );
+
   const openCreateDialog = () => {
     setEditingEquipamento(null);
     setFormData({
@@ -158,11 +162,11 @@ export default function Equipamentos() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportEquipamentosToPDF(filteredEquipamentos, filterRegiao)}>
+              <DropdownMenuItem onClick={() => exportEquipamentosToPDF(sortedEquipamentos, filterRegiao)}>
                 <FilePdf className="w-4 h-4 mr-2" />
                 Exportar PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportEquipamentosToExcel(filteredEquipamentos)}>
+              <DropdownMenuItem onClick={() => exportEquipamentosToExcel(sortedEquipamentos)}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
                 Exportar Excel
               </DropdownMenuItem>
@@ -252,7 +256,7 @@ export default function Equipamentos() {
                   </td>
                 </tr>
               ) : (
-                filteredEquipamentos.map((equipamento) => (
+                sortedEquipamentos.map((equipamento) => (
                   <tr key={equipamento.id} className="animate-fade-in">
                     <td className="font-medium">{equipamento.municipio}</td>
                     <td>
