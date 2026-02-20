@@ -78,20 +78,24 @@ export default function Viaturas() {
     (e) => e.municipio === formData.municipio
   );
 
-  const filteredViaturas = viaturas.filter((v) => {
-    const matchesSearch =
-      v.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.responsavel || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesOrgao = filterOrgao === 'all' || v.orgao_responsavel === filterOrgao;
-    const matchesVinculada =
-      filterVinculada === 'all' ||
-      (filterVinculada === 'sim' && v.vinculada_equipamento) ||
-      (filterVinculada === 'nao' && !v.vinculada_equipamento);
-    const matchesRegiao = filterRegiao === 'all' || getRegiao(v.municipio) === filterRegiao;
-    return matchesSearch && matchesOrgao && matchesVinculada && matchesRegiao;
-  });
+  // Filtro e ordenação das viaturas PMCE
+  const filteredViaturas = viaturas
+    .filter((v) => {
+      const matchesSearch =
+        v.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (v.responsavel || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesOrgao = filterOrgao === 'all' || v.orgao_responsavel === filterOrgao;
+      const matchesVinculada =
+        filterVinculada === 'all' ||
+        (filterVinculada === 'sim' && v.vinculada_equipamento) ||
+        (filterVinculada === 'nao' && !v.vinculada_equipamento);
+      const matchesRegiao = filterRegiao === 'all' || getRegiao(v.municipio) === filterRegiao;
+      return matchesSearch && matchesOrgao && matchesVinculada && matchesRegiao;
+    })
+    .sort((a, b) => a.municipio.localeCompare(b.municipio));
 
-  // Patrulhas Maria da Penha das Casas (equipamentos com possui_patrulha = true)
+  // --- Patrulhas das Casas ---
+  // Equipamentos com possui_patrulha = true (já filtrados pela busca e região)
   const patrulhasDeEquipamentos = equipamentos
     .filter((e) => e.possui_patrulha)
     .filter((e) => {
@@ -102,20 +106,21 @@ export default function Viaturas() {
       return matchesSearch && matchesRegiao;
     });
 
-  // Patrulhas de Solicitações (solicitações com recebeu_patrulha = true)
-  // Exclui municípios que já têm patrulha em equipamentos para evitar duplicidade
-  const municipiosComPatrulhaEquip = new Set(patrulhasDeEquipamentos.map(e => e.municipio));
-  
+  // Conjunto de municípios que já possuem equipamento com patrulha (em todo o sistema, independente de filtro)
+  const municipiosComPatrulhaEquip = new Set(
+    equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio)
+  );
+
+  // Solicitações que receberam patrulha e cujo município NÃO possui equipamento com patrulha
   const patrulhasDeSolicitacoes = solicitacoes
     .filter((s) => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio))
     .filter((s) => {
-      const matchesSearch =
-        s.municipio.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = s.municipio.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesRegiao = filterRegiao === 'all' || getRegiao(s.municipio) === filterRegiao;
       return matchesSearch && matchesRegiao;
     });
 
-  // Combinar para exibição unificada
+  // Combinar para exibição unificada e ordenar
   type PatrulhaCasa = {
     id: string;
     municipio: string;
@@ -147,8 +152,9 @@ export default function Viaturas() {
       origem: 'solicitacao' as const,
       status: s.status,
     })),
-  ];
+  ].sort((a, b) => a.municipio.localeCompare(b.municipio));
 
+  // --- Funções CRUD ---
   const openCreateDialog = () => {
     setEditingViatura(null);
     setFormData({
@@ -403,7 +409,7 @@ export default function Viaturas() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportPatrulhasCasasToPDF(equipamentos, solicitacoes)}>
+                <DropdownMenuItem onClick={() => exportPatrulhasCasasToPDF(equipamentos, solicitacoes)}>
                   <FilePdf className="w-4 h-4 mr-2" />
                   Exportar PDF
                 </DropdownMenuItem>

@@ -93,15 +93,18 @@ export default function Solicitacoes() {
     anexos: [] as string[],
   });
 
-  const filteredSolicitacoes = solicitacoes.filter((s) => {
-    const matchesSearch =
-      s.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (s.observacoes || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
-    const matchesTipo = filterTipo === 'all' || s.tipo_equipamento === filterTipo;
-    const matchesRegiao = filterRegiao === 'all' || getRegiao(s.municipio) === filterRegiao;
-    return matchesSearch && matchesStatus && matchesTipo && matchesRegiao;
-  });
+  // Aplicar filtros e depois ordenar por município
+  const filteredSolicitacoes = solicitacoes
+    .filter((s) => {
+      const matchesSearch =
+        s.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.observacoes || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
+      const matchesTipo = filterTipo === 'all' || s.tipo_equipamento === filterTipo;
+      const matchesRegiao = filterRegiao === 'all' || getRegiao(s.municipio) === filterRegiao;
+      return matchesSearch && matchesStatus && matchesTipo && matchesRegiao;
+    })
+    .sort((a, b) => a.municipio.localeCompare(b.municipio)); // <-- ORDENAÇÃO ADICIONADA
 
   const openCreateDialog = () => {
     setEditingSolicitacao(null);
