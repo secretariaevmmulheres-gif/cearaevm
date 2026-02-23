@@ -127,7 +127,7 @@ function AtividadeRow({ atividade, onEdit, onDelete }: {
           )}
         </td>
         <td className="text-sm text-muted-foreground">
-          {format(new Date(atividade.data), 'dd/MM/yyyy', { locale: ptBR })}
+          {format(new Date(atividade.data + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
           {atividade.dias && <span className="ml-1 text-[10px]">({atividade.dias}d)</span>}
         </td>
         <td onClick={e => e.stopPropagation()}>
