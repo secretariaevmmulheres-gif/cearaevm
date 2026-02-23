@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,11 @@ import {
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { municipiosCeara, tiposEquipamento, TipoEquipamento, regioesList, getRegiao } from '@/data/municipios';
 import { Equipamento } from '@/types';
-import { Plus, Pencil, Trash2, Search, Building2, CheckCircle, XCircle, Download, FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
+import {
+  Plus, Pencil, Trash2, Search, Building2, CheckCircle, XCircle,
+  Download, FileSpreadsheet, FileText as FilePdf, ChevronDown,
+  MapPin, Phone, User, FileText, AlertCircle, ShieldCheck,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportEquipamentosToPDF, exportEquipamentosToExcel } from '@/lib/exportUtils';
 import {
@@ -51,6 +56,216 @@ const tipoStyles: Record<TipoEquipamento, string> = {
   'Sala Lilás': 'equipment-lilas',
 };
 
+const tipoColors: Record<TipoEquipamento, { bg: string; text: string; border: string; icon: string }> = {
+  'Casa da Mulher Brasileira': {
+    bg: 'bg-teal-500/10',
+    text: 'text-teal-600',
+    border: 'border-teal-500/20',
+    icon: 'bg-teal-500/15',
+  },
+  'Casa da Mulher Cearense': {
+    bg: 'bg-violet-500/10',
+    text: 'text-violet-600',
+    border: 'border-violet-500/20',
+    icon: 'bg-violet-500/15',
+  },
+  'Casa da Mulher Municipal': {
+    bg: 'bg-orange-500/10',
+    text: 'text-orange-600',
+    border: 'border-orange-500/20',
+    icon: 'bg-orange-500/15',
+  },
+  'Sala Lilás': {
+    bg: 'bg-pink-500/10',
+    text: 'text-pink-600',
+    border: 'border-pink-500/20',
+    icon: 'bg-pink-500/15',
+  },
+};
+
+// ── Calcula completude do cadastro ──────────────────────────────────────────
+function getCompletude(e: Equipamento): { pct: number; faltando: string[] } {
+  const campos = [
+    { label: 'Endereço', ok: !!e.endereco?.trim() },
+    { label: 'Telefone', ok: !!e.telefone?.trim() },
+    { label: 'Responsável', ok: !!e.responsavel?.trim() },
+    { label: 'Observações', ok: !!e.observacoes?.trim() },
+  ];
+  const ok = campos.filter(c => c.ok).length;
+  const faltando = campos.filter(c => !c.ok).map(c => c.label);
+  // municipio e tipo são obrigatórios, os 4 acima são opcionais mas contam para completude
+  const pct = Math.round((ok / campos.length) * 100);
+  return { pct, faltando };
+}
+
+function CompletudeBar({ equipamento }: { equipamento: Equipamento }) {
+  const { pct, faltando } = getCompletude(equipamento);
+  const color = pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+  const label = pct === 100 ? 'Completo' : pct >= 50 ? 'Parcial' : 'Incompleto';
+
+  return (
+    <div className="flex items-center gap-2 min-w-[100px]">
+      <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+        <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={cn('text-[10px] font-medium shrink-0', {
+        'text-emerald-600': pct === 100,
+        'text-amber-600': pct >= 50 && pct < 100,
+        'text-rose-600': pct < 50,
+      })}>
+        {pct}%
+      </span>
+      {pct < 100 && (
+        <div className="group relative">
+          <AlertCircle className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 bg-popover border border-border rounded-lg shadow-lg p-2 text-xs w-36">
+            <p className="font-medium mb-1 text-foreground">Faltando:</p>
+            {faltando.map(f => (
+              <p key={f} className="text-muted-foreground">• {f}</p>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Linha expansível ─────────────────────────────────────────────────────────
+function EquipamentoRow({
+  equipamento,
+  onEdit,
+  onDelete,
+}: {
+  equipamento: Equipamento;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const regiao = getRegiao(equipamento.municipio);
+  const { pct } = getCompletude(equipamento);
+
+  return (
+    <>
+      <tr
+        className={cn('cursor-pointer transition-colors', expanded ? 'bg-muted/40' : 'hover:bg-muted/20')}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <td>
+          <div className="flex items-center gap-2">
+            <ChevronDown
+              className={cn('w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200', expanded && 'rotate-180')}
+            />
+            <div>
+              <p className="font-medium">{equipamento.municipio}</p>
+              {regiao && <p className="text-[11px] text-muted-foreground">{regiao}</p>}
+            </div>
+          </div>
+        </td>
+        <td onClick={e => e.stopPropagation()}>
+          <span className={cn('equipment-badge', tipoStyles[equipamento.tipo])}>
+            {equipamento.tipo}
+          </span>
+        </td>
+        <td>
+          {equipamento.possui_patrulha ? (
+            <span className="flex items-center gap-1 text-success text-sm">
+              <CheckCircle className="w-4 h-4" /> Sim
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-muted-foreground text-sm">
+              <XCircle className="w-4 h-4" /> Não
+            </span>
+          )}
+        </td>
+        <td className="text-sm text-muted-foreground">{equipamento.responsavel || '—'}</td>
+        <td className="text-sm text-muted-foreground">{equipamento.telefone || '—'}</td>
+        <td onClick={e => e.stopPropagation()}>
+          <CompletudeBar equipamento={equipamento} />
+        </td>
+        <td onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-end gap-1">
+            <Button variant="ghost" size="icon" onClick={onEdit}>
+              <Pencil className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </td>
+      </tr>
+
+      {/* Linha expandida */}
+      <AnimatePresence>
+        {expanded && (
+          <tr className="bg-muted/20">
+            <td colSpan={7} className="p-0">
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-t border-border/50">
+                  {/* Endereço */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-0.5">Endereço</p>
+                      <p className="text-sm">{equipamento.endereco || <span className="text-muted-foreground/60 italic">Não informado</span>}</p>
+                    </div>
+                  </div>
+
+                  {/* Telefone */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <Phone className="w-3.5 h-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-0.5">Telefone</p>
+                      <p className="text-sm">{equipamento.telefone || <span className="text-muted-foreground/60 italic">Não informado</span>}</p>
+                    </div>
+                  </div>
+
+                  {/* Responsável */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <User className="w-3.5 h-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-0.5">Responsável</p>
+                      <p className="text-sm">{equipamento.responsavel || <span className="text-muted-foreground/60 italic">Não informado</span>}</p>
+                    </div>
+                  </div>
+
+                  {/* Observações */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <FileText className="w-3.5 h-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-0.5">Observações</p>
+                      <p className="text-sm">{equipamento.observacoes || <span className="text-muted-foreground/60 italic">Nenhuma</span>}</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </td>
+          </tr>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ── Página principal ─────────────────────────────────────────────────────────
 export default function Equipamentos() {
   const { equipamentos, addEquipamento, updateEquipamento, deleteEquipamento, isAdding, isUpdating } = useEquipamentos();
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,7 +277,6 @@ export default function Equipamentos() {
   const [editingEquipamento, setEditingEquipamento] = useState<Equipamento | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Form state
   const [formData, setFormData] = useState({
     municipio: '',
     tipo: '' as TipoEquipamento | '',
@@ -87,21 +301,22 @@ export default function Equipamentos() {
     return matchesSearch && matchesTipo && matchesPatrulha && matchesRegiao;
   });
 
-      const sortedEquipamentos = [...filteredEquipamentos].sort((a, b) =>
-      a.municipio.localeCompare(b.municipio, 'pt-BR')
-      );
+  const sortedEquipamentos = [...filteredEquipamentos].sort((a, b) =>
+    a.municipio.localeCompare(b.municipio, 'pt-BR')
+  );
+
+  // ── Cards de resumo ──
+  const totalPorTipo = tiposEquipamento.map(tipo => ({
+    tipo,
+    count: equipamentos.filter(e => e.tipo === tipo).length,
+    colors: tipoColors[tipo as TipoEquipamento],
+  }));
+  const comPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
+  const incompletos = equipamentos.filter(e => getCompletude(e).pct < 100).length;
 
   const openCreateDialog = () => {
     setEditingEquipamento(null);
-    setFormData({
-      municipio: '',
-      tipo: '',
-      possui_patrulha: false,
-      endereco: '',
-      telefone: '',
-      responsavel: '',
-      observacoes: '',
-    });
+    setFormData({ municipio: '', tipo: '', possui_patrulha: false, endereco: '', telefone: '', responsavel: '', observacoes: '' });
     setIsDialogOpen(true);
   };
 
@@ -120,10 +335,7 @@ export default function Equipamentos() {
   };
 
   const handleSubmit = () => {
-    if (!formData.municipio || !formData.tipo) {
-      return;
-    }
-
+    if (!formData.municipio || !formData.tipo) return;
     const data = {
       municipio: formData.municipio,
       tipo: formData.tipo as TipoEquipamento,
@@ -133,7 +345,6 @@ export default function Equipamentos() {
       responsavel: formData.responsavel,
       observacoes: formData.observacoes,
     };
-
     if (editingEquipamento) {
       updateEquipamento({ id: editingEquipamento.id, ...data });
     } else {
@@ -179,11 +390,66 @@ export default function Equipamentos() {
         </div>
       </PageHeader>
 
-      {/* Filters */}
+      {/* ── Cards de resumo ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
+        {totalPorTipo.map((item, i) => (
+          <motion.div
+            key={item.tipo}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className={cn(
+              'bg-card rounded-xl p-3 border shadow-sm cursor-pointer transition-all hover:shadow-md',
+              filterTipo === item.tipo ? 'ring-2 ring-primary' : 'border-border',
+            )}
+            onClick={() => setFilterTipo(filterTipo === item.tipo ? 'all' : item.tipo)}
+          >
+            <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center mb-2', item.colors.icon)}>
+              <Building2 className={cn('w-3.5 h-3.5', item.colors.text)} />
+            </div>
+            <p className="text-2xl font-bold">{item.count}</p>
+            <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">{item.tipo}</p>
+          </motion.div>
+        ))}
+
+        {/* Card patrulha */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className={cn(
+            'bg-card rounded-xl p-3 border shadow-sm cursor-pointer transition-all hover:shadow-md',
+            filterPatrulha === 'sim' ? 'ring-2 ring-primary' : 'border-border',
+          )}
+          onClick={() => setFilterPatrulha(filterPatrulha === 'sim' ? 'all' : 'sim')}
+        >
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center mb-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          </div>
+          <p className="text-2xl font-bold">{comPatrulha}</p>
+          <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">Com Patrulha M.P.</p>
+        </motion.div>
+
+        {/* Card incompletos */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="bg-card rounded-xl p-3 border border-border shadow-sm"
+        >
+          <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center mb-2">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+          </div>
+          <p className="text-2xl font-bold">{incompletos}</p>
+          <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">Cadastro Incompleto</p>
+        </motion.div>
+      </div>
+
+      {/* ── Filtros ── */}
       <div className="bg-card rounded-xl p-4 border border-border shadow-sm mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar..."
               value={searchTerm}
@@ -192,35 +458,21 @@ export default function Equipamentos() {
             />
           </div>
           <Select value={filterRegiao} onValueChange={setFilterRegiao}>
-            <SelectTrigger>
-              <SelectValue placeholder="Região" />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Região" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as regiões</SelectItem>
-              {regioesList.map((regiao) => (
-                <SelectItem key={regiao} value={regiao}>
-                  {regiao}
-                </SelectItem>
-              ))}
+              {regioesList.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filterTipo} onValueChange={setFilterTipo}>
-            <SelectTrigger>
-              <SelectValue placeholder="Tipo de Equipamento" />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Tipo de Equipamento" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
-              {tiposEquipamento.map((tipo) => (
-                <SelectItem key={tipo} value={tipo}>
-                  {tipo}
-                </SelectItem>
-              ))}
+              {tiposEquipamento.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filterPatrulha} onValueChange={setFilterPatrulha}>
-            <SelectTrigger>
-              <SelectValue placeholder="Patrulha M.P." />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Patrulha M.P." /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="sim">Com Patrulha</SelectItem>
@@ -233,73 +485,41 @@ export default function Equipamentos() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* ── Tabela ── */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Município</th>
+                <th>Município / Região</th>
                 <th>Tipo</th>
                 <th>Patrulha M.P.</th>
                 <th>Responsável</th>
                 <th>Telefone</th>
+                <th>Cadastro</th>
                 <th className="text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filteredEquipamentos.length === 0 ? (
+              {sortedEquipamentos.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-muted-foreground">
-                    <Building2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Nenhum equipamento encontrado</p>
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <Building2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    <p className="font-medium">Nenhum equipamento encontrado</p>
+                    <p className="text-xs mt-1 opacity-70">Tente ajustar os filtros ou cadastre um novo equipamento</p>
                   </td>
                 </tr>
               ) : (
                 sortedEquipamentos.map((equipamento) => (
-                  <tr key={equipamento.id} className="animate-fade-in">
-                    <td className="font-medium">{equipamento.municipio}</td>
-                    <td>
-                      <span className={cn('equipment-badge', tipoStyles[equipamento.tipo])}>
-                        {equipamento.tipo}
-                      </span>
-                    </td>
-                    <td>
-                      {equipamento.possui_patrulha ? (
-                        <span className="flex items-center gap-1 text-success">
-                          <CheckCircle className="w-4 h-4" /> Sim
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <XCircle className="w-4 h-4" /> Não
-                        </span>
-                      )}
-                    </td>
-                    <td>{equipamento.responsavel || '-'}</td>
-                    <td>{equipamento.telefone || '-'}</td>
-                    <td>
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(equipamento)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            setDeletingId(equipamento.id);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+                  <EquipamentoRow
+                    key={equipamento.id}
+                    equipamento={equipamento}
+                    onEdit={() => openEditDialog(equipamento)}
+                    onDelete={() => {
+                      setDeletingId(equipamento.id);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                  />
                 ))
               )}
             </tbody>
@@ -307,53 +527,31 @@ export default function Equipamentos() {
         </div>
       </div>
 
-      {/* Create/Edit Dialog */}
+      {/* ── Dialog Criar/Editar ── */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>
-              {editingEquipamento ? 'Editar Equipamento' : 'Novo Equipamento'}
-            </DialogTitle>
-            <DialogDescription>
-              Preencha os dados do equipamento de atendimento.
-            </DialogDescription>
+            <DialogTitle>{editingEquipamento ? 'Editar Equipamento' : 'Novo Equipamento'}</DialogTitle>
+            <DialogDescription>Preencha os dados do equipamento de atendimento.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Município *</Label>
-                <Select
-                  value={formData.municipio}
-                  onValueChange={(value) => setFormData({ ...formData, municipio: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
+                <Select value={formData.municipio} onValueChange={(v) => setFormData({ ...formData, municipio: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {municipiosCeara.map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {m}
-                      </SelectItem>
-                    ))}
+                    {municipiosCeara.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Tipo *</Label>
-                <Select
-                  value={formData.tipo}
-                  onValueChange={(value) => setFormData({ ...formData, tipo: value as TipoEquipamento })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
+                <Select value={formData.tipo} onValueChange={(v) => setFormData({ ...formData, tipo: v as TipoEquipamento })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {tiposEquipamento.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
+                    {tiposEquipamento.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -364,7 +562,7 @@ export default function Equipamentos() {
               <Switch
                 id="patrulha"
                 checked={formData.possui_patrulha}
-                onCheckedChange={(checked) => setFormData({ ...formData, possui_patrulha: checked })}
+                onCheckedChange={(v) => setFormData({ ...formData, possui_patrulha: v })}
               />
             </div>
 
@@ -408,9 +606,7 @@ export default function Equipamentos() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={isAdding || isUpdating}>
               {editingEquipamento ? 'Salvar Alterações' : 'Cadastrar'}
             </Button>
@@ -418,7 +614,7 @@ export default function Equipamentos() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* ── Dialog Deletar ── */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
