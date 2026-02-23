@@ -65,7 +65,7 @@ export function LoginForm() {
               <Shield className="w-8 h-8 text-accent" />
             </div>
             <h1 className="text-2xl font-display font-bold text-foreground text-center">
-              Sistema de Gestão
+              Sistema de Gestão - EVM
             </h1>
             <p className="text-muted-foreground text-sm mt-1 text-center">
               Rede de Atendimento à Mulher - Ceará
@@ -193,7 +193,7 @@ export function LoginForm() {
         </div>
 
         <p className="text-primary-foreground/60 text-xs text-center mt-4">
-          Secretaria de Políticas para Mulheres - Governo do Estado do Ceará
+          Enfrentamento à violência contra as Mulheres - Governo do Estado do Ceará
         </p>
       </div>
     </div>

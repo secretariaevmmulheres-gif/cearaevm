@@ -13,18 +13,20 @@ import {
   X,
   Users,
   User,
+  CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
 const menuItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/dashboard-regional', label: 'Por Região', icon: PieChart },
-  { path: '/equipamentos', label: 'Equipamentos', icon: Building2 },
-  { path: '/viaturas', label: 'Viaturas', icon: Truck },
-  { path: '/solicitacoes', label: 'Solicitações', icon: FileText },
-  { path: '/mapa', label: 'Mapa', icon: Map },
+  { path: '/dashboard',           label: 'Dashboard',    icon: LayoutDashboard },
+  { path: '/dashboard-regional',  label: 'Por Região',   icon: PieChart        },
+  { path: '/equipamentos',        label: 'Equipamentos', icon: Building2       },
+  { path: '/viaturas',            label: 'Viaturas',     icon: Truck           },
+  { path: '/solicitacoes',        label: 'Solicitações', icon: FileText        },
+  { path: '/atividades',          label: 'Atividades',   icon: CalendarDays    },
+  { path: '/mapa',                label: 'Mapa',         icon: Map             },
 ];
 
 const adminMenuItems = [
@@ -85,7 +87,7 @@ export function AppSidebar() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {menuItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (

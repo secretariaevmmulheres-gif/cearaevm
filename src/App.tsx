@@ -11,6 +11,7 @@ import DashboardRegional from "./pages/DashboardRegional";
 import Equipamentos from "./pages/Equipamentos";
 import Viaturas from "./pages/Viaturas";
 import Solicitacoes from "./pages/Solicitacoes";
+import Atividades from "./pages/Atividades";
 import Mapa from "./pages/Mapa";
 import Usuarios from "./pages/Usuarios";
 import Perfil from "./pages/Perfil";
@@ -72,6 +73,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Solicitacoes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/atividades"
+        element={
+          <ProtectedRoute>
+            <Atividades />
           </ProtectedRoute>
         }
       />

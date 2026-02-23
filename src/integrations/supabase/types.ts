@@ -7,13 +7,71 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
+      atividades: {
+        Row: {
+          atendimentos: number | null
+          created_at: string
+          data: string
+          dias: number | null
+          endereco: string | null
+          horario: string | null
+          id: string
+          municipio: string
+          municipio_sede: string
+          nome_evento: string | null
+          nup: string | null
+          observacoes: string | null
+          quantidade_equipe: number | null
+          recurso: string
+          status: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          atendimentos?: number | null
+          created_at?: string
+          data: string
+          dias?: number | null
+          endereco?: string | null
+          horario?: string | null
+          id?: string
+          municipio: string
+          municipio_sede: string
+          nome_evento?: string | null
+          nup?: string | null
+          observacoes?: string | null
+          quantidade_equipe?: number | null
+          recurso: string
+          status?: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          atendimentos?: number | null
+          created_at?: string
+          data?: string
+          dias?: number | null
+          endereco?: string | null
+          horario?: string | null
+          id?: string
+          municipio?: string
+          municipio_sede?: string
+          nome_evento?: string | null
+          nup?: string | null
+          observacoes?: string | null
+          quantidade_equipe?: number | null
+          recurso?: string
+          status?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string

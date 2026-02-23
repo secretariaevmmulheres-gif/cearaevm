@@ -2,6 +2,40 @@ import { TipoEquipamento, StatusSolicitacao, OrgaoResponsavel } from "@/data/mun
 
 export type AppRole = 'admin' | 'editor' | 'viewer';
 
+// ── Atividades ────────────────────────────────────────────────────────────────
+export type TipoAtividade = 'Unidade Móvel' | 'Palestra' | 'Evento' | 'Tenda Lilás' | 'Outro';
+export type RecursoAtividade = 'Unidade Móvel' | 'Equipe' | 'Unidade Móvel + Equipe';
+export type StatusAtividade = 'Agendado' | 'Realizado' | 'Cancelado';
+
+export interface Atividade {
+  id: string;
+  // Localização
+  municipio: string;
+  municipio_sede: string;
+  // Tipo e recurso
+  tipo: TipoAtividade;
+  recurso: RecursoAtividade;
+  quantidade_equipe: number | null;
+  status: StatusAtividade;
+  // Identificação
+  nup: string | null;
+  nome_evento: string | null;
+  // Datas e tempo
+  data: string;           // ISO date "YYYY-MM-DD"
+  dias: number | null;
+  horario: string | null;
+  // Resultado
+  atendimentos: number | null;
+  // Localização física
+  endereco: string | null;
+  // Texto livre
+  observacoes: string | null;
+  // Auditoria
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Perfil e roles ────────────────────────────────────────────────────────────
 export interface Profile {
   id: string;
   full_name: string | null;
@@ -16,6 +50,7 @@ export interface UserRole {
   role: AppRole;
 }
 
+// ── Equipamentos ──────────────────────────────────────────────────────────────
 export interface Equipamento {
   id: string;
   municipio: string;
@@ -29,6 +64,7 @@ export interface Equipamento {
   updated_at: string;
 }
 
+// ── Viaturas ──────────────────────────────────────────────────────────────────
 export interface Viatura {
   id: string;
   municipio: string;
@@ -44,6 +80,7 @@ export interface Viatura {
   updated_at: string;
 }
 
+// ── Solicitações ──────────────────────────────────────────────────────────────
 export interface Solicitacao {
   id: string;
   municipio: string;
@@ -61,6 +98,7 @@ export interface Solicitacao {
   updated_at: string;
 }
 
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 export interface DashboardStats {
   totalEquipamentos: number;
   equipamentosPorTipo: Record<TipoEquipamento, number>;
