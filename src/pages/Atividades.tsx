@@ -24,10 +24,12 @@ import { useAtividades } from '@/hooks/useAtividades';
 import { municipiosCeara, regioesList, getRegiao } from '@/data/municipios';
 import { Atividade, TipoAtividade, RecursoAtividade, StatusAtividade } from '@/types';
 import { exportAtividadesToPDF, exportAtividadesToExcel } from '@/lib/exportUtils';
+import { CoberturaMapa } from '@/components/atividades/CoberturaMapa';
 import {
   Plus, Pencil, Trash2, Search, ChevronDown, MapPin,
   CalendarDays, Users, Hash, StickyNote, Truck, Download,
   FileSpreadsheet, FileText as FilePdf, AlertCircle, Building2,
+  Map, List, Copy,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -96,8 +98,8 @@ function CompletudeBar({ atividade }: { atividade: Atividade }) {
   );
 }
 
-function AtividadeRow({ atividade, onEdit, onDelete }: {
-  atividade: Atividade; onEdit: () => void; onDelete: () => void;
+function AtividadeRow({ atividade, onEdit, onDelete, onDuplicate }: {
+  atividade: Atividade; onEdit: () => void; onDelete: () => void; onDuplicate: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const regiao = getRegiao(atividade.municipio);
@@ -141,8 +143,9 @@ function AtividadeRow({ atividade, onEdit, onDelete }: {
         <td onClick={e => e.stopPropagation()}><CompletudeBar atividade={atividade} /></td>
         <td onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-1">
-            <Button variant="ghost" size="icon" onClick={onEdit}><Pencil className="w-4 h-4" /></Button>
-            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={onDelete}>
+            <Button variant="ghost" size="icon" onClick={onEdit} title="Editar"><Pencil className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={onDuplicate} title="Duplicar" className="text-blue-500 hover:text-blue-600"><Copy className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={onDelete} title="Excluir">
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>
@@ -180,9 +183,9 @@ function AtividadeRow({ atividade, onEdit, onDelete }: {
   );
 }
 
-function SedeBlock({ sede, atividades, onEdit, onDelete }: {
+function SedeBlock({ sede, atividades, onEdit, onDelete, onDuplicate }: {
   sede: string; atividades: Atividade[];
-  onEdit: (a: Atividade) => void; onDelete: (id: string) => void;
+  onEdit: (a: Atividade) => void; onDelete: (id: string) => void; onDuplicate: (a: Atividade) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const s = sedeStyle[sede] ?? sedeDefault;
@@ -232,7 +235,8 @@ function SedeBlock({ sede, atividades, onEdit, onDelete }: {
                   {atividades.map(a => (
                     <AtividadeRow key={a.id} atividade={a}
                       onEdit={() => onEdit(a)}
-                      onDelete={() => onDelete(a.id)} />
+                      onDelete={() => onDelete(a.id)}
+                      onDuplicate={() => onDuplicate(a)} />
                   ))}
                 </tbody>
               </table>
@@ -254,13 +258,14 @@ const FORM_INICIAL = {
 
 export default function Atividades() {
   const { atividades, addAtividade, updateAtividade, deleteAtividade, isAdding, isUpdating } = useAtividades();
+  const [activeTab, setActiveTab]       = useState<'registros' | 'cobertura'>('registros');
   const [searchTerm, setSearchTerm]     = useState('');
   const [filterTipo, setFilterTipo]     = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSede, setFilterSede]     = useState('all');
   const [filterRegiao, setFilterRegiao] = useState('all');
   const [filterMes, setFilterMes]       = useState('all');
-  const [filterAno, setFilterAno]       = useState(String(new Date().getFullYear()));
+  const [filterAno, setFilterAno]       = useState(String(new Date().getFullYear())); // pré-selecionado no ano atual
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingId, setEditingId]       = useState<string | null>(null);
@@ -278,10 +283,10 @@ export default function Atividades() {
       (filterStatus === 'all' || a.status === filterStatus) &&
       (filterSede   === 'all' || a.municipio_sede === filterSede) &&
       (filterRegiao === 'all' || getRegiao(a.municipio) === filterRegiao) &&
-      (filterAno === 'all' || new Date(a.data).getFullYear() === parseInt(filterAno)) &&
-      (filterMes === 'all' || new Date(a.data).getMonth() + 1 === parseInt(filterMes))
+      (filterAno === 'all' || new Date(a.data + 'T00:00:00').getFullYear() === parseInt(filterAno)) &&
+      (filterMes === 'all' || new Date(a.data + 'T00:00:00').getMonth() + 1 === parseInt(filterMes))
     );
-  }).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+  }).sort((a, b) => new Date(b.data + 'T00:00:00').getTime() - new Date(a.data + 'T00:00:00').getTime());
 
   const sedesOrdenadas = [
     ...MUNICIPIOS_SEDE.filter(s => filtered.some(a => a.municipio_sede === s)),
@@ -304,6 +309,21 @@ export default function Atividades() {
       quantidade_equipe: a.quantidade_equipe ?? '', status: a.status, nup: a.nup ?? '',
       nome_evento: a.nome_evento ?? '', data: a.data, dias: a.dias ?? '', horario: a.horario ?? '',
       atendimentos: a.atendimentos ?? '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '' });
+    setIsDialogOpen(true);
+  };
+
+  // Duplicar: abre formulário de nova atividade pré-preenchido com os dados da existente
+  // Data é resetada para hoje — o usuário só muda a data e salva
+  const openDuplicate = (a: Atividade) => {
+    setEditingId(null);
+    setFormData({
+      municipio: a.municipio, municipio_sede: a.municipio_sede, tipo: a.tipo, recurso: a.recurso,
+      quantidade_equipe: a.quantidade_equipe ?? '', status: 'Agendado',
+      nup: '', nome_evento: a.nome_evento ?? '',
+      data: new Date().toISOString().split('T')[0], // hoje
+      dias: a.dias ?? '', horario: a.horario ?? '',
+      atendimentos: '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '',
+    });
     setIsDialogOpen(true);
   };
 
@@ -331,23 +351,56 @@ export default function Atividades() {
     <AppLayout>
       <PageHeader title="Atividades" description="Unidades móveis, palestras, eventos e Tenda Lilás">
         <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline"><Download className="w-4 h-4 mr-2" />Exportar</Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportAtividadesToPDF(filtered, filterSede !== 'all' ? `Sede: ${filterSede}` : undefined)}>
-                <FilePdf className="w-4 h-4 mr-2" />Exportar PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportAtividadesToExcel(filtered)}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />Exportar Excel
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Nova Atividade</Button>
+          {activeTab === 'registros' && (
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline"><Download className="w-4 h-4 mr-2" />Exportar</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => exportAtividadesToPDF(filtered, filterSede !== 'all' ? `Sede: ${filterSede}` : undefined)}>
+                    <FilePdf className="w-4 h-4 mr-2" />Exportar PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportAtividadesToExcel(filtered)}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />Exportar Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Nova Atividade</Button>
+            </>
+          )}
         </div>
       </PageHeader>
 
+      {/* ── Abas ── */}
+      <div className="flex gap-1 bg-muted/40 p-1 rounded-xl mb-6 w-fit">
+        <button
+          onClick={() => setActiveTab('registros')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+            activeTab === 'registros'
+              ? 'bg-card shadow-sm text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <List className="w-4 h-4" />
+          Registros
+        </button>
+        <button
+          onClick={() => setActiveTab('cobertura')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+            activeTab === 'cobertura'
+              ? 'bg-card shadow-sm text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Map className="w-4 h-4" />
+          Consulta de Cobertura
+        </button>
+      </div>
+
+      {activeTab === 'registros' && <>
       {/* Cards */}
       <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3 mb-6">
         {cards.map((card, i) => (
@@ -418,7 +471,11 @@ export default function Atividades() {
             </SelectContent>
           </Select>
           <Select value={filterAno} onValueChange={setFilterAno}>
-            <SelectTrigger><SelectValue placeholder="Ano" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Ano">
+                {filterAno === 'all' ? 'Todos os anos' : filterAno}
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os anos</SelectItem>
               <SelectItem value="2024">2024</SelectItem>
@@ -444,7 +501,8 @@ export default function Atividades() {
         return (
           <motion.div key={sede} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <SedeBlock sede={sede} atividades={grupo} onEdit={openEdit}
-              onDelete={id => { setDeletingId(id); setIsDeleteOpen(true); }} />
+              onDelete={id => { setDeletingId(id); setIsDeleteOpen(true); }}
+              onDuplicate={openDuplicate} />
           </motion.div>
         );
       })}
@@ -577,6 +635,13 @@ export default function Atividades() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+
+      </>
+      }
+
+      {/* ── Aba Consulta de Cobertura ── */}
+      {activeTab === 'cobertura' && <CoberturaMapa />}
 
       {/* Dialog Deletar */}
       <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

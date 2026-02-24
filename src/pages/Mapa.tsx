@@ -628,12 +628,17 @@ export default function Mapa() {
                       Viaturas ({(() => {
                         const viaturasCount = selectedMunicipio.viaturas.reduce((s, v) => s + v.quantidade, 0);
                         const patrulhasEquip = selectedMunicipio.equipamentos.filter(e => e.possui_patrulha).length;
-                        const patrulhasSolic = selectedMunicipio.solicitacoes.filter(s => s.recebeu_patrulha).length;
+                        // Só conta patrulha de solicitação se o município ainda NÃO tem equipamento com patrulha
+                        // (evita dupla contagem quando solicitação é transformada em equipamento)
+                        const municipioTemPatrulhaEquip = patrulhasEquip > 0;
+                        const patrulhasSolic = municipioTemPatrulhaEquip
+                          ? 0
+                          : selectedMunicipio.solicitacoes.filter(s => s.recebeu_patrulha).length;
                         return viaturasCount + patrulhasEquip + patrulhasSolic;
                       })()})
                     </h3>
                   </div>
-                  {selectedMunicipio.viaturas.length === 0 && !selectedMunicipio.equipamentos.some(e => e.possui_patrulha) && !selectedMunicipio.solicitacoes.some(s => s.recebeu_patrulha) ? (
+                  {selectedMunicipio.viaturas.length === 0 && !selectedMunicipio.equipamentos.some(e => e.possui_patrulha) && !selectedMunicipio.solicitacoes.some(s => s.recebeu_patrulha && !selectedMunicipio.equipamentos.some(e2 => e2.possui_patrulha)) ? (
                     <p className="text-sm text-muted-foreground pl-8">Nenhuma viatura</p>
                   ) : (
                     <div className="space-y-1.5 pl-8">
@@ -649,7 +654,7 @@ export default function Mapa() {
                           <span className="text-xs text-success">via {e.tipo}</span>
                         </div>
                       ))}
-                      {selectedMunicipio.solicitacoes.filter(s => s.recebeu_patrulha).map((s) => (
+                      {selectedMunicipio.solicitacoes.filter(s => s.recebeu_patrulha && !selectedMunicipio.equipamentos.some(e => e.possui_patrulha)).map((s) => (
                         <div key={`ps-${s.id}`} className="flex items-center gap-2 text-sm bg-warning/5 rounded-lg px-2.5 py-1.5 border border-warning/20">
                           <span className="flex-1">1x Patrulha das Casas</span>
                           <span className="text-xs text-warning">Solicitação · {s.status}</span>

@@ -8,6 +8,7 @@ import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
+import { useAtividades } from '@/hooks/useAtividades';
 import { Button } from '@/components/ui/button';
 import {
   Building2,
@@ -21,6 +22,7 @@ import {
   Download,
   Image,
   ShieldCheck,
+  CalendarDays,
 } from 'lucide-react';
 import {
   BarChart,
@@ -38,6 +40,7 @@ import {
   Line,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import {
   DropdownMenu,
@@ -105,6 +108,7 @@ export default function Dashboard() {
   const { equipamentos } = useEquipamentos();
   const { viaturas } = useViaturas();
   const { solicitacoes } = useSolicitacoes();
+  const { atividades } = useAtividades();
 
   const equipamentoChartData = Object.entries(stats.equipamentosPorTipo).map(([name, value]) => ({
     name: name.replace('Casa da Mulher ', 'C.M. ').replace('Sala Lilás', 'S. Lilás'),
@@ -124,19 +128,28 @@ export default function Dashboard() {
 
   // Evolução temporal
   const evolutionData = useMemo(() => {
-    const monthlyData = new Map<string, { equipamentos: number; solicitacoes: number }>();
+    const monthlyData = new Map<string, { equipamentos: number; solicitacoes: number; atendimentos: number }>();
 
     equipamentos.forEach((e) => {
       const month = format(parseISO(e.created_at), 'yyyy-MM');
-      const existing = monthlyData.get(month) || { equipamentos: 0, solicitacoes: 0 };
+      const existing = monthlyData.get(month) || { equipamentos: 0, solicitacoes: 0, atendimentos: 0 };
       existing.equipamentos++;
       monthlyData.set(month, existing);
     });
 
     solicitacoes.forEach((s) => {
       const month = format(parseISO(s.created_at), 'yyyy-MM');
-      const existing = monthlyData.get(month) || { equipamentos: 0, solicitacoes: 0 };
+      const existing = monthlyData.get(month) || { equipamentos: 0, solicitacoes: 0, atendimentos: 0 };
       existing.solicitacoes++;
+      monthlyData.set(month, existing);
+    });
+
+    // Atendimentos mensais por data da atividade (não acumulado — mostra fluxo mensal)
+    atividades.forEach((a) => {
+      if (!a.atendimentos) return;
+      const month = format(new Date(a.data + 'T00:00:00'), 'yyyy-MM');
+      const existing = monthlyData.get(month) || { equipamentos: 0, solicitacoes: 0, atendimentos: 0 };
+      existing.atendimentos += a.atendimentos;
       monthlyData.set(month, existing);
     });
 
@@ -151,9 +164,10 @@ export default function Dashboard() {
         month: format(parseISO(`${month}-01`), 'MMM/yy', { locale: ptBR }),
         equipamentos: accEquip,
         solicitacoes: accSolic,
+        atendimentos: data.atendimentos, // mensal (não acumulado — mais útil operacionalmente)
       };
     });
-  }, [equipamentos, solicitacoes]);
+  }, [equipamentos, solicitacoes, atividades]);
 
   // Solicitações por tipo_equipamento — exclui inauguradas
   const solicitacoesPorTipo = useMemo(() => {
@@ -255,6 +269,23 @@ export default function Dashboard() {
     'S. Lilás':        'hsl(280, 65%, 60%)',
   };
 
+
+  // Atividades stats
+  const totalAtendimentosAtividades = atividades.reduce((s, a) => s + (a.atendimentos ?? 0), 0);
+  const atividadesRealizadas = atividades.filter(a => a.status === 'Realizado').length;
+  const atividadesPorSede = (['Fortaleza', 'Juazeiro do Norte', 'Sobral', 'Quixadá'] as const).map(sede => ({
+    name: sede === 'Juazeiro do Norte' ? 'Juazeiro' : sede,
+    total: atividades.filter(a => a.municipio_sede === sede).length,
+    realizadas: atividades.filter(a => a.municipio_sede === sede && a.status === 'Realizado').length,
+    atendimentos: atividades.filter(a => a.municipio_sede === sede).reduce((s, a) => s + (a.atendimentos ?? 0), 0),
+  })).filter(s => s.total > 0);
+
+  // Próximas atividades agendadas (ordenadas por data)
+  const proximasAtividades = atividades
+    .filter(a => a.status === 'Agendado')
+    .sort((a, b) => new Date(a.data + 'T00:00:00').getTime() - new Date(b.data + 'T00:00:00').getTime())
+    .slice(0, 6);
+
   const handleExportWithCharts = async () => {
     if (!chartsRef.current) return;
     toast.loading('Gerando PDF com gráficos...', { id: 'export-charts' });
@@ -288,11 +319,11 @@ export default function Dashboard() {
               PDF com Gráficos
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => exportAllToPDF(equipamentos, viaturas, solicitacoes)}>
+            <DropdownMenuItem onClick={() => exportAllToPDF(equipamentos, viaturas, solicitacoes, atividades)}>
               <FileText className="w-4 h-4 mr-2" />
               PDF (Tabelas)
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportAllToExcel(equipamentos, viaturas, solicitacoes)}>
+            <DropdownMenuItem onClick={() => exportAllToExcel(equipamentos, viaturas, solicitacoes, atividades)}>
               <FileText className="w-4 h-4 mr-2" />
               Excel
             </DropdownMenuItem>
@@ -315,6 +346,13 @@ export default function Dashboard() {
         <MotionStatCard title="Viatura s/ Equipamento" value={stats.municipiosComViaturaSemEquipamento} icon={Truck} description="Municípios" index={6} />
         <MotionStatCard title="Sem Cobertura" value={stats.municipiosSemEquipamento} icon={AlertCircle} description="Municípios" index={7} />
         <MotionStatCard title="Inauguradas" value={stats.solicitacoesPorStatus['Inaugurada'] || 0} icon={Users} description="Solicitações concluídas" index={8} />
+      </div>
+
+      {/* Atividades Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <MotionStatCard title="Total de Atividades" value={atividades.length} icon={CalendarDays} variant="primary" description="Unidades móveis, eventos e mais" index={9} />
+        <MotionStatCard title="Realizadas" value={atividadesRealizadas} icon={CheckCircle2} variant="success" description="Atividades concluídas" index={10} />
+        <MotionStatCard title="Pessoas Atendidas" value={totalAtendimentosAtividades} icon={Users} variant="accent" description="Total de atendimentos" index={11} />
       </div>
 
       {/* Charts */}
@@ -634,7 +672,7 @@ export default function Dashboard() {
         </ChartCard>
 
         {/* ── Linha 5: Evolução Temporal (full width) ── */}
-        <ChartCard title="Evolução Temporal (Acumulado)" dotColor="bg-warning" delay={11} colSpan={2}>
+        <ChartCard title="Evolução Temporal · Atendimentos Mensais" dotColor="bg-warning" delay={11} colSpan={2}>
           <div className="h-80">
             {evolutionData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -670,6 +708,12 @@ export default function Dashboard() {
                     activeDot={{ r: 8, fill: 'hsl(320, 60%, 50%)', stroke: 'white', strokeWidth: 3 }}
                     animationDuration={1200} animationEasing="ease-out" filter="url(#lineShadow2)"
                   />
+                  <Line type="monotone" dataKey="atendimentos" name="Atendimentos/mês" stroke="hsl(270, 60%, 55%)" strokeWidth={3}
+                    strokeDasharray="6 3"
+                    dot={{ fill: 'hsl(270, 60%, 55%)', strokeWidth: 0, r: 4 }}
+                    activeDot={{ r: 7, fill: 'hsl(270, 60%, 55%)', stroke: 'white', strokeWidth: 3 }}
+                    animationDuration={1200} animationEasing="ease-out"
+                  />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -682,6 +726,122 @@ export default function Dashboard() {
             )}
           </div>
         </ChartCard>
+
+
+        {/* ── Atividades por Sede ── */}
+        <ChartCard title="Atividades e Atendimentos por Sede" dotColor="bg-violet-500" delay={12} colSpan={2}>
+          <div className="h-72">
+            {atividadesPorSede.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={atividadesPorSede} margin={{ top: 10, right: 50, bottom: 10, left: 0 }} barGap={4}>
+                  <defs>
+                    <linearGradient id="sedeGrad1" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(215, 70%, 55%)" />
+                      <stop offset="100%" stopColor="hsl(215, 70%, 40%)" />
+                    </linearGradient>
+                    <linearGradient id="sedeGrad2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(160, 55%, 50%)" />
+                      <stop offset="100%" stopColor="hsl(160, 55%, 35%)" />
+                    </linearGradient>
+                    <linearGradient id="sedeGrad3" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(270, 60%, 60%)" />
+                      <stop offset="100%" stopColor="hsl(270, 60%, 45%)" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'hsl(var(--foreground))', fontWeight: 500 }} axisLine={false} tickLine={false} />
+                  {/* Eixo esquerdo: atividades */}
+                  <YAxis yAxisId="ativ" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} dx={-5} />
+                  {/* Eixo direito: atendimentos (escala separada) */}
+                  <YAxis yAxisId="atend" orientation="right" tick={{ fontSize: 11, fill: 'hsl(270, 60%, 55%)' }} axisLine={false} tickLine={false} allowDecimals={false} dx={5} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="bg-card border border-border rounded-xl shadow-lg p-3 text-sm">
+                          <p className="font-semibold mb-2">{label}</p>
+                          {payload.map((p: any) => (
+                            <div key={p.name} className="flex items-center gap-2 mb-1">
+                              <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: p.color }} />
+                              <span className="text-muted-foreground">{p.name}:</span>
+                              <span className="font-medium">{p.value?.toLocaleString('pt-BR')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }}
+                    cursor={{ fill: 'hsl(var(--muted) / 0.3)', radius: 6 }}
+                  />
+                  <Legend verticalAlign="top" height={36} formatter={(v) => <span className="text-xs font-medium text-foreground">{v}</span>} />
+                  <Bar yAxisId="ativ" dataKey="total" name="Total atividades" fill="url(#sedeGrad1)" radius={[6, 6, 0, 0]} animationDuration={1000} />
+                  <Bar yAxisId="ativ" dataKey="realizadas" name="Realizadas" fill="url(#sedeGrad2)" radius={[6, 6, 0, 0]} animationDuration={1000} />
+                  <Bar yAxisId="atend" dataKey="atendimentos" name="Pessoas atendidas" fill="url(#sedeGrad3)" radius={[6, 6, 0, 0]} animationDuration={1000} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <CalendarDays className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                  <p>Nenhuma atividade cadastrada</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </ChartCard>
+
+        {/* ── Próximas Atividades Agendadas ── */}
+        {proximasAtividades.length > 0 && (
+          <ChartCard title="Próximas Atividades Agendadas" dotColor="bg-blue-500" delay={13} colSpan={2}>
+            <div className="divide-y divide-border/50">
+              {proximasAtividades.map((a, i) => {
+                const dataAtiv = new Date(a.data + 'T00:00:00');
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                const diffDias = Math.round((dataAtiv.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+                const urgente = diffDias <= 7;
+                const passado = diffDias < 0;
+                return (
+                  <motion.div
+                    key={a.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-center gap-4 py-3 first:pt-0 last:pb-0"
+                  >
+                    {/* Data */}
+                    <div className={cn(
+                      'w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 font-display font-bold',
+                      passado ? 'bg-rose-500/10 text-rose-600' :
+                      urgente ? 'bg-amber-500/10 text-amber-600' :
+                      'bg-blue-500/10 text-blue-600'
+                    )}>
+                      <span className="text-xs leading-none">{format(dataAtiv, 'MMM', { locale: ptBR }).toUpperCase()}</span>
+                      <span className="text-lg leading-none">{format(dataAtiv, 'dd')}</span>
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{a.municipio}</p>
+                      <p className="text-xs text-muted-foreground truncate">{a.tipo} · {a.recurso} · {a.municipio_sede}</p>
+                    </div>
+                    {/* Badge dias */}
+                    <div className={cn(
+                      'shrink-0 text-xs font-medium px-2.5 py-1 rounded-full',
+                      passado ? 'bg-rose-500/10 text-rose-600' :
+                      urgente ? 'bg-amber-500/10 text-amber-600' :
+                      'bg-blue-500/10 text-blue-600'
+                    )}>
+                      {passado
+                        ? `${Math.abs(diffDias)}d atrás`
+                        : diffDias === 0 ? 'Hoje'
+                        : diffDias === 1 ? 'Amanhã'
+                        : `em ${diffDias}d`}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </ChartCard>
+        )}
 
       </div>
     </AppLayout>

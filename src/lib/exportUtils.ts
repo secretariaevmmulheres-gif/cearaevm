@@ -234,14 +234,7 @@ export interface RegionStatsExport {
 
 export function exportRegionalToPDF(regionStats: RegionStatsExport, equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
   const doc = new jsPDF();
-  let currentY = 22;
-
-  doc.setFontSize(16);
-  doc.text(`Relatório Regional - ${regionStats.regiao}`, 14, currentY);
-  currentY += 8;
-  doc.setFontSize(10);
-  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, currentY);
-  currentY += 12;
+  let currentY = addPdfHeader(doc, 'Dashboard Regional', `Região: ${regionStats.regiao}`);
 
   doc.setFontSize(12);
   doc.text('Resumo da Região:', 14, currentY);
@@ -306,14 +299,8 @@ export function exportRegionalToPDF(regionStats: RegionStatsExport, equipamentos
 
 export function exportAllRegionsToPDF(regionStats: RegionStatsExport[], equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
   const doc = new jsPDF();
-  let currentY = 22;
-
-  doc.setFontSize(20);
-  doc.text('Dashboard Regional Consolidado', 14, currentY); currentY += 10;
-  doc.setFontSize(12);
-  doc.text('EVM - Enfrentamento à Violência contra as Mulheres', 14, currentY); currentY += 8;
-  doc.setFontSize(10);
-  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, currentY); currentY += 15;
+  let currentY = addPdfHeader(doc, 'Dashboard Regional', 'Relatório Consolidado — 14 Regiões de Planejamento');
+  currentY += 4;
 
   const totalEquipamentos = equipamentos.length;
   const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
@@ -372,9 +359,7 @@ export function exportAllRegionsToPDF(regionStats: RegionStatsExport[], equipame
 
   regionStats.forEach((region, index) => {
     doc.addPage();
-    currentY = 22;
-    doc.setFontSize(16);
-    doc.text(`${index + 1}. ${region.regiao}`, 14, currentY); currentY += 10;
+    currentY = addPdfHeader(doc, 'Dashboard Regional', `${index + 1}. ${region.regiao}`);
     doc.setFontSize(10);
     doc.text(`Municípios: ${region.totalMunicipios} | Com Equipamento: ${region.municipiosComEquipamento} | Cobertura: ${region.cobertura.toFixed(2)}%`, 14, currentY); currentY += 6;
     doc.text(`Equipamentos: ${region.totalEquipamentos} | Patrulhas M.P.: ${region.totalViaturas} | Solicitações: ${region.totalSolicitacoes}`, 14, currentY); currentY += 10;
@@ -603,12 +588,14 @@ export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[], filterRegia
   doc.setTextColor(0, 0, 0);
   autoTable(doc, {
     head: [['Município', 'Região', 'Tipo', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Capacitação']],
-    body: solicitacoes.map(s => [s.municipio, getRegiao(s.municipio) || '-', s.tipo_equipamento, s.status, new Date(s.data_solicitacao).toLocaleDateString('pt-BR'), s.suite_implantada || '-', s.guarda_municipal_estruturada ? 'Sim' : 'Não', s.recebeu_patrulha ? 'Sim' : 'Não', s.kit_athena_entregue ? 'Sim' : 'Não', s.capacitacao_realizada ? 'Sim' : 'Não']),
-    startY,
+    body: solicitacoes.map(s => [s.municipio, getRegiao(s.municipio) || '-', s.tipo_equipamento, s.status, new Date(s.data_solicitacao + 'T00:00:00').toLocaleDateString('pt-BR'), s.suite_implantada || '-', s.guarda_municipal_estruturada ? 'Sim' : 'Não', s.recebeu_patrulha ? 'Sim' : 'Não', s.kit_athena_entregue ? 'Sim' : 'Não', s.capacitacao_realizada ? 'Sim' : 'Não']),
+    startY: startY + 6,
     styles: { fontSize: 6.5 },
     headStyles: { fillColor: [31, 81, 140] },
+    alternateRowStyles: { fillColor: [240, 244, 250] },
   });
-  doc.save('solicitacoes.pdf');
+  addPdfFooters(doc);
+  doc.save(`solicitacoes_${ts()}.pdf`);
 }
 
 export function exportSolicitacoesToExcel(solicitacoes: Solicitacao[]) {
@@ -620,7 +607,7 @@ export function exportSolicitacoesToExcel(solicitacoes: Solicitacao[]) {
   saveWb(wb, `solicitacoes_${ts()}.xlsx`);
 }
 
-export function exportAllToPDF(equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
+export function exportAllToPDF(equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[], atividades: Atividade[] = []) {
   const doc = new jsPDF('landscape');
   let currentY = 22;
 
@@ -708,17 +695,37 @@ export function exportAllToPDF(equipamentos: Equipamento[], viaturas: Viatura[],
   doc.text('Solicitações:', 14, currentY);
   autoTable(doc, {
     head: [['Município', 'Região', 'Tipo', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Capacitação']],
-    body: solicitacoes.map(s => [s.municipio, getRegiao(s.municipio) || '-', s.tipo_equipamento, s.status, new Date(s.data_solicitacao).toLocaleDateString('pt-BR'), s.suite_implantada || '-', s.guarda_municipal_estruturada ? 'Sim' : 'Não', s.recebeu_patrulha ? 'Sim' : 'Não', s.kit_athena_entregue ? 'Sim' : 'Não', s.capacitacao_realizada ? 'Sim' : 'Não']),
+    body: solicitacoes.map(s => [s.municipio, getRegiao(s.municipio) || '-', s.tipo_equipamento, s.status, new Date(s.data_solicitacao + 'T00:00:00').toLocaleDateString('pt-BR'), s.suite_implantada || '-', s.guarda_municipal_estruturada ? 'Sim' : 'Não', s.recebeu_patrulha ? 'Sim' : 'Não', s.kit_athena_entregue ? 'Sim' : 'Não', s.capacitacao_realizada ? 'Sim' : 'Não']),
     startY: currentY + 5,
     styles: { fontSize: 6.5 },
     headStyles: { fillColor: [31, 81, 140] },
   });
 
+  // Atividades
+  if (atividades.length > 0) {
+    doc.addPage(); currentY = 22;
+    doc.setFontSize(12);
+    const totalAtend = atividades.reduce((s, a) => s + (a.atendimentos ?? 0), 0);
+    doc.text(`Atividades (${atividades.length} registros | ${totalAtend} atendimentos):`, 14, currentY);
+    autoTable(doc, {
+      head: [['Município', 'Sede', 'Tipo', 'Recurso', 'Data', 'Status', 'Atend.']],
+      body: atividades.map(a => [
+        a.municipio, a.municipio_sede, a.tipo, a.recurso,
+        new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR'),
+        a.status, a.atendimentos?.toString() || '-',
+      ]),
+      startY: currentY + 5,
+      styles: { fontSize: 6.5 },
+      headStyles: { fillColor: [124, 58, 237] },
+      alternateRowStyles: { fillColor: [245, 243, 255] },
+    });
+  }
+
   addPdfFooters(doc);
   doc.save(`relatorio-completo_${ts()}.pdf`);
 }
 
-export function exportAllToExcel(equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
+export function exportAllToExcel(equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[], atividades: Atividade[] = []) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(equipamentos.map(e => ({ 'Município': e.municipio, 'Região': getRegiao(e.municipio) || '', 'Tipo': e.tipo, 'Patrulha M.P.': e.possui_patrulha ? 'Sim' : 'Não', 'Endereço': e.endereco || '', 'Responsável': e.responsavel || '', 'Telefone': e.telefone || '', 'Observações': e.observacoes || '', 'Data Criação': new Date(e.created_at).toLocaleDateString('pt-BR') }))), 'Equipamentos');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(viaturas.map(v => ({ 'Município': v.municipio, 'Região': getRegiao(v.municipio) || '', 'Tipo de Patrulha': v.tipo_patrulha, 'Órgão Responsável': v.orgao_responsavel, 'Quantidade': v.quantidade, 'Vinculada a Equipamento': v.vinculada_equipamento ? 'Sim' : 'Não', 'Data de Implantação': new Date(v.data_implantacao).toLocaleDateString('pt-BR'), 'Responsável': v.responsavel || '', 'Observações': v.observacoes || '' }))), 'Viaturas PMCE');
@@ -726,7 +733,21 @@ export function exportAllToExcel(equipamentos: Equipamento[], viaturas: Viatura[
   const municipiosComPatrulhaEquip = new Set(patrulhasEquip.map(e => e.municipio));
   const patrulhasSolic = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([...patrulhasEquip.map(e => ({ 'Município': e.municipio, 'Região': getRegiao(e.municipio) || '', 'Tipo de Equipamento': e.tipo, 'Origem': 'Equipamento', 'Status': '-', 'Endereço': e.endereco || '', 'Responsável': e.responsavel || '', 'Telefone': e.telefone || '', 'Observações': e.observacoes || '', 'Data Criação': new Date(e.created_at).toLocaleDateString('pt-BR') })), ...patrulhasSolic.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Origem': 'Solicitação', 'Status': s.status, 'Endereço': '', 'Responsável': '', 'Telefone': '', 'Observações': s.observacoes || '', 'Data Criação': new Date(s.created_at).toLocaleDateString('pt-BR') }))]), 'Patrulhas Casas');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(solicitacoes.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Status': s.status, 'Data da Solicitação': new Date(s.data_solicitacao).toLocaleDateString('pt-BR'), 'NUP': s.suite_implantada || '', 'Guarda Municipal Estruturada': s.guarda_municipal_estruturada ? 'Sim' : 'Não', 'Recebeu Patrulha': s.recebeu_patrulha ? 'Sim' : 'Não', 'Kit Athena Entregue': s.kit_athena_entregue ? 'Sim' : 'Não', 'Capacitação Realizada': s.capacitacao_realizada ? 'Sim' : 'Não', 'Observações': s.observacoes || '' }))), 'Solicitações');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(solicitacoes.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Status': s.status, 'Data da Solicitação': new Date(s.data_solicitacao + 'T00:00:00').toLocaleDateString('pt-BR'), 'NUP': s.suite_implantada || '', 'Guarda Municipal Estruturada': s.guarda_municipal_estruturada ? 'Sim' : 'Não', 'Recebeu Patrulha': s.recebeu_patrulha ? 'Sim' : 'Não', 'Kit Athena Entregue': s.kit_athena_entregue ? 'Sim' : 'Não', 'Capacitação Realizada': s.capacitacao_realizada ? 'Sim' : 'Não', 'Observações': s.observacoes || '' }))), 'Solicitações');
+  if (atividades.length > 0) {
+    const atividadesWs = XLSX.utils.json_to_sheet(atividades.map(a => ({
+      'Município': a.municipio, 'Sede (CMB/CMC)': a.municipio_sede,
+      'Região': getRegiao(a.municipio) || '',
+      'Tipo': a.tipo, 'Recurso': a.recurso,
+      'Status': a.status,
+      'Data': new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR'),
+      'Duração (dias)': a.dias ?? '',
+      'Atendimentos': a.atendimentos ?? '',
+      'NUP': a.nup || '', 'Nome do Evento': a.nome_evento || '',
+    })));
+    styleWorksheet(atividadesWs, '7C3AED');
+    XLSX.utils.book_append_sheet(wb, atividadesWs, 'Atividades');
+  }
   saveWb(wb, `relatorio-completo_${ts()}.xlsx`);
 }
 
@@ -747,7 +768,7 @@ export function exportRegionalGoalsToPDF(payload: RegionalGoalsExportPayload) {
   doc.text(`Gerado em: ${payload.generatedAt.toLocaleDateString('pt-BR')} às ${payload.generatedAt.toLocaleTimeString('pt-BR')}`, 14, 32);
   doc.text(`Resumo: ${payload.summary.achieved} atingidas • ${payload.summary.onTrack} no caminho • ${payload.summary.atRisk} em risco • ${payload.summary.behind} atrasadas • Média ${payload.summary.avgProgress.toFixed(0)}%`, 14, 40);
   autoTable(doc, {
-    startY: metasY + 6,
+    startY: 46,
     head: [['Região', 'Status', 'Equip. (atual/meta)', 'Equip. %', 'Viaturas (atual/meta)', 'Viaturas %', 'Cobertura (atual/meta)', 'Cobertura %', 'Geral %', 'Esperado %']],
     body: payload.rows.map(r => [r.regiao, r.status, `${r.equipamentos.current}/${r.equipamentos.goal}`, `${Math.round(r.equipamentos.progress)}%`, `${r.viaturas.current}/${r.viaturas.goal}`, `${Math.round(r.viaturas.progress)}%`, `${r.cobertura.current.toFixed(1)}%/${r.cobertura.goal}%`, `${Math.round(r.cobertura.progress)}%`, `${Math.round(r.overallProgress)}%`, `${Math.round(r.expectedProgress)}%`]),
     styles: { fontSize: 8, cellPadding: 2 },
@@ -1008,7 +1029,7 @@ export function exportAtividadesToPDF(atividades: Atividade[], filterLabel?: str
         getRegiao(a.municipio) || '-',
         a.tipo,
         a.recurso,
-        new Date(a.data).toLocaleDateString('pt-BR'),
+        new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR'),
         a.dias?.toString() || '-',
         a.horario || '-',
         a.status,
@@ -1044,7 +1065,7 @@ export function exportAtividadesToExcel(atividades: Atividade[]) {
     'Recurso':             a.recurso,
     'Qtd. Equipe':         a.quantidade_equipe ?? '',
     'Status':              a.status,
-    'Data':                new Date(a.data).toLocaleDateString('pt-BR'),
+    'Data':                new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR'),
     'Duração (dias)':      a.dias ?? '',
     'Horário':             a.horario || '',
     'Atendimentos':        a.atendimentos ?? '',

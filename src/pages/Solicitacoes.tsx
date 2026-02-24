@@ -124,7 +124,7 @@ function SolicitacaoRow({
         </td>
         <td className="text-sm">{solicitacao.tipo_equipamento}</td>
         <td className="text-sm text-muted-foreground">
-          {format(new Date(solicitacao.data_solicitacao), 'dd/MM/yyyy', { locale: ptBR })}
+          {format(new Date(solicitacao.data_solicitacao + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
         </td>
         <td onClick={e => e.stopPropagation()}>
           <span className={cn('badge-status', statusStyles[solicitacao.status])}>
@@ -217,7 +217,7 @@ function SolicitacaoRow({
                       <div>
                         <p className="text-[10px] text-muted-foreground">Data da Solicitação</p>
                         <p className="text-xs font-medium">
-                          {format(new Date(solicitacao.data_solicitacao), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                          {format(new Date(solicitacao.data_solicitacao + 'T00:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                         </p>
                       </div>
                     </div>
@@ -256,6 +256,7 @@ export default function Solicitacoes() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterTipo, setFilterTipo] = useState<string>('all');
   const [filterRegiao, setFilterRegiao] = useState<string>('all');
+  const [filterAno, setFilterAno] = useState<string>(String(new Date().getFullYear()));
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTransformDialogOpen, setIsTransformDialogOpen] = useState(false);
@@ -285,9 +286,10 @@ export default function Solicitacoes() {
       const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
       const matchesTipo = filterTipo === 'all' || s.tipo_equipamento === filterTipo;
       const matchesRegiao = filterRegiao === 'all' || getRegiao(s.municipio) === filterRegiao;
-      return matchesSearch && matchesStatus && matchesTipo && matchesRegiao;
+      const matchesAno = filterAno === 'all' || new Date(s.data_solicitacao + 'T00:00:00').getFullYear() === parseInt(filterAno);
+      return matchesSearch && matchesStatus && matchesTipo && matchesRegiao && matchesAno;
     })
-    .sort((a, b) => a.municipio.localeCompare(b.municipio));
+    .sort((a, b) => new Date(b.data_solicitacao + 'T00:00:00').getTime() - new Date(a.data_solicitacao + 'T00:00:00').getTime());
 
   // ── Cards de resumo por status ──
   const cardStatuses: StatusSolicitacao[] = ['Recebida', 'Em análise', 'Aprovada', 'Em implantação', 'Inaugurada', 'Cancelada'];
@@ -308,7 +310,7 @@ export default function Solicitacoes() {
     setEditingSolicitacao(s);
     setFormData({
       municipio: s.municipio,
-      data_solicitacao: format(new Date(s.data_solicitacao), 'yyyy-MM-dd'),
+      data_solicitacao: format(new Date(s.data_solicitacao + 'T00:00:00'), 'yyyy-MM-dd'),
       tipo_equipamento: s.tipo_equipamento,
       status: s.status,
       recebeu_patrulha: s.recebeu_patrulha,
@@ -412,7 +414,7 @@ export default function Solicitacoes() {
 
       {/* ── Filtros ── */}
       <div className="bg-card rounded-xl p-4 border border-border shadow-sm mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
@@ -436,6 +438,19 @@ export default function Solicitacoes() {
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
               {tiposEquipamento.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterAno} onValueChange={setFilterAno}>
+            <SelectTrigger>
+              <SelectValue placeholder="Ano">
+                {filterAno === 'all' ? 'Todos os anos' : filterAno}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os anos</SelectItem>
+              {[2024, 2025, 2026, 2027].map(y => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <div className="flex items-center text-sm text-muted-foreground">
