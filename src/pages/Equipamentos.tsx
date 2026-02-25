@@ -54,6 +54,8 @@ const tipoStyles: Record<TipoEquipamento, string> = {
   'Casa da Mulher Cearense': 'equipment-cearense',
   'Casa da Mulher Municipal': 'equipment-municipal',
   'Sala Lilás': 'equipment-lilas',
+  'DDM': 'equipment-ddm',
+  'Sala em Delegacia': 'equipment-sala-delegacia',
 };
 
 const tipoColors: Record<TipoEquipamento, { bg: string; text: string; border: string; icon: string }> = {
@@ -80,6 +82,18 @@ const tipoColors: Record<TipoEquipamento, { bg: string; text: string; border: st
     text: 'text-pink-600',
     border: 'border-pink-500/20',
     icon: 'bg-pink-500/15',
+  },
+  'DDM': {
+    bg: 'bg-green-700/10',
+    text: 'text-green-800',
+    border: 'border-green-700/20',
+    icon: 'bg-green-700/15',
+  },
+  'Sala em Delegacia': {
+    bg: 'bg-green-400/10',
+    text: 'text-green-600',
+    border: 'border-green-400/20',
+    icon: 'bg-green-400/15',
   },
 };
 
@@ -391,7 +405,7 @@ export default function Equipamentos() {
       </PageHeader>
 
       {/* ── Cards de resumo ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-6">
         {totalPorTipo.map((item, i) => (
           <motion.div
             key={item.tipo}

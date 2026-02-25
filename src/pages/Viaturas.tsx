@@ -301,6 +301,7 @@ export default function Viaturas() {
   const [filterOrgao, setFilterOrgao] = useState<string>('all');
   const [filterVinculada, setFilterVinculada] = useState<string>('all');
   const [filterRegiao, setFilterRegiao] = useState<string>('all');
+  const [filterAno, setFilterAno] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingViatura, setEditingViatura] = useState<Viatura | null>(null);
@@ -324,9 +325,14 @@ export default function Viaturas() {
         (filterVinculada === 'sim' && v.vinculada_equipamento) ||
         (filterVinculada === 'nao' && !v.vinculada_equipamento);
       const matchesRegiao = filterRegiao === 'all' || getRegiao(v.municipio) === filterRegiao;
-      return matchesSearch && matchesOrgao && matchesVinculada && matchesRegiao;
+      const matchesAno = filterAno === 'all' || !v.data_implantacao || new Date(v.data_implantacao + 'T00:00:00').getFullYear() === parseInt(filterAno);
+      return matchesSearch && matchesOrgao && matchesVinculada && matchesRegiao && matchesAno;
     })
     .sort((a, b) => a.municipio.localeCompare(b.municipio));
+
+  const anosDisponiveis = Array.from(
+    new Set(viaturas.map(v => v.data_implantacao ? new Date(v.data_implantacao + 'T00:00:00').getFullYear() : null).filter(Boolean))
+  ).sort((a, b) => (b as number) - (a as number)) as number[];
 
   const patrulhasDeEquipamentos = equipamentos
     .filter(e => e.possui_patrulha)
@@ -522,6 +528,13 @@ export default function Viaturas() {
             <SelectContent>
               <SelectItem value="all">Todos os órgãos</SelectItem>
               {orgaosResponsaveis.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterAno} onValueChange={setFilterAno}>
+            <SelectTrigger><SelectValue placeholder="Ano" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os anos</SelectItem>
+              {anosDisponiveis.map(ano => <SelectItem key={ano} value={String(ano)}>{ano}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filterVinculada} onValueChange={setFilterVinculada}>

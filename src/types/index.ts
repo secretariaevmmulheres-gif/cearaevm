@@ -3,7 +3,7 @@ import { TipoEquipamento, StatusSolicitacao, OrgaoResponsavel } from "@/data/mun
 export type AppRole = 'admin' | 'editor' | 'viewer';
 
 // ── Atividades ────────────────────────────────────────────────────────────────
-export type TipoAtividade = 'Unidade Móvel' | 'Palestra' | 'Evento' | 'Tenda Lilás' | 'Outro';
+export type TipoAtividade = 'Unidade Móvel' | 'Palestra' | 'Evento' | 'Tenda Lilás' | 'Visita a DDM' | 'Visita a Delegacia' | 'Outro';
 export type RecursoAtividade = 'Unidade Móvel' | 'Equipe' | 'Unidade Móvel + Equipe';
 export type StatusAtividade = 'Agendado' | 'Realizado' | 'Cancelado';
 

@@ -23,6 +23,11 @@ import {
   municipiosCeara, tiposEquipamento, statusSolicitacao,
   TipoEquipamento, StatusSolicitacao, regioesList, getRegiao,
 } from '@/data/municipios';
+
+// DDM e Sala em Delegacia são da Polícia Civil — não passam pelo fluxo de solicitações
+const tiposEquipamentoSolicitacao = tiposEquipamento.filter(
+  t => t !== 'DDM' && t !== 'Sala em Delegacia'
+);
 import { Solicitacao } from '@/types';
 import {
   Plus, Pencil, Trash2, Search, FileText, ArrowRight, Building2,
@@ -437,7 +442,7 @@ export default function Solicitacoes() {
             <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
-              {tiposEquipamento.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {tiposEquipamentoSolicitacao.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filterAno} onValueChange={setFilterAno}>
@@ -527,7 +532,7 @@ export default function Solicitacoes() {
                 <Select value={formData.tipo_equipamento} onValueChange={(v) => setFormData({ ...formData, tipo_equipamento: v as TipoEquipamento })}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {tiposEquipamento.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {tiposEquipamentoSolicitacao.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

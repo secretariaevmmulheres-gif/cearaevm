@@ -55,13 +55,15 @@ interface MunicipioData {
 }
 
 const priorityColors: Record<number, string> = {
-  1: '#0d9488',
-  2: '#7c3aed',
-  3: '#ea580c',
-  4: '#d946ef',
-  5: '#06b6d4',
-  6: '#e5e7eb',
-  0: '#9ca3af',
+  1: '#0d9488',  // Casa da Mulher Brasileira — teal
+  2: '#7c3aed',  // Casa da Mulher Cearense — violet
+  3: '#ea580c',  // Casa da Mulher Municipal — orange
+  4: '#d946ef',  // Sala Lilás — fuchsia
+  5: '#15803d',  // DDM — verde escuro
+  6: '#4ade80',  // Sala em Delegacia — verde claro
+  7: '#06b6d4',  // Só Viatura — cyan
+  8: '#e5e7eb',  // Sem Cobertura — gray
+  0: '#9ca3af',  // Filtrado — gray opaco
 };
 
 // Mini progress bar component
@@ -176,20 +178,22 @@ export default function Mapa() {
         const hasViatura = viats.length > 0 || eqs.some((e) => e.possui_patrulha) || sols.some((s) => s.recebeu_patrulha);
         if (!hasViatura) visible = false;
       }
-      let prioridade = 6; let cor = 'bg-muted'; let hexColor = priorityColors[6];
+      let prioridade = 8; let cor = 'bg-muted'; let hexColor = priorityColors[8];
       if (!visible) { prioridade = 0; cor = 'bg-muted/50'; hexColor = priorityColors[0]; }
       else if (eqs.some((e) => e.tipo === 'Casa da Mulher Brasileira')) { prioridade = 1; cor = 'bg-equipment-brasileira'; hexColor = priorityColors[1]; }
       else if (eqs.some((e) => e.tipo === 'Casa da Mulher Cearense')) { prioridade = 2; cor = 'bg-equipment-cearense'; hexColor = priorityColors[2]; }
       else if (eqs.some((e) => e.tipo === 'Casa da Mulher Municipal')) { prioridade = 3; cor = 'bg-equipment-municipal'; hexColor = priorityColors[3]; }
       else if (eqs.some((e) => e.tipo === 'Sala Lilás')) { prioridade = 4; cor = 'bg-equipment-lilas'; hexColor = priorityColors[4]; }
-      else if (viats.length > 0) { prioridade = 5; cor = 'bg-equipment-viatura'; hexColor = priorityColors[5]; }
+      else if (eqs.some((e) => e.tipo === 'DDM')) { prioridade = 5; cor = 'bg-equipment-ddm'; hexColor = priorityColors[5]; }
+      else if (eqs.some((e) => e.tipo === 'Sala em Delegacia')) { prioridade = 6; cor = 'bg-equipment-sala-delegacia'; hexColor = priorityColors[6]; }
+      else if (viats.length > 0) { prioridade = 7; cor = 'bg-equipment-viatura'; hexColor = priorityColors[7]; }
       dataMap.set(normalizarNome(nome), { nome, equipamentos: eqs, viaturas: viats, solicitacoes: sols, prioridade, cor, hexColor, visible });
     });
     return dataMap;
   }, [equipamentos, viaturas, solicitacoes, filterTipoEquipamento, filterStatusSolicitacao, filterApenasComViatura, filterRegiao]);
 
   const equipmentCounts = useMemo(() => {
-    const counts = { brasileira: 0, cearense: 0, municipal: 0, lilas: 0 };
+    const counts = { brasileira: 0, cearense: 0, municipal: 0, lilas: 0, ddm: 0, salaDelegacia: 0 };
     let vis = equipamentos;
     if (filterRegiao !== 'all') vis = vis.filter(e => getRegiao(e.municipio) === filterRegiao);
     if (filterTipoEquipamento !== 'all') vis = vis.filter(e => e.tipo === filterTipoEquipamento);
@@ -198,19 +202,23 @@ export default function Mapa() {
       else if (e.tipo === 'Casa da Mulher Cearense') counts.cearense++;
       else if (e.tipo === 'Casa da Mulher Municipal') counts.municipal++;
       else if (e.tipo === 'Sala Lilás') counts.lilas++;
+      else if (e.tipo === 'DDM') counts.ddm++;
+      else if (e.tipo === 'Sala em Delegacia') counts.salaDelegacia++;
     });
     return counts;
   }, [equipamentos, filterRegiao, filterTipoEquipamento]);
 
   const stats = useMemo(() => {
-    const counts = { brasileira: 0, cearense: 0, municipal: 0, lilas: 0, viaturaOnly: 0, semCobertura: 0, filteredOut: 0 };
+    const counts = { brasileira: 0, cearense: 0, municipal: 0, lilas: 0, ddm: 0, salaDelegacia: 0, viaturaOnly: 0, semCobertura: 0, filteredOut: 0 };
     municipiosData.forEach((m) => {
       if (!m.visible) { counts.filteredOut++; return; }
       if (m.prioridade === 1) counts.brasileira++;
       else if (m.prioridade === 2) counts.cearense++;
       else if (m.prioridade === 3) counts.municipal++;
       else if (m.prioridade === 4) counts.lilas++;
-      else if (m.prioridade === 5) counts.viaturaOnly++;
+      else if (m.prioridade === 5) counts.ddm++;
+      else if (m.prioridade === 6) counts.salaDelegacia++;
+      else if (m.prioridade === 7) counts.viaturaOnly++;
       else counts.semCobertura++;
     });
     return counts;
@@ -223,16 +231,16 @@ export default function Mapa() {
       const total = municipios.length;
       const comEquipamento = municipios.filter((m) => {
         const data = municipiosData.get(normalizarNome(m));
-        return data && data.visible && data.prioridade >= 1 && data.prioridade <= 4;
+        return data && data.visible && data.prioridade >= 1 && data.prioridade <= 6;
       }).length;
       return { regiao, total, comEquipamento, pct: total > 0 ? (comEquipamento / total) * 100 : 0 };
     }).sort((a, b) => b.pct - a.pct);
   }, [municipiosData]);
 
   const getFeatureStyle = (feature: Feature<Geometry> | undefined): PathOptions => {
-    if (!feature?.properties) return { fillColor: priorityColors[6], weight: 1, opacity: 1, color: '#ffffff', fillOpacity: 0.7 };
+    if (!feature?.properties) return { fillColor: priorityColors[8], weight: 1, opacity: 1, color: '#ffffff', fillOpacity: 0.7 };
     const municipioData = municipiosData.get(normalizarNome(feature.properties.name as string));
-    return { fillColor: municipioData?.hexColor || priorityColors[6], weight: 1, opacity: 1, color: '#ffffff', fillOpacity: 0.7 };
+    return { fillColor: municipioData?.hexColor || priorityColors[8], weight: 1, opacity: 1, color: '#ffffff', fillOpacity: 0.7 };
   };
 
   const onEachFeature = (feature: Feature<Geometry>, layer: Layer) => {
@@ -242,13 +250,13 @@ export default function Mapa() {
       mouseover: (e) => { e.target.setStyle({ weight: 3, color: '#1f2937', fillOpacity: 0.9 }); e.target.bringToFront(); },
       mouseout: (e) => { e.target.setStyle({ weight: 1, color: '#ffffff', fillOpacity: 0.7 }); },
       click: () => {
-        setSelectedMunicipio(municipioData || { nome: municipioName, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 6, cor: 'bg-muted', hexColor: priorityColors[6], visible: true });
+        setSelectedMunicipio(municipioData || { nome: municipioName, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 6, cor: 'bg-muted', hexColor: priorityColors[8], visible: true });
       },
     });
     layer.bindTooltip(municipioName, { permanent: false, direction: 'center', className: 'bg-card text-foreground border border-border rounded-md px-2 py-1 text-xs shadow-lg' });
   };
 
-  const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilas;
+  const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilas + stats.ddm + stats.salaDelegacia;
   const coberturaGeral = ((totalComEquipamento / 184) * 100);
 
   const legendItems = [
@@ -256,8 +264,10 @@ export default function Mapa() {
     { color: priorityColors[2], label: 'Casa da Mulher Cearense', count: equipmentCounts.cearense },
     { color: priorityColors[3], label: 'Casa da Mulher Municipal', count: equipmentCounts.municipal },
     { color: priorityColors[4], label: 'Sala Lilás', count: equipmentCounts.lilas },
-    { color: priorityColors[5], label: 'Só Viatura', count: stats.viaturaOnly },
-    { color: priorityColors[6], label: 'Sem Cobertura', count: stats.semCobertura },
+    { color: priorityColors[5], label: 'DDM', count: equipmentCounts.ddm },
+    { color: priorityColors[6], label: 'Sala em Delegacia', count: equipmentCounts.salaDelegacia },
+    { color: priorityColors[7], label: 'Só Viatura', count: stats.viaturaOnly },
+    { color: priorityColors[8], label: 'Sem Cobertura', count: stats.semCobertura },
   ];
 
   return (
@@ -321,10 +331,10 @@ export default function Mapa() {
                   return (
                     <li key={municipio}>
                       <button
-                        onClick={() => { setSelectedMunicipio(data || { nome: municipio, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 6, cor: 'bg-muted', hexColor: priorityColors[6], visible: true }); setSearchQuery(''); setSearchResults([]); }}
+                        onClick={() => { setSelectedMunicipio(data || { nome: municipio, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 6, cor: 'bg-muted', hexColor: priorityColors[8], visible: true }); setSearchQuery(''); setSearchResults([]); }}
                         className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-left rounded-lg hover:bg-muted transition-colors"
                       >
-                        <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: data?.hexColor || priorityColors[6] }} />
+                        <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: data?.hexColor || priorityColors[8] }} />
                         {municipio}
                         <ChevronRight className="w-3 h-3 ml-auto text-muted-foreground" />
                       </button>
@@ -439,7 +449,7 @@ export default function Mapa() {
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             {legendItems.map((item) => (
               <div key={item.label} className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 rounded-sm shrink-0 shadow-sm" style={{ backgroundColor: item.color, border: item.color === priorityColors[6] ? '1px solid #d1d5db' : 'none' }} />
+                <div className="w-3.5 h-3.5 rounded-sm shrink-0 shadow-sm" style={{ backgroundColor: item.color, border: item.color === priorityColors[8] ? '1px solid #d1d5db' : 'none' }} />
                 <span className="text-xs text-foreground flex-1 truncate">{item.label}</span>
                 <span className="text-xs font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">{item.count}</span>
               </div>
@@ -454,7 +464,16 @@ export default function Mapa() {
           <h3 className="font-semibold text-sm mb-3">Cobertura por Região</h3>
           <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
             {coberturaPorRegiao.map((r) => (
-              <div key={r.regiao}>
+              <div
+                key={r.regiao}
+                onClick={() => setFilterRegiao(filterRegiao === r.regiao ? 'all' : r.regiao)}
+                className={cn(
+                  'cursor-pointer rounded-lg px-2 py-1.5 -mx-2 transition-colors',
+                  filterRegiao === r.regiao
+                    ? 'bg-primary/10 ring-1 ring-primary/30'
+                    : 'hover:bg-muted/60'
+                )}
+              >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs text-foreground truncate max-w-[160px]" title={r.regiao}>{r.regiao}</span>
                   <span className="text-xs font-semibold text-primary ml-2 shrink-0">{r.pct.toFixed(0)}%</span>

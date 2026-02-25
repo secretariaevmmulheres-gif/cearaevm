@@ -13,6 +13,7 @@ import Viaturas from "./pages/Viaturas";
 import Solicitacoes from "./pages/Solicitacoes";
 import Atividades from "./pages/Atividades";
 import Mapa from "./pages/Mapa";
+import RelatorioEVM from "./pages/RelatorioEVM";
 import Usuarios from "./pages/Usuarios";
 import Perfil from "./pages/Perfil";
 import NotFound from "./pages/NotFound";
@@ -89,6 +90,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Mapa />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/relatorio-cpdi"
+        element={
+          <ProtectedRoute>
+            <RelatorioEVM />
           </ProtectedRoute>
         }
       />

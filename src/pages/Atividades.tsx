@@ -35,7 +35,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-const TIPOS_ATIVIDADE: TipoAtividade[] = ['Unidade Móvel', 'Palestra', 'Evento', 'Tenda Lilás', 'Outro'];
+const TIPOS_ATIVIDADE: TipoAtividade[] = ['Unidade Móvel', 'Palestra', 'Evento', 'Tenda Lilás', 'Visita a DDM', 'Visita a Delegacia', 'Outro'];
 const RECURSOS: RecursoAtividade[] = ['Unidade Móvel', 'Equipe', 'Unidade Móvel + Equipe'];
 const STATUS_ATIVIDADE: StatusAtividade[] = ['Agendado', 'Realizado', 'Cancelado'];
 const MUNICIPIOS_SEDE = ['Fortaleza', 'Juazeiro do Norte', 'Sobral', 'Quixadá'];
@@ -47,11 +47,13 @@ const statusStyles: Record<StatusAtividade, string> = {
 };
 
 const tipoColors: Record<TipoAtividade, { bg: string; text: string }> = {
-  'Unidade Móvel': { bg: 'bg-teal-500/15',   text: 'text-teal-700'   },
-  'Palestra':      { bg: 'bg-blue-500/15',    text: 'text-blue-700'   },
-  'Evento':        { bg: 'bg-violet-500/15',  text: 'text-violet-700' },
-  'Tenda Lilás':   { bg: 'bg-pink-500/15',    text: 'text-pink-700'   },
-  'Outro':         { bg: 'bg-slate-500/15',   text: 'text-slate-700'  },
+  'Unidade Móvel':      { bg: 'bg-teal-500/15',   text: 'text-teal-700'   },
+  'Palestra':           { bg: 'bg-blue-500/15',    text: 'text-blue-700'   },
+  'Evento':             { bg: 'bg-violet-500/15',  text: 'text-violet-700' },
+  'Tenda Lilás':        { bg: 'bg-pink-500/15',    text: 'text-pink-700'   },
+  'Visita a DDM':       { bg: 'bg-green-700/15',   text: 'text-green-800'  },
+  'Visita a Delegacia': { bg: 'bg-green-400/15',   text: 'text-green-700'  },
+  'Outro':              { bg: 'bg-slate-500/15',   text: 'text-slate-700'  },
 };
 
 const sedeStyle: Record<string, { border: string; icon: string; text: string }> = {
@@ -119,7 +121,9 @@ function AtividadeRow({ atividade, onEdit, onDelete, onDuplicate }: {
         </td>
         <td onClick={e => e.stopPropagation()}>
           <span className={cn('inline-flex text-xs font-medium px-2 py-0.5 rounded-full', colors.bg, colors.text)}>
-            {atividade.tipo}
+            {atividade.tipo === 'Outro' && (atividade as any).tipo_personalizado
+              ? `Outro: ${(atividade as any).tipo_personalizado}`
+              : atividade.tipo}
           </span>
         </td>
         <td className="text-sm">
@@ -253,7 +257,7 @@ const FORM_INICIAL = {
   tipo: '' as TipoAtividade | '', recurso: '' as RecursoAtividade | '',
   quantidade_equipe: '' as number | '', status: 'Agendado' as StatusAtividade,
   nup: '', nome_evento: '', data: '', dias: '' as number | '',
-  horario: '', atendimentos: '' as number | '', endereco: '', observacoes: '',
+  horario: '', atendimentos: '' as number | '', endereco: '', observacoes: '', tipo_personalizado: '',
 };
 
 export default function Atividades() {
@@ -544,6 +548,16 @@ export default function Atividades() {
                     <SelectContent>{TIPOS_ATIVIDADE.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+                {formData.tipo === 'Outro' && (
+                  <div className="space-y-2">
+                    <Label>Descreva o tipo de atividade</Label>
+                    <Input
+                      placeholder="Ex: Visita a DDM, Capacitação interna..."
+                      value={formData.tipo_personalizado}
+                      onChange={e => f('tipo_personalizado', e.target.value)}
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Recurso Utilizado *</Label>
                   <Select value={formData.recurso} onValueChange={v => f('recurso', v)}>

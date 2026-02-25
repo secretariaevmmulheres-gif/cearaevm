@@ -49,7 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { exportAllToPDF, exportAllToExcel, exportDashboardWithChartsToPDF } from '@/lib/exportUtils';
+import { exportAllToPDF, exportAllToExcel, exportDashboardWithChartsToPDF, exportCpdiToPDF } from '@/lib/exportUtils';
 import { toast } from 'sonner';
 
 const COLORS = [
@@ -111,7 +111,13 @@ export default function Dashboard() {
   const { atividades } = useAtividades();
 
   const equipamentoChartData = Object.entries(stats.equipamentosPorTipo).map(([name, value]) => ({
-    name: name.replace('Casa da Mulher ', 'C.M. ').replace('Sala Lilás', 'S. Lilás'),
+    name: name === 'Casa da Mulher Brasileira' ? 'CMB'
+        : name === 'Casa da Mulher Cearense' ? 'CMC'
+        : name === 'Casa da Mulher Municipal' ? 'CMM'
+        : name === 'Sala Lilás' ? 'Sala Lilás'
+        : name === 'DDM' ? 'DDM'
+        : name === 'Sala em Delegacia' ? 'Sala Deleg.'
+        : name,
     fullName: name,
     value,
   }));
@@ -125,6 +131,16 @@ export default function Dashboard() {
     { name: 'PMCE', value: stats.viaturasPMCE },
     { name: 'Patrulhas das Casas', value: stats.viaturasPatrulhasCasas },
   ].filter(item => item.value > 0);
+
+  // Atividades por tipo
+  const atividadesPorTipoData = useMemo(() => {
+    const map = new Map<string, number>();
+    atividades.forEach(a => map.set(a.tipo, (map.get(a.tipo) ?? 0) + 1));
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .filter(d => d.value > 0);
+  }, [atividades]);
 
   // Evolução temporal
   const evolutionData = useMemo(() => {
@@ -182,7 +198,13 @@ export default function Dashboard() {
 
     return Array.from(map.entries())
       .map(([name, value]) => ({
-        name: name.replace('Casa da Mulher ', 'C.M. ').replace('Sala Lilás', 'S. Lilás'),
+        name: name === 'Casa da Mulher Brasileira' ? 'CMB'
+        : name === 'Casa da Mulher Cearense' ? 'CMC'
+        : name === 'Casa da Mulher Municipal' ? 'CMM'
+        : name === 'Sala Lilás' ? 'Sala Lilás'
+        : name === 'DDM' ? 'DDM'
+        : name === 'Sala em Delegacia' ? 'Sala Deleg.'
+        : name,
         fullName: name,
         value,
       }))
@@ -327,6 +349,11 @@ export default function Dashboard() {
               <FileText className="w-4 h-4 mr-2" />
               Excel
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => exportCpdiToPDF({ equipamentos, solicitacoes, viaturas }).catch(() => toast.error("Erro ao gerar relatório"))}>
+              <FileText className="w-4 h-4 mr-2 text-primary" />
+              <span className="text-primary font-medium">Relatório EVM</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -347,6 +374,34 @@ export default function Dashboard() {
         <MotionStatCard title="Sem Cobertura" value={stats.municipiosSemEquipamento} icon={AlertCircle} description="Municípios" index={7} />
         <MotionStatCard title="Inauguradas" value={stats.solicitacoesPorStatus['Inaugurada'] || 0} icon={Users} description="Solicitações concluídas" index={8} />
       </div>
+
+      {/* DDM + Sala em Delegacia sub-stats */}
+      {((stats.equipamentosPorTipo['DDM'] ?? 0) > 0 || (stats.equipamentosPorTipo['Sala em Delegacia'] ?? 0) > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
+            className="bg-card rounded-2xl border border-green-700/20 shadow-sm p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-green-700/10 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 text-green-800" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold text-green-800">{stats.equipamentosPorTipo['DDM'] ?? 0}</p>
+              <p className="text-sm font-medium text-foreground">Delegacias de Defesa da Mulher</p>
+              <p className="text-xs text-muted-foreground">DDM — Polícia Civil do Ceará</p>
+            </div>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+            className="bg-card rounded-2xl border border-green-400/20 shadow-sm p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-green-400/10 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 text-green-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold text-green-600">{stats.equipamentosPorTipo['Sala em Delegacia'] ?? 0}</p>
+              <p className="text-sm font-medium text-foreground">Salas em Delegacia</p>
+              <p className="text-xs text-muted-foreground">Polícia Civil — em funcionamento</p>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Atividades Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -788,6 +843,30 @@ export default function Dashboard() {
             )}
           </div>
         </ChartCard>
+
+        {/* ── Atividades por Tipo ── */}
+        {atividadesPorTipoData.length > 0 && (
+          <ChartCard title="Atividades por Tipo" dotColor="bg-teal-500" delay={13} colSpan={2}>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={atividadesPorTipoData} layout="vertical" margin={{ left: 8, right: 32, top: 4, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: number) => [`${v} atividade${v !== 1 ? 's' : ''}`, 'Total']}
+                  />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={28}>
+                    {atividadesPorTipoData.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+        )}
 
         {/* ── Próximas Atividades Agendadas ── */}
         {proximasAtividades.length > 0 && (

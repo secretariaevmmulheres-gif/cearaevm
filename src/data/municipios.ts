@@ -210,9 +210,11 @@ export type RegiaoPlanejamento = typeof regioesList[number];
 
 export const tiposEquipamento = [
   "Casa da Mulher Brasileira",
-  "Casa da Mulher Cearense", 
+  "Casa da Mulher Cearense",
   "Casa da Mulher Municipal",
-  "Sala Lilás"
+  "Sala Lilás",
+  "DDM",
+  "Sala em Delegacia",
 ] as const;
 
 export const statusSolicitacao = [
