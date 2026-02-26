@@ -27,6 +27,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { exportMapToPDF, captureMapImage, CapturedMapImage } from '@/lib/exportUtils';
+import { useMapaContext } from '@/contexts/MapaContext';
 import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -98,6 +99,7 @@ export default function Mapa() {
   const { equipamentos } = useEquipamentos();
   const { viaturas } = useViaturas();
   const { solicitacoes } = useSolicitacoes();
+  const { setMapaCapturado } = useMapaContext();
   const [selectedMunicipio, setSelectedMunicipio] = useState<MunicipioData | null>(null);
   const [geoJsonData, setGeoJsonData] = useState<FeatureCollection | null>(null);
   const [isLoadingGeoJson, setIsLoadingGeoJson] = useState(true);
@@ -125,6 +127,7 @@ export default function Mapa() {
       await new Promise((r) => setTimeout(r, 350));
       const captured = await captureMapImage(mapContainerRef.current, exportHighRes);
       setPreviewImageData(captured);
+      setMapaCapturado(captured); // salva no contexto global para o Relatório EVM
       setShowExportPreview(true);
     } catch {
       toast.error('Erro ao capturar o mapa');
@@ -253,7 +256,22 @@ export default function Mapa() {
         setSelectedMunicipio(municipioData || { nome: municipioName, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 6, cor: 'bg-muted', hexColor: priorityColors[8], visible: true });
       },
     });
-    layer.bindTooltip(municipioName, { permanent: false, direction: 'center', className: 'bg-card text-foreground border border-border rounded-md px-2 py-1 text-xs shadow-lg' });
+    // Tooltip enriquecido com cobertura
+    const cobertura = municipioData
+      ? municipioData.prioridade === 1 ? '🏠 Casa da Mulher Brasileira'
+      : municipioData.prioridade === 2 ? '🏠 Casa da Mulher Cearense'
+      : municipioData.prioridade === 3 ? '🏠 Casa da Mulher Municipal'
+      : municipioData.prioridade === 4 ? '💜 Sala Lilás'
+      : municipioData.prioridade === 5 ? '🟢 DDM'
+      : municipioData.prioridade === 6 ? '🟢 Sala em Delegacia'
+      : municipioData.prioridade === 7 ? '🚔 Só Viatura'
+      : '⚪ Sem Cobertura'
+      : '⚪ Sem Cobertura';
+    const patrulha = municipioData?.equipamentos?.some(e => e.possui_patrulha) ? ' · Patrulha M.P.' : '';
+    layer.bindTooltip(
+      `<strong>${municipioName}</strong><br/><span style="font-size:10px">${cobertura}${patrulha}</span>`,
+      { permanent: false, direction: 'top', className: 'bg-card text-foreground border border-border rounded-md px-2 py-1 text-xs shadow-lg', opacity: 0.97 }
+    );
   };
 
   const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilas + stats.ddm + stats.salaDelegacia;
@@ -426,7 +444,7 @@ export default function Mapa() {
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                    {geoJsonData && <GeoJSON data={geoJsonData} style={getFeatureStyle} onEachFeature={onEachFeature} />}
+                    {geoJsonData && <GeoJSON key={`geojson-${municipiosData.size}-${equipamentos.length}-${viaturas.length}`} data={geoJsonData} style={getFeatureStyle} onEachFeature={onEachFeature} />}
                   </MapContainer>
                 </ErrorBoundary>
               )}

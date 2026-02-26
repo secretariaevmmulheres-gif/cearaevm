@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { Equipamento, Viatura, Solicitacao, DashboardStats, Atividade } from '@/types';
-import { regioesList, getRegiao, getMunicipiosPorRegiao, RegiaoPlanejamento } from '@/data/municipios';
+import { getRegiao, RegiaoPlanejamento } from '@/data/municipios';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS COMPARTILHADOS
@@ -1097,22 +1097,24 @@ export interface CpdiReportData {
   equipamentos: Equipamento[];
   solicitacoes: Solicitacao[];
   viaturas: Viatura[];
-  dataReferencia?: string; // 'YYYY-MM-DD' — padrão: hoje
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RELATÓRIO EVM — Rede de Proteção à Mulher
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface CpdiReportData {
-  equipamentos: Equipamento[];
-  solicitacoes: Solicitacao[];
-  viaturas: Viatura[];
-  dataReferencia?: string; // 'YYYY-MM-DD' — padrão: hoje
+  dataReferencia?: string;  // 'YYYY-MM-DD' — padrão: hoje
+  regiaoFiltro?: string;    // filtra por região; undefined = todas
+  secoesAtivas?: string[];  // seções a incluir; undefined = todas
+  mapaImagem?: CapturedMapImage; // captura do mapa para embutir como página extra
 }
 
 export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
-  const { equipamentos, solicitacoes, viaturas, dataReferencia } = data;
+  const { equipamentos: eqAll, solicitacoes: solAll, viaturas: viAll, dataReferencia, regiaoFiltro, secoesAtivas, mapaImagem } = data;
+
+  // ── Aplicar filtro de região ───────────────────────────────────────────────
+  const inclui = (regiao?: string | null) =>
+    !regiaoFiltro || !regiao || regiao === regiaoFiltro;
+  const equipamentos  = eqAll.filter(e => inclui(getRegiao(e.municipio)));
+  const solicitacoes  = solAll.filter(s => inclui(getRegiao(s.municipio)));
+  const viaturas      = viAll.filter(v  => inclui(getRegiao(v.municipio)));
+
+  // ── Verificar se seção deve ser incluída ─────────────────────────────────
+  const temSecao = (id: string) => !secoesAtivas || secoesAtivas.includes(id);
   const refDate = dataReferencia ? new Date(dataReferencia + 'T00:00:00') : new Date();
   const doc = new jsPDF();
   const PW = doc.internal.pageSize.getWidth();
@@ -1156,7 +1158,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
   doc.setFontSize(9);
   doc.setTextColor(100, 100, 100);
   doc.text(
-    `Data de referência: ${refDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+    `Data de referência: ${refDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${regiaoFiltro ? ' | Região: ' + regiaoFiltro : ''}`,
     PW / 2, 62, { align: 'center' }
   );
   doc.setTextColor(0, 0, 0);
@@ -1314,42 +1316,55 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
   }
 
   // ── 1. Casa da Mulher Brasileira ──────────────────────────────────────────
-  if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
-  y = addSecHeader('1. Casa da Mulher Brasileira (CMB)', [13,148,136], y);
-  y = tableEquip(cmb, y, [13,148,136],
-    solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Brasileira' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  if (temSecao('cmb')) {
+    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    y = addSecHeader('1. Casa da Mulher Brasileira (CMB)', [13,148,136], y);
+    y = tableEquip(cmb, y, [13,148,136],
+      solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Brasileira' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  }
 
   // ── 2. Casa da Mulher Cearense ────────────────────────────────────────────
-  if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
-  y = addSecHeader('2. Casa da Mulher Cearense (CMC)', [124,58,237], y);
-  y = tableEquip(cmc, y, [124,58,237],
-    solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Cearense' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  if (temSecao('cmc')) {
+    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    y = addSecHeader('2. Casa da Mulher Cearense (CMC)', [124,58,237], y);
+    y = tableEquip(cmc, y, [124,58,237],
+      solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Cearense' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  }
 
   // ── 3. Casa da Mulher Municipal ───────────────────────────────────────────
-  if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
-  y = addSecHeader('3. Casa da Mulher Municipal (CMM)', [234,88,12], y);
-  y = tableEquip(cmm, y, [234,88,12],
-    solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Municipal' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  if (temSecao('cmm')) {
+    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    y = addSecHeader('3. Casa da Mulher Municipal (CMM)', [234,88,12], y);
+    y = tableEquip(cmm, y, [234,88,12],
+      solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Municipal' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  }
 
   // ── 4. Salas Lilás ────────────────────────────────────────────────────────
-  if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
-  y = addSecHeader('4. Salas Lilás', [217,70,239], y);
-  y = tableEquip(lilas, y, [217,70,239],
-    solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  if (temSecao('lilas')) {
+    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    y = addSecHeader('4. Salas Lilás', [217,70,239], y);
+    y = tableEquip(lilas, y, [217,70,239],
+      solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  }
 
   // ── 5. Salas em Delegacia (PC) ────────────────────────────────────────────
-  if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
-  y = addSecHeader('5. Salas em Delegacia (Polícia Civil)', [74,222,128], y);
-  y = tableEquip(salaDelegacia, y, [74,222,128],
-    solicitacoes.filter(s => s.tipo_equipamento === 'Sala em Delegacia' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  if (temSecao('salaDelegacia')) {
+    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    y = addSecHeader('5. Salas em Delegacia (Polícia Civil)', [74,222,128], y);
+    y = tableEquip(salaDelegacia, y, [74,222,128],
+      solicitacoes.filter(s => s.tipo_equipamento === 'Sala em Delegacia' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+  }
 
   // ── 6. DDM ────────────────────────────────────────────────────────────────
-  if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
-  y = addSecHeader('6. Delegacias de Defesa da Mulher (DDM)', [21,128,61], y);
-  y = addNote('As DDMs são gerenciadas pela Polícia Civil do Ceará e não passam pelo fluxo de solicitações desta Secretaria.', y);
-  y = tableEquip(ddm, y, [21,128,61]);
+  if (temSecao('ddm')) {
+    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    y = addSecHeader('6. Delegacias de Defesa da Mulher (DDM)', [21,128,61], y);
+    y = addNote('As DDMs são gerenciadas pela Polícia Civil do Ceará e não passam pelo fluxo de solicitações desta Secretaria.', y);
+    y = tableEquip(ddm, y, [21,128,61]);
+  }
 
   // ── 7. Patrulhas Maria da Penha ───────────────────────────────────────────
+  if (temSecao('patrulha')) {
   if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
   y = addSecHeader('7. Patrulhas Maria da Penha', [6,182,212], y);
 
@@ -1396,8 +1411,10 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     doc.text('Nenhuma Patrulha Maria da Penha cadastrada.', 18, y);
     doc.setTextColor(0, 0, 0);
   }
+  } // end temSecao('patrulha')
 
   // ── 8. Viaturas PMCE ─────────────────────────────────────────────────────
+  if (temSecao('viaturas')) {
   if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
   y = addSecHeader('8. Viaturas PMCE', [99,102,241], y);
 
@@ -1424,6 +1441,80 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
   } else {
     doc.setFontSize(8); doc.setTextColor(150, 150, 150);
     doc.text('Nenhuma viatura PMCE cadastrada.', 18, y);
+    doc.setTextColor(0, 0, 0);
+  }
+
+  } // end temSecao('viaturas')
+
+  // ── Página extra: Mapa de Cobertura ──────────────────────────────────────
+  if (mapaImagem) {
+    doc.addPage();
+    const PW2 = doc.internal.pageSize.getWidth();
+    const PH2 = doc.internal.pageSize.getHeight();
+
+    // Cabeçalho azul
+    doc.setFillColor(31, 81, 140);
+    doc.rect(0, 0, PW2, 14, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('Mapa de Cobertura — Estado do Ceará', PW2 / 2, 9, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal');
+
+    // Calcular dimensões mantendo aspect ratio
+    const margin2 = 10;
+    const topOffset = 18;
+    const botOffset = 14; // espaço para rodapé
+    const availW2 = PW2 - margin2 * 2;
+    const availH2 = PH2 - topOffset - botOffset;
+    const aspect = mapaImagem.width / mapaImagem.height;
+    let mW = availW2;
+    let mH = mW / aspect;
+    if (mH > availH2) { mH = availH2; mW = mH * aspect; }
+    const mX = margin2 + (availW2 - mW) / 2;
+    const mY = topOffset;
+
+    doc.addImage(mapaImagem.dataUrl, 'PNG', mX, mY, mW, mH);
+
+    // Legenda compacta sobreposta (canto inferior direito)
+    const lgW = 56, lgItemH = 7;
+    const legendItems2 = [
+      { color: [13, 148, 136]  as [number,number,number], label: 'C.M. Brasileira'  },
+      { color: [124, 58, 237]  as [number,number,number], label: 'C.M. Cearense'    },
+      { color: [234, 88, 12]   as [number,number,number], label: 'C.M. Municipal'   },
+      { color: [217, 70, 239]  as [number,number,number], label: 'Sala Lilás'       },
+      { color: [21, 128, 61]   as [number,number,number], label: 'DDM'              },
+      { color: [74, 222, 128]  as [number,number,number], label: 'Sala em Delegacia'},
+      { color: [6, 182, 212]   as [number,number,number], label: 'Só Viatura'       },
+      { color: [229, 231, 235] as [number,number,number], label: 'Sem Cobertura'    },
+    ];
+    const lgH2 = 10 + legendItems2.length * lgItemH;
+    const lgX2 = mX + mW - lgW - 3;
+    const lgY2 = mY + mH - lgH2 - 3;
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(180, 180, 180);
+    doc.roundedRect(lgX2, lgY2, lgW, lgH2, 2, 2, 'FD');
+    doc.setFontSize(6.5);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('Legenda', lgX2 + 3, lgY2 + 5.5);
+    doc.setFont(undefined, 'normal');
+    legendItems2.forEach((item, i) => {
+      const ly = lgY2 + 10 + i * lgItemH;
+      doc.setFillColor(...item.color);
+      doc.rect(lgX2 + 3, ly - 2.5, 3.5, 3.5, 'F');
+      doc.setTextColor(0, 0, 0);
+      doc.text(item.label, lgX2 + 9, ly);
+    });
+
+    // Rodapé da página do mapa
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(
+      'Imagem capturada da página Mapa do sistema EVM',
+      PW2 / 2, PH2 - 6, { align: 'center' }
+    );
     doc.setTextColor(0, 0, 0);
   }
 

@@ -6,14 +6,30 @@ import { Button } from '@/components/ui/button';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useViaturas } from '@/hooks/useViaturas';
-import { getRegiao } from '@/data/municipios';
+import { getRegiao, regioesList } from '@/data/municipios';
 import { exportCpdiToPDF } from '@/lib/exportUtils';
+import { useMapaContext, MapaCapturada } from '@/contexts/MapaContext';
 import { cn } from '@/lib/utils';
 import {
-  Download, FileText, Building2, ShieldCheck, Loader2,
+  Download, ShieldCheck, Loader2,
   CheckCircle2, Clock, AlertCircle, LayoutList,
+  Filter, X, Settings2, Map, ImageOff, Camera,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// ── Definição das seções disponíveis ──────────────────────────────────────────
+const SECOES = [
+  { id: 'cmb',           label: 'Casa da Mulher Brasileira (CMB)', cor: 'bg-teal-500',    dot: 'bg-teal-500'    },
+  { id: 'cmc',           label: 'Casa da Mulher Cearense (CMC)',   cor: 'bg-violet-500',  dot: 'bg-violet-500'  },
+  { id: 'cmm',           label: 'Casa da Mulher Municipal (CMM)',  cor: 'bg-orange-500',  dot: 'bg-orange-500'  },
+  { id: 'lilas',         label: 'Salas Lilás',                     cor: 'bg-fuchsia-500', dot: 'bg-fuchsia-500' },
+  { id: 'salaDelegacia', label: 'Salas em Delegacia (PC)',         cor: 'bg-green-400',   dot: 'bg-green-500'   },
+  { id: 'ddm',           label: 'Delegacias de Defesa da Mulher (DDM)', cor: 'bg-green-700', dot: 'bg-green-700' },
+  { id: 'patrulha',      label: 'Patrulhas Maria da Penha',        cor: 'bg-cyan-500',    dot: 'bg-cyan-500'    },
+  { id: 'viaturas',      label: 'Viaturas PMCE',                   cor: 'bg-indigo-500',  dot: 'bg-indigo-500'  },
+] as const;
+
+type SecaoId = typeof SECOES[number]['id'];
 
 // ── Cores por tipo ────────────────────────────────────────────────────────────
 const SECTION_COLORS = {
@@ -34,6 +50,237 @@ const STATUS_ICON: Record<string, JSX.Element> = {
   'Recebida':         <AlertCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />,
   'Cancelada':        <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />,
 };
+
+// ── Painel de configuração do PDF ─────────────────────────────────────────────
+function ConfiguracaoPDF({
+  secoesAtivas, setSecoesAtivas,
+  regiaoFiltro, setRegiaoFiltro,
+  dataRef, setDataRef,
+  onExportar, exporting,
+  contagens,
+  mapaCapturado, dataCapturaMap,
+  incluirMapa, setIncluirMapa,
+}: {
+  secoesAtivas: Set<SecaoId>;
+  setSecoesAtivas: (s: Set<SecaoId>) => void;
+  regiaoFiltro: string;
+  setRegiaoFiltro: (r: string) => void;
+  dataRef: string;
+  setDataRef: (d: string) => void;
+  onExportar: () => void;
+  exporting: boolean;
+  contagens: Record<SecaoId, number>;
+  mapaCapturado: MapaCapturada | null;
+  dataCapturaMap: Date | null;
+  incluirMapa: boolean;
+  setIncluirMapa: (v: boolean) => void;
+}) {
+  const toggleSecao = (id: SecaoId) => {
+    const novo = new Set(secoesAtivas);
+    if (novo.has(id)) { novo.delete(id); } else { novo.add(id); }
+    setSecoesAtivas(novo);
+  };
+  const toggleTudo = () => {
+    if (secoesAtivas.size === SECOES.length) {
+      setSecoesAtivas(new Set());
+    } else {
+      setSecoesAtivas(new Set(SECOES.map(s => s.id)));
+    }
+  };
+
+  const todosAtivos = secoesAtivas.size === SECOES.length;
+  const nenhum = secoesAtivas.size === 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden mb-6"
+    >
+      {/* Header do painel */}
+      <div className="flex items-center gap-3 px-5 py-3.5 bg-muted/40 border-b border-border">
+        <Settings2 className="w-4 h-4 text-primary" />
+        <p className="font-semibold text-sm">Configurar exportação PDF</p>
+        <div className="ml-auto flex items-center gap-2">
+          {regiaoFiltro !== 'all' && (
+            <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-medium">
+              {regiaoFiltro}
+            </span>
+          )}
+          {!todosAtivos && (
+            <span className="text-xs bg-amber-500/10 text-amber-700 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
+              {secoesAtivas.size} de {SECOES.length} seções
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="p-5 space-y-5">
+        {/* Linha: Data + Região */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+              Data de referência
+            </label>
+            <input
+              type="date"
+              value={dataRef}
+              onChange={e => setDataRef(e.target.value)}
+              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+              Filtrar por região
+            </label>
+            <select
+              value={regiaoFiltro}
+              onChange={e => setRegiaoFiltro(e.target.value)}
+              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="all">Todas as regiões</option>
+              {regioesList.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Seções */}
+        <div>
+          <div className="flex items-center justify-between mb-2.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Seções a incluir no PDF
+            </label>
+            <button
+              onClick={toggleTudo}
+              className="text-xs text-primary hover:underline font-medium"
+            >
+              {todosAtivos ? 'Desmarcar tudo' : 'Selecionar tudo'}
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {SECOES.map(secao => {
+              const ativa = secoesAtivas.has(secao.id);
+              const count = contagens[secao.id] ?? 0;
+              return (
+                <button
+                  key={secao.id}
+                  onClick={() => toggleSecao(secao.id)}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all',
+                    ativa
+                      ? 'border-primary/30 bg-primary/5 ring-1 ring-primary/20'
+                      : 'border-border bg-muted/30 opacity-60 hover:opacity-80'
+                  )}
+                >
+                  {/* Checkbox visual */}
+                  <div className={cn(
+                    'w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                    ativa ? 'bg-primary border-primary' : 'border-muted-foreground/40'
+                  )}>
+                    {ativa && <CheckCircle2 className="w-3 h-3 text-white" />}
+                  </div>
+                  {/* Dot colorido */}
+                  <div className={cn('w-2 h-2 rounded-full shrink-0', secao.dot)} />
+                  <span className="text-sm font-medium flex-1 min-w-0 truncate">{secao.label}</span>
+                  {/* Badge de contagem */}
+                  <span className={cn(
+                    'text-xs font-bold px-1.5 py-0.5 rounded-md shrink-0',
+                    count > 0 ? 'bg-foreground/10 text-foreground' : 'text-muted-foreground/50'
+                  )}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Preview do que vai gerar */}
+        {secoesAtivas.size > 0 && (
+          <div className="bg-muted/40 rounded-xl px-4 py-3 text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">O PDF vai incluir:</span>{' '}
+            {Array.from(secoesAtivas).map(id => SECOES.find(s => s.id === id)?.label).join(' · ')}
+            {regiaoFiltro !== 'all' && <span className="text-primary font-medium"> — apenas {regiaoFiltro}</span>}
+          </div>
+        )}
+
+        {/* Mapa de Cobertura */}
+        <div>
+          <div className="flex items-center justify-between mb-2.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Mapa de Cobertura
+            </label>
+          </div>
+          <div className={cn(
+            'flex items-center gap-3 p-3 rounded-xl border transition-all',
+            mapaCapturado && incluirMapa
+              ? 'border-primary/30 bg-primary/5'
+              : 'border-border bg-muted/30'
+          )}>
+            {mapaCapturado ? (
+              <>
+                <img
+                  src={mapaCapturado.dataUrl}
+                  alt="Preview mapa"
+                  className="w-20 h-14 object-cover rounded-lg border border-border shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Imagem capturada</p>
+                  {dataCapturaMap && (
+                    <p className="text-xs text-muted-foreground">
+                      {dataCapturaMap.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} — {dataCapturaMap.toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground/60">
+                    {mapaCapturado.width}×{mapaCapturado.height}px
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIncluirMapa(!incluirMapa)}
+                  className={cn(
+                    'w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                    incluirMapa ? 'bg-primary border-primary' : 'border-muted-foreground/40'
+                  )}
+                >
+                  {incluirMapa && <CheckCircle2 className="w-3 h-3 text-white" />}
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-3 text-muted-foreground/60 py-1">
+                <ImageOff className="w-5 h-5 shrink-0" />
+                <div>
+                  <p className="text-sm">Nenhuma captura disponível</p>
+                  <p className="text-xs">
+                    Acesse a página{' '}
+                    <a href="/mapa" className="text-primary hover:underline font-medium">
+                      Mapa <Map className="w-3 h-3 inline" />
+                    </a>
+                    {' '}e clique em "Exportar PDF" para capturar e salvar automaticamente.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Botão exportar */}
+        <div className="flex justify-end pt-1">
+          <Button
+            onClick={onExportar}
+            disabled={exporting || nenhum}
+            className="gap-2 min-w-[160px]"
+          >
+            {exporting
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando PDF...</>
+              : <><Download className="w-4 h-4" />Exportar PDF</>}
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 // ── Card de seção ─────────────────────────────────────────────────────────────
 function SectionCard({
@@ -58,7 +305,6 @@ function SectionCard({
       transition={{ delay }}
       className={cn('rounded-2xl border shadow-sm overflow-hidden', c.border)}
     >
-      {/* Header da seção */}
       <button
         onClick={() => setExpanded(v => !v)}
         className={cn('w-full flex items-center gap-4 px-5 py-4 text-left', c.bg)}
@@ -68,11 +314,8 @@ function SectionCard({
         </div>
         <div className="flex-1 min-w-0">
           <p className={cn('font-bold text-base', c.text)}>{titulo}</p>
-          {observacao && (
-            <p className="text-xs text-muted-foreground mt-0.5">{observacao}</p>
-          )}
+          {observacao && <p className="text-xs text-muted-foreground mt-0.5">{observacao}</p>}
         </div>
-        {/* Badges de contagem */}
         <div className="flex items-center gap-2 shrink-0">
           <span className={cn('flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full', c.bg, c.text, 'border', c.border)}>
             <CheckCircle2 className="w-3 h-3" />
@@ -87,8 +330,6 @@ function SectionCard({
         </div>
         <LayoutList className={cn('w-4 h-4 shrink-0 transition-transform duration-200', c.text, !expanded && 'rotate-90')} />
       </button>
-
-      {/* Conteúdo expansível */}
       {expanded && (
         <div className="px-5 pb-5 pt-3 bg-card space-y-3">
           {children}
@@ -98,11 +339,9 @@ function SectionCard({
   );
 }
 
-// ── Linha de equipamento ──────────────────────────────────────────────────────
 function EquipRow({ municipio, tipo, endereco, responsavel, patrulha, cor }: {
   municipio: string; tipo: string; endereco?: string;
-  responsavel?: string; patrulha?: boolean;
-  cor: keyof typeof SECTION_COLORS;
+  responsavel?: string; patrulha?: boolean; cor: keyof typeof SECTION_COLORS;
 }) {
   const c = SECTION_COLORS[cor];
   const regiao = getRegiao(municipio);
@@ -132,7 +371,6 @@ function EquipRow({ municipio, tipo, endereco, responsavel, patrulha, cor }: {
   );
 }
 
-// ── Linha de solicitação ──────────────────────────────────────────────────────
 function SolicRow({ municipio, status, data, nup }: {
   municipio: string; status: string; data: string; nup?: string;
 }) {
@@ -153,14 +391,10 @@ function SolicRow({ municipio, status, data, nup }: {
   );
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
 function EmptyState({ msg }: { msg: string }) {
-  return (
-    <p className="text-sm text-muted-foreground/60 italic text-center py-3">{msg}</p>
-  );
+  return <p className="text-sm text-muted-foreground/60 italic text-center py-3">{msg}</p>;
 }
 
-// ── Subtítulo de sub-lista ────────────────────────────────────────────────────
 function SubTitle({ label, count }: { label: string; count: number }) {
   return (
     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 mb-1">
@@ -174,52 +408,83 @@ export default function RelatorioEVM() {
   const { equipamentos } = useEquipamentos();
   const { solicitacoes } = useSolicitacoes();
   const { viaturas } = useViaturas();
+  const { mapaCapturado, dataCapturaMap } = useMapaContext();
+  const [incluirMapa, setIncluirMapa] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [dataRef, setDataRef] = useState(new Date().toISOString().split('T')[0]);
+  const [regiaoFiltro, setRegiaoFiltro] = useState('all');
+  const [secoesAtivas, setSecoesAtivas] = useState<Set<SecaoId>>(
+    new Set(SECOES.map(s => s.id))
+  );
 
-  // ── Dados por categoria ────────────────────────────────────────────────────
-  const dados = useMemo(() => {
-    const cmb = equipamentos.filter(e => e.tipo === 'Casa da Mulher Brasileira');
-    const cmc = equipamentos.filter(e => e.tipo === 'Casa da Mulher Cearense');
-    const cmm = equipamentos.filter(e => e.tipo === 'Casa da Mulher Municipal');
-    const lilas = equipamentos.filter(e => e.tipo === 'Sala Lilás');
-    const salaDelegacia = equipamentos.filter(e => e.tipo === 'Sala em Delegacia');
-    const ddm = equipamentos.filter(e => e.tipo === 'DDM');
+  // ── Dados filtrados por região ─────────────────────────────────────────────
+  const dadosFiltrados = useMemo(() => {
+    const filtrarRegiao = <T extends { municipio: string }>(arr: T[]) =>
+      regiaoFiltro === 'all' ? arr : arr.filter(i => getRegiao(i.municipio) === regiaoFiltro);
 
-    const municipiosComPatrulhaEquip = new Set(
-      equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio)
-    );
-    const equipsComPatrulha = equipamentos.filter(e => e.possui_patrulha);
-    const solicsComPatrulha = solicitacoes.filter(
-      s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)
-    );
+    const equips = filtrarRegiao(equipamentos);
+    const sols   = filtrarRegiao(solicitacoes);
+    const viats  = filtrarRegiao(viaturas);
 
-    const getSolics = (tipo: string) => solicitacoes.filter(
+    const cmb           = equips.filter(e => e.tipo === 'Casa da Mulher Brasileira');
+    const cmc           = equips.filter(e => e.tipo === 'Casa da Mulher Cearense');
+    const cmm           = equips.filter(e => e.tipo === 'Casa da Mulher Municipal');
+    const lilas         = equips.filter(e => e.tipo === 'Sala Lilás');
+    const salaDelegacia = equips.filter(e => e.tipo === 'Sala em Delegacia');
+    const ddm           = equips.filter(e => e.tipo === 'DDM');
+
+    const municipiosComPatrulhaEquip = new Set(equips.filter(e => e.possui_patrulha).map(e => e.municipio));
+    const equipsComPatrulha  = equips.filter(e => e.possui_patrulha);
+    const solicsComPatrulha  = sols.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio));
+
+    const getSolics = (tipo: string) => sols.filter(
       s => s.tipo_equipamento === tipo && s.status !== 'Cancelada' && s.status !== 'Inaugurada'
     ).sort((a, b) => a.status.localeCompare(b.status));
-
 
     return {
       cmb, cmc, cmm, lilas, salaDelegacia, ddm,
       equipsComPatrulha, solicsComPatrulha,
-      cmbSolics: getSolics('Casa da Mulher Brasileira'),
-      cmcSolics: getSolics('Casa da Mulher Cearense'),
-      cmmSolics: getSolics('Casa da Mulher Municipal'),
-      lilasSolics: getSolics('Sala Lilás'),
+      viats,
+      cmbSolics:           getSolics('Casa da Mulher Brasileira'),
+      cmcSolics:           getSolics('Casa da Mulher Cearense'),
+      cmmSolics:           getSolics('Casa da Mulher Municipal'),
+      lilasSolics:         getSolics('Sala Lilás'),
       salaDelegaciaSolics: getSolics('Sala em Delegacia'),
-      totalPatrulhas: equipsComPatrulha.length + solicsComPatrulha.length,
-      totalViaturasPMCE: viaturas.reduce((s, v) => s + v.quantidade, 0),
-      solicsAtivas: solicitacoes.filter(s => s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
+      totalPatrulhas:      equipsComPatrulha.length + solicsComPatrulha.length,
+      totalViaturasPMCE:   viats.reduce((s, v) => s + v.quantidade, 0),
+      solicsAtivas:        sols.filter(s => s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
     };
-  }, [equipamentos, solicitacoes]);
+  }, [equipamentos, solicitacoes, viaturas, regiaoFiltro]);
+
+  // ── Contagens para o painel de config (sem filtro de região para dar contexto) ──
+  const contagens = useMemo((): Record<SecaoId, number> => ({
+    cmb:           equipamentos.filter(e => e.tipo === 'Casa da Mulher Brasileira').length,
+    cmc:           equipamentos.filter(e => e.tipo === 'Casa da Mulher Cearense').length,
+    cmm:           equipamentos.filter(e => e.tipo === 'Casa da Mulher Municipal').length,
+    lilas:         equipamentos.filter(e => e.tipo === 'Sala Lilás').length,
+    salaDelegacia: equipamentos.filter(e => e.tipo === 'Sala em Delegacia').length,
+    ddm:           equipamentos.filter(e => e.tipo === 'DDM').length,
+    patrulha:      equipamentos.filter(e => e.possui_patrulha).length,
+    viaturas:      viaturas.reduce((s, v) => s + v.quantidade, 0),
+  }), [equipamentos, viaturas]);
+
+  const dados = dadosFiltrados;
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      await new Promise(r => setTimeout(r, 50)); // deixa UI atualizar
-      await exportCpdiToPDF({ equipamentos, solicitacoes, viaturas, dataReferencia: dataRef });
+      await new Promise(r => setTimeout(r, 50));
+      await exportCpdiToPDF({
+        equipamentos,
+        solicitacoes,
+        viaturas,
+        dataReferencia: dataRef,
+        regiaoFiltro:   regiaoFiltro === 'all' ? undefined : regiaoFiltro,
+        secoesAtivas:   Array.from(secoesAtivas),
+        mapaImagem:     incluirMapa && mapaCapturado ? mapaCapturado : undefined,
+      });
       toast.success('Relatório EVM exportado com sucesso!');
-    } catch (e) {
+    } catch {
       toast.error('Erro ao exportar o relatório');
     } finally {
       setExporting(false);
@@ -233,92 +498,83 @@ export default function RelatorioEVM() {
           title="Relatório EVM"
           description="Rede de Proteção à Mulher — Secretaria das Mulheres do Estado do Ceará"
         />
-        <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-          <Button onClick={handleExport} disabled={exporting} className="gap-2 shrink-0">
-            {exporting
-              ? <Loader2 className="w-4 h-4 animate-spin" />
-              : <Download className="w-4 h-4" />}
-            {exporting ? 'Gerando PDF...' : 'Exportar PDF'}
-          </Button>
-        </motion.div>
       </div>
 
-      {/* Banner informativo */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row gap-4 mb-6"
-      >
-        <div className="flex gap-3 flex-1">
-          <FileText className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-semibold text-primary">Relatório da Rede de Proteção</p>
-            <p className="text-muted-foreground text-xs mt-0.5">
-              Consolida o status atual de toda a rede de proteção à mulher no Ceará,
-              conforme os dados cadastrados no sistema EVM.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <label className="text-xs text-muted-foreground whitespace-nowrap">Data de referência:</label>
-          <input
-            type="date"
-            value={dataRef}
-            onChange={e => setDataRef(e.target.value)}
-            className="text-sm border border-border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-      </motion.div>
+      {/* Painel de configuração */}
+      <ConfiguracaoPDF
+        secoesAtivas={secoesAtivas}
+        setSecoesAtivas={setSecoesAtivas}
+        regiaoFiltro={regiaoFiltro}
+        setRegiaoFiltro={setRegiaoFiltro}
+        dataRef={dataRef}
+        setDataRef={setDataRef}
+        onExportar={handleExport}
+        exporting={exporting}
+        contagens={contagens}
+        mapaCapturado={mapaCapturado}
+        dataCapturaMap={dataCapturaMap}
+        incluirMapa={incluirMapa}
+        setIncluirMapa={setIncluirMapa}
+      />
 
       {/* Cards de resumo executivo */}
       <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3 mb-8">
         {[
-          { label: 'CMB',             value: dados.cmb.length,           cor: 'bg-teal-500',    text: 'text-teal-700'    },
-          { label: 'CMC',             value: dados.cmc.length,           cor: 'bg-violet-500',  text: 'text-violet-700'  },
-          { label: 'CMM',             value: dados.cmm.length,           cor: 'bg-orange-500',  text: 'text-orange-700'  },
-          { label: 'Sala Lilás',      value: dados.lilas.length,         cor: 'bg-fuchsia-500', text: 'text-fuchsia-700' },
-          { label: 'Sala Deleg.',     value: dados.salaDelegacia.length, cor: 'bg-green-400',   text: 'text-green-700'   },
-          { label: 'DDM',             value: dados.ddm.length,           cor: 'bg-green-700',   text: 'text-green-800'   },
-          { label: 'Patrulhas M.P.', value: dados.totalPatrulhas,       cor: 'bg-cyan-500',    text: 'text-cyan-700'    },
-          { label: 'Viaturas PMCE',  value: dados.totalViaturasPMCE,    cor: 'bg-indigo-500',  text: 'text-indigo-700'  },
-          { label: 'Solicitações',   value: dados.solicsAtivas.length,  cor: 'bg-amber-500',   text: 'text-amber-700'   },
-        ].map((item, i) => (
+          { label: 'CMB',          value: dados.cmb.length,           cor: 'bg-teal-500',    text: 'text-teal-700'    },
+          { label: 'CMC',          value: dados.cmc.length,           cor: 'bg-violet-500',  text: 'text-violet-700'  },
+          { label: 'CMM',          value: dados.cmm.length,           cor: 'bg-orange-500',  text: 'text-orange-700'  },
+          { label: 'Sala Lilás',   value: dados.lilas.length,         cor: 'bg-fuchsia-500', text: 'text-fuchsia-700' },
+          { label: 'Sala Deleg.',  value: dados.salaDelegacia.length, cor: 'bg-green-400',   text: 'text-green-700'   },
+          { label: 'DDM',          value: dados.ddm.length,           cor: 'bg-green-700',   text: 'text-green-900'   },
+          { label: 'Patrulhas',    value: dados.totalPatrulhas,       cor: 'bg-cyan-500',    text: 'text-cyan-700'    },
+          { label: 'Viaturas',     value: dados.totalViaturasPMCE,    cor: 'bg-indigo-500',  text: 'text-indigo-700'  },
+          { label: 'Em andamento', value: dados.solicsAtivas.length,  cor: 'bg-amber-500',   text: 'text-amber-700'   },
+        ].map(({ label, value, cor, text }) => (
           <motion.div
-            key={item.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 * i }}
-            className="bg-card rounded-xl border border-border shadow-sm p-3 text-center"
+            key={label}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card rounded-xl border border-border p-3 text-center shadow-sm"
           >
-            <div className={cn('w-2 h-2 rounded-full mx-auto mb-2', item.cor)} />
-            <p className={cn('text-2xl font-bold', item.text)}>{item.value}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{item.label}</p>
+            <div className={cn('w-2 h-2 rounded-full mx-auto mb-2', cor)} />
+            <p className={cn('text-2xl font-bold', text)}>{value}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{label}</p>
           </motion.div>
         ))}
       </div>
 
-      {/* Seções detalhadas */}
+      {/* Indicador de filtro ativo */}
+      {regiaoFiltro !== 'all' && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center gap-2 mb-4 px-4 py-2.5 bg-primary/5 border border-primary/20 rounded-xl text-sm"
+        >
+          <Filter className="w-4 h-4 text-primary" />
+          <span className="text-primary font-medium">Exibindo apenas: {regiaoFiltro}</span>
+          <button
+            onClick={() => setRegiaoFiltro('all')}
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+          >
+            <X className="w-3 h-3" /> Limpar filtro
+          </button>
+        </motion.div>
+      )}
+
+      {/* Seções */}
       <div className="space-y-4">
 
         {/* 1. CMB */}
         <SectionCard numero={1} titulo="Casa da Mulher Brasileira (CMB)" cor="cmb"
           funcionando={dados.cmb.length} emAndamento={dados.cmbSolics.length} delay={0.1}>
           {dados.cmb.length > 0 ? (
-            <>
-              <SubTitle label="Em funcionamento" count={dados.cmb.length} />
-              {dados.cmb.map(e => (
-                <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo}
-                  endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmb" />
-              ))}
+            <>{<SubTitle label="Em funcionamento" count={dados.cmb.length} />}
+              {dados.cmb.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmb" />)}
             </>
           ) : <EmptyState msg="Nenhuma CMB em funcionamento." />}
           {dados.cmbSolics.length > 0 && (
-            <>
-              <SubTitle label="Em construção / Previstas" count={dados.cmbSolics.length} />
-              {dados.cmbSolics.map(s => (
-                <SolicRow key={s.id} municipio={s.municipio} status={s.status}
-                  data={s.data_solicitacao} nup={s.suite_implantada} />
-              ))}
+            <>{<SubTitle label="Em construção / Previstas" count={dados.cmbSolics.length} />}
+              {dados.cmbSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
             </>
           )}
         </SectionCard>
@@ -327,21 +583,13 @@ export default function RelatorioEVM() {
         <SectionCard numero={2} titulo="Casa da Mulher Cearense (CMC)" cor="cmc"
           funcionando={dados.cmc.length} emAndamento={dados.cmcSolics.length} delay={0.15}>
           {dados.cmc.length > 0 ? (
-            <>
-              <SubTitle label="Em funcionamento" count={dados.cmc.length} />
-              {dados.cmc.map(e => (
-                <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo}
-                  endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmc" />
-              ))}
+            <>{<SubTitle label="Em funcionamento" count={dados.cmc.length} />}
+              {dados.cmc.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmc" />)}
             </>
           ) : <EmptyState msg="Nenhuma CMC em funcionamento." />}
           {dados.cmcSolics.length > 0 && (
-            <>
-              <SubTitle label="Em construção / Previstas" count={dados.cmcSolics.length} />
-              {dados.cmcSolics.map(s => (
-                <SolicRow key={s.id} municipio={s.municipio} status={s.status}
-                  data={s.data_solicitacao} nup={s.suite_implantada} />
-              ))}
+            <>{<SubTitle label="Em construção / Previstas" count={dados.cmcSolics.length} />}
+              {dados.cmcSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
             </>
           )}
         </SectionCard>
@@ -350,21 +598,13 @@ export default function RelatorioEVM() {
         <SectionCard numero={3} titulo="Casa da Mulher Municipal (CMM)" cor="cmm"
           funcionando={dados.cmm.length} emAndamento={dados.cmmSolics.length} delay={0.2}>
           {dados.cmm.length > 0 ? (
-            <>
-              <SubTitle label="Em funcionamento" count={dados.cmm.length} />
-              {dados.cmm.map(e => (
-                <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo}
-                  endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmm" />
-              ))}
+            <>{<SubTitle label="Em funcionamento" count={dados.cmm.length} />}
+              {dados.cmm.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmm" />)}
             </>
           ) : <EmptyState msg="Nenhuma CMM em funcionamento." />}
           {dados.cmmSolics.length > 0 && (
-            <>
-              <SubTitle label="Em construção / Previstas" count={dados.cmmSolics.length} />
-              {dados.cmmSolics.map(s => (
-                <SolicRow key={s.id} municipio={s.municipio} status={s.status}
-                  data={s.data_solicitacao} nup={s.suite_implantada} />
-              ))}
+            <>{<SubTitle label="Em construção / Previstas" count={dados.cmmSolics.length} />}
+              {dados.cmmSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
             </>
           )}
         </SectionCard>
@@ -373,21 +613,13 @@ export default function RelatorioEVM() {
         <SectionCard numero={4} titulo="Salas Lilás" cor="lilas"
           funcionando={dados.lilas.length} emAndamento={dados.lilasSolics.length} delay={0.25}>
           {dados.lilas.length > 0 ? (
-            <>
-              <SubTitle label="Em funcionamento" count={dados.lilas.length} />
-              {dados.lilas.map(e => (
-                <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo}
-                  endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="lilas" />
-              ))}
+            <>{<SubTitle label="Em funcionamento" count={dados.lilas.length} />}
+              {dados.lilas.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="lilas" />)}
             </>
           ) : <EmptyState msg="Nenhuma Sala Lilás em funcionamento." />}
           {dados.lilasSolics.length > 0 && (
-            <>
-              <SubTitle label="Previstas" count={dados.lilasSolics.length} />
-              {dados.lilasSolics.map(s => (
-                <SolicRow key={s.id} municipio={s.municipio} status={s.status}
-                  data={s.data_solicitacao} nup={s.suite_implantada} />
-              ))}
+            <>{<SubTitle label="Previstas" count={dados.lilasSolics.length} />}
+              {dados.lilasSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
             </>
           )}
         </SectionCard>
@@ -396,21 +628,13 @@ export default function RelatorioEVM() {
         <SectionCard numero={5} titulo="Salas em Delegacia (Polícia Civil)" cor="salaDelegacia"
           funcionando={dados.salaDelegacia.length} emAndamento={dados.salaDelegaciaSolics.length} delay={0.28}>
           {dados.salaDelegacia.length > 0 ? (
-            <>
-              <SubTitle label="Em funcionamento" count={dados.salaDelegacia.length} />
-              {dados.salaDelegacia.map(e => (
-                <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo}
-                  endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="salaDelegacia" />
-              ))}
+            <>{<SubTitle label="Em funcionamento" count={dados.salaDelegacia.length} />}
+              {dados.salaDelegacia.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="salaDelegacia" />)}
             </>
           ) : <EmptyState msg="Nenhuma Sala em Delegacia em funcionamento." />}
           {dados.salaDelegaciaSolics.length > 0 && (
-            <>
-              <SubTitle label="Previstas" count={dados.salaDelegaciaSolics.length} />
-              {dados.salaDelegaciaSolics.map(s => (
-                <SolicRow key={s.id} municipio={s.municipio} status={s.status}
-                  data={s.data_solicitacao} nup={s.suite_implantada} />
-              ))}
+            <>{<SubTitle label="Previstas" count={dados.salaDelegaciaSolics.length} />}
+              {dados.salaDelegaciaSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
             </>
           )}
         </SectionCard>
@@ -421,34 +645,25 @@ export default function RelatorioEVM() {
           observacao="Gerenciadas pela Polícia Civil do Ceará — não passam pelo fluxo de solicitações desta Secretaria."
           delay={0.3}>
           {dados.ddm.length > 0 ? (
-            <>
-              <SubTitle label="Em funcionamento" count={dados.ddm.length} />
-              {dados.ddm.map(e => (
-                <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo}
-                  endereco={e.endereco} responsavel={e.responsavel} cor="ddm" />
-              ))}
+            <>{<SubTitle label="Em funcionamento" count={dados.ddm.length} />}
+              {dados.ddm.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} cor="ddm" />)}
             </>
           ) : <EmptyState msg="Nenhuma DDM cadastrada." />}
         </SectionCard>
 
-        {/* 7. Patrulhas Maria da Penha */}
+        {/* 7. Patrulhas */}
         <SectionCard numero={7} titulo="Patrulhas Maria da Penha" cor="patrulha"
           funcionando={dados.totalPatrulhas} emAndamento={0} delay={0.35}>
           {dados.equipsComPatrulha.length > 0 && (
-            <>
-              <SubTitle label="Vinculadas a equipamentos" count={dados.equipsComPatrulha.length} />
+            <>{<SubTitle label="Vinculadas a equipamentos" count={dados.equipsComPatrulha.length} />}
               {dados.equipsComPatrulha.map(e => (
                 <div key={e.id} className="flex items-start gap-3 py-2 border-b border-border/40 last:border-0">
                   <ShieldCheck className="w-4 h-4 text-cyan-500 shrink-0 mt-0.5" />
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-sm">{e.municipio}</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                        {getRegiao(e.municipio)}
-                      </span>
-                      <span className="text-[10px] text-cyan-700 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">
-                        via {e.tipo}
-                      </span>
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{getRegiao(e.municipio)}</span>
+                      <span className="text-[10px] text-cyan-700 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">via {e.tipo}</span>
                     </div>
                     {e.endereco && <p className="text-xs text-muted-foreground">{e.endereco}</p>}
                   </div>
@@ -457,12 +672,8 @@ export default function RelatorioEVM() {
             </>
           )}
           {dados.solicsComPatrulha.length > 0 && (
-            <>
-              <SubTitle label="Aguardando equipamento" count={dados.solicsComPatrulha.length} />
-              {dados.solicsComPatrulha.map(s => (
-                <SolicRow key={s.id} municipio={s.municipio} status={s.status}
-                  data={s.data_solicitacao} nup={s.suite_implantada} />
-              ))}
+            <>{<SubTitle label="Aguardando equipamento" count={dados.solicsComPatrulha.length} />}
+              {dados.solicsComPatrulha.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
             </>
           )}
           {dados.totalPatrulhas === 0 && <EmptyState msg="Nenhuma Patrulha Maria da Penha cadastrada." />}
@@ -471,28 +682,20 @@ export default function RelatorioEVM() {
         {/* 8. Viaturas PMCE */}
         <SectionCard numero={8} titulo="Viaturas PMCE" cor="patrulha"
           funcionando={dados.totalViaturasPMCE} emAndamento={0} delay={0.4}>
-          {viaturas.length > 0 ? (
+          {dados.viats.length > 0 ? (
             <>
-              <SubTitle label="Total de viaturas cadastradas" count={viaturas.length} />
-              {viaturas.sort((a, b) => a.municipio.localeCompare(b.municipio, 'pt-BR')).map(v => (
+              <SubTitle label="Total de viaturas cadastradas" count={dados.viats.length} />
+              {dados.viats.sort((a, b) => a.municipio.localeCompare(b.municipio, 'pt-BR')).map(v => (
                 <div key={v.id} className="flex items-start gap-3 py-2 border-b border-border/40 last:border-0">
                   <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 bg-indigo-500" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-sm">{v.municipio}</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                        {getRegiao(v.municipio)}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
-                        {v.orgao_responsavel}
-                      </span>
-                      <span className="text-[10px] font-bold text-indigo-700">
-                        {v.quantidade} viatura{v.quantidade !== 1 ? 's' : ''}
-                      </span>
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{getRegiao(v.municipio)}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">{v.orgao_responsavel}</span>
+                      <span className="text-[10px] font-bold text-indigo-700">{v.quantidade} viatura{v.quantidade !== 1 ? 's' : ''}</span>
                     </div>
-                    {v.tipo_patrulha && (
-                      <p className="text-xs text-muted-foreground">{v.tipo_patrulha}</p>
-                    )}
+                    {v.tipo_patrulha && <p className="text-xs text-muted-foreground">{v.tipo_patrulha}</p>}
                   </div>
                 </div>
               ))}

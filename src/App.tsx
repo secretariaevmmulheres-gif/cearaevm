@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuthContext } from "@/contexts/AuthContext";
+import { MapaProvider } from "@/contexts/MapaContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -14,6 +15,7 @@ import Solicitacoes from "./pages/Solicitacoes";
 import Atividades from "./pages/Atividades";
 import Mapa from "./pages/Mapa";
 import RelatorioEVM from "./pages/RelatorioEVM";
+import Historico from "./pages/Historico";
 import Usuarios from "./pages/Usuarios";
 import Perfil from "./pages/Perfil";
 import NotFound from "./pages/NotFound";
@@ -102,6 +104,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/historico"
+        element={
+          <ProtectedRoute>
+            <Historico />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/usuarios"
         element={
           <ProtectedRoute>
@@ -128,10 +138,12 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
+          <MapaProvider>
+            <AuthProvider>
+              <AppRoutes />
+            </AuthProvider>
+          </MapaProvider>
+        </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );

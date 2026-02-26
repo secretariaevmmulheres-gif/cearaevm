@@ -15,6 +15,7 @@ import {
   User,
   CalendarDays,
   ClipboardList,
+  History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -28,7 +29,8 @@ const menuItems = [
   { path: '/solicitacoes',        label: 'Solicitações', icon: FileText        },
   { path: '/atividades',          label: 'Atividades',   icon: CalendarDays    },
   { path: '/mapa',                label: 'Mapa',         icon: Map             },
-  { path: '/relatorio-cpdi',      label: 'Relatorio EVM',    icon: ClipboardList   },
+  { path: '/relatorio-cpdi',      label: 'Rel. EVM',     icon: ClipboardList   },
+  { path: '/historico',           label: 'Histórico',    icon: History         },
 ];
 
 const adminMenuItems = [
