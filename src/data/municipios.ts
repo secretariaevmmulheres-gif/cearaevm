@@ -212,9 +212,10 @@ export const tiposEquipamento = [
   "Casa da Mulher Brasileira",
   "Casa da Mulher Cearense",
   "Casa da Mulher Municipal",
-  "Sala Lilás",
+  "Sala Lilás Municipal",
+  "Sala Lilás Governo do Estado",
+  "Sala Lilás em Delegacia",
   "DDM",
-  "Sala em Delegacia",
 ] as const;
 
 export const statusSolicitacao = [

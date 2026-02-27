@@ -22,8 +22,9 @@ const SECOES = [
   { id: 'cmb',           label: 'Casa da Mulher Brasileira (CMB)', cor: 'bg-teal-500',    dot: 'bg-teal-500'    },
   { id: 'cmc',           label: 'Casa da Mulher Cearense (CMC)',   cor: 'bg-violet-500',  dot: 'bg-violet-500'  },
   { id: 'cmm',           label: 'Casa da Mulher Municipal (CMM)',  cor: 'bg-orange-500',  dot: 'bg-orange-500'  },
-  { id: 'lilas',         label: 'Salas Lilás',                     cor: 'bg-fuchsia-500', dot: 'bg-fuchsia-500' },
-  { id: 'salaDelegacia', label: 'Salas em Delegacia (PC)',         cor: 'bg-green-400',   dot: 'bg-green-500'   },
+  { id: 'lilasMunicipal',  label: 'Salas Lilás Municipal',           cor: 'bg-fuchsia-800', dot: 'bg-fuchsia-800' },
+  { id: 'lilasEstado',    label: 'Salas Lilás Gov. Estado',         cor: 'bg-fuchsia-500', dot: 'bg-fuchsia-500' },
+  { id: 'lilasDelegacia', label: 'Salas Lilás em Delegacia',        cor: 'bg-fuchsia-300', dot: 'bg-fuchsia-300' },
   { id: 'ddm',           label: 'Delegacias de Defesa da Mulher (DDM)', cor: 'bg-green-700', dot: 'bg-green-700' },
   { id: 'patrulha',      label: 'Patrulhas Maria da Penha',        cor: 'bg-cyan-500',    dot: 'bg-cyan-500'    },
   { id: 'viaturas',      label: 'Viaturas PMCE',                   cor: 'bg-indigo-500',  dot: 'bg-indigo-500'  },
@@ -36,9 +37,10 @@ const SECTION_COLORS = {
   cmb:           { bg: 'bg-teal-500/10',   text: 'text-teal-700',   border: 'border-teal-500/20',   dot: 'bg-teal-500'   },
   cmc:           { bg: 'bg-violet-500/10', text: 'text-violet-700', border: 'border-violet-500/20', dot: 'bg-violet-500' },
   cmm:           { bg: 'bg-orange-500/10', text: 'text-orange-700', border: 'border-orange-500/20', dot: 'bg-orange-500' },
-  lilas:         { bg: 'bg-fuchsia-500/10',text: 'text-fuchsia-700',border: 'border-fuchsia-500/20',dot: 'bg-fuchsia-500'},
-  ddm:           { bg: 'bg-green-700/10',  text: 'text-green-800',  border: 'border-green-700/20',  dot: 'bg-green-700'  },
-  salaDelegacia: { bg: 'bg-green-400/10',  text: 'text-green-700',  border: 'border-green-400/20',  dot: 'bg-green-500'  },
+  lilasMunicipal:  { bg: 'bg-fuchsia-800/10', text: 'text-fuchsia-900', border: 'border-fuchsia-800/20', dot: 'bg-fuchsia-800' },
+  lilasEstado:     { bg: 'bg-fuchsia-500/10', text: 'text-fuchsia-700', border: 'border-fuchsia-500/20', dot: 'bg-fuchsia-500' },
+  lilasDelegacia:  { bg: 'bg-fuchsia-300/10', text: 'text-fuchsia-600', border: 'border-fuchsia-300/20', dot: 'bg-fuchsia-300' },
+  ddm:             { bg: 'bg-green-700/10',   text: 'text-green-800',  border: 'border-green-700/20',  dot: 'bg-green-700'  },
   patrulha:      { bg: 'bg-cyan-500/10',   text: 'text-cyan-700',   border: 'border-cyan-500/20',   dot: 'bg-cyan-500'   },
 };
 
@@ -295,7 +297,14 @@ function SectionCard({
   children: React.ReactNode;
   delay: number;
 }) {
-  const c = SECTION_COLORS[cor];
+  // Fallback seguro: se 'cor' não for encontrada, usa 'cmb' como padrão
+  const c = SECTION_COLORS[cor] || SECTION_COLORS.cmb;
+
+  // (Opcional) aviso em desenvolvimento para depuração
+  if (process.env.NODE_ENV === 'development' && !SECTION_COLORS[cor]) {
+    console.warn(`SectionCard: cor inválida "${cor}" — usando fallback "cmb"`);
+  }
+
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -429,8 +438,9 @@ export default function RelatorioEVM() {
     const cmb           = equips.filter(e => e.tipo === 'Casa da Mulher Brasileira');
     const cmc           = equips.filter(e => e.tipo === 'Casa da Mulher Cearense');
     const cmm           = equips.filter(e => e.tipo === 'Casa da Mulher Municipal');
-    const lilas         = equips.filter(e => e.tipo === 'Sala Lilás');
-    const salaDelegacia = equips.filter(e => e.tipo === 'Sala em Delegacia');
+    const lilasMunicipal  = equips.filter(e => e.tipo === 'Sala Lilás Municipal');
+    const lilasEstado     = equips.filter(e => e.tipo === 'Sala Lilás Governo do Estado');
+    const lilasDelegacia  = equips.filter(e => e.tipo === 'Sala Lilás em Delegacia');
     const ddm           = equips.filter(e => e.tipo === 'DDM');
 
     const municipiosComPatrulhaEquip = new Set(equips.filter(e => e.possui_patrulha).map(e => e.municipio));
@@ -442,14 +452,15 @@ export default function RelatorioEVM() {
     ).sort((a, b) => a.status.localeCompare(b.status));
 
     return {
-      cmb, cmc, cmm, lilas, salaDelegacia, ddm,
+      cmb, cmc, cmm, lilasMunicipal, lilasEstado, lilasDelegacia, ddm,
       equipsComPatrulha, solicsComPatrulha,
       viats,
       cmbSolics:           getSolics('Casa da Mulher Brasileira'),
       cmcSolics:           getSolics('Casa da Mulher Cearense'),
       cmmSolics:           getSolics('Casa da Mulher Municipal'),
-      lilasSolics:         getSolics('Sala Lilás'),
-      salaDelegaciaSolics: getSolics('Sala em Delegacia'),
+      lilasMunicipalSolics:  getSolics('Sala Lilás Municipal'),
+      lilasEstadoSolics:    getSolics('Sala Lilás Governo do Estado'),
+      lilasDelegaciaSolics: getSolics('Sala Lilás em Delegacia'),
       totalPatrulhas:      equipsComPatrulha.length + solicsComPatrulha.length,
       totalViaturasPMCE:   viats.reduce((s, v) => s + v.quantidade, 0),
       solicsAtivas:        sols.filter(s => s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
@@ -461,8 +472,9 @@ export default function RelatorioEVM() {
     cmb:           equipamentos.filter(e => e.tipo === 'Casa da Mulher Brasileira').length,
     cmc:           equipamentos.filter(e => e.tipo === 'Casa da Mulher Cearense').length,
     cmm:           equipamentos.filter(e => e.tipo === 'Casa da Mulher Municipal').length,
-    lilas:         equipamentos.filter(e => e.tipo === 'Sala Lilás').length,
-    salaDelegacia: equipamentos.filter(e => e.tipo === 'Sala em Delegacia').length,
+    lilasMunicipal:  equipamentos.filter(e => e.tipo === 'Sala Lilás Municipal').length,
+    lilasEstado:     equipamentos.filter(e => e.tipo === 'Sala Lilás Governo do Estado').length,
+    lilasDelegacia:  equipamentos.filter(e => e.tipo === 'Sala Lilás em Delegacia').length,
     ddm:           equipamentos.filter(e => e.tipo === 'DDM').length,
     patrulha:      equipamentos.filter(e => e.possui_patrulha).length,
     viaturas:      viaturas.reduce((s, v) => s + v.quantidade, 0),
@@ -523,8 +535,9 @@ export default function RelatorioEVM() {
           { label: 'CMB',          value: dados.cmb.length,           cor: 'bg-teal-500',    text: 'text-teal-700'    },
           { label: 'CMC',          value: dados.cmc.length,           cor: 'bg-violet-500',  text: 'text-violet-700'  },
           { label: 'CMM',          value: dados.cmm.length,           cor: 'bg-orange-500',  text: 'text-orange-700'  },
-          { label: 'Sala Lilás',   value: dados.lilas.length,         cor: 'bg-fuchsia-500', text: 'text-fuchsia-700' },
-          { label: 'Sala Deleg.',  value: dados.salaDelegacia.length, cor: 'bg-green-400',   text: 'text-green-700'   },
+          { label: 'S.L. Municipal',  value: dados.lilasMunicipal.length,  cor: 'bg-fuchsia-800', text: 'text-fuchsia-900' },
+          { label: 'S.L. Estado',     value: dados.lilasEstado.length,    cor: 'bg-fuchsia-500', text: 'text-fuchsia-700' },
+          { label: 'S.L. Delegacia',  value: dados.lilasDelegacia.length, cor: 'bg-fuchsia-300', text: 'text-fuchsia-600' },
           { label: 'DDM',          value: dados.ddm.length,           cor: 'bg-green-700',   text: 'text-green-900'   },
           { label: 'Patrulhas',    value: dados.totalPatrulhas,       cor: 'bg-cyan-500',    text: 'text-cyan-700'    },
           { label: 'Viaturas',     value: dados.totalViaturasPMCE,    cor: 'bg-indigo-500',  text: 'text-indigo-700'  },
@@ -568,13 +581,13 @@ export default function RelatorioEVM() {
         <SectionCard numero={1} titulo="Casa da Mulher Brasileira (CMB)" cor="cmb"
           funcionando={dados.cmb.length} emAndamento={dados.cmbSolics.length} delay={0.1}>
           {dados.cmb.length > 0 ? (
-            <>{<SubTitle label="Em funcionamento" count={dados.cmb.length} />}
+            <><SubTitle label="Em funcionamento" count={dados.cmb.length} />
               {dados.cmb.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmb" />)}
             </>
           ) : <EmptyState msg="Nenhuma CMB em funcionamento." />}
           {dados.cmbSolics.length > 0 && (
-            <>{<SubTitle label="Em construção / Previstas" count={dados.cmbSolics.length} />}
-              {dados.cmbSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
+            <><SubTitle label="Em construção / Previstas" count={dados.cmbSolics.length} />
+              {dados.cmbSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}
             </>
           )}
         </SectionCard>
@@ -583,13 +596,13 @@ export default function RelatorioEVM() {
         <SectionCard numero={2} titulo="Casa da Mulher Cearense (CMC)" cor="cmc"
           funcionando={dados.cmc.length} emAndamento={dados.cmcSolics.length} delay={0.15}>
           {dados.cmc.length > 0 ? (
-            <>{<SubTitle label="Em funcionamento" count={dados.cmc.length} />}
+            <><SubTitle label="Em funcionamento" count={dados.cmc.length} />
               {dados.cmc.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmc" />)}
             </>
           ) : <EmptyState msg="Nenhuma CMC em funcionamento." />}
           {dados.cmcSolics.length > 0 && (
-            <>{<SubTitle label="Em construção / Previstas" count={dados.cmcSolics.length} />}
-              {dados.cmcSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
+            <><SubTitle label="Em construção / Previstas" count={dados.cmcSolics.length} />
+              {dados.cmcSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}
             </>
           )}
         </SectionCard>
@@ -598,64 +611,79 @@ export default function RelatorioEVM() {
         <SectionCard numero={3} titulo="Casa da Mulher Municipal (CMM)" cor="cmm"
           funcionando={dados.cmm.length} emAndamento={dados.cmmSolics.length} delay={0.2}>
           {dados.cmm.length > 0 ? (
-            <>{<SubTitle label="Em funcionamento" count={dados.cmm.length} />}
+            <><SubTitle label="Em funcionamento" count={dados.cmm.length} />
               {dados.cmm.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmm" />)}
             </>
           ) : <EmptyState msg="Nenhuma CMM em funcionamento." />}
           {dados.cmmSolics.length > 0 && (
-            <>{<SubTitle label="Em construção / Previstas" count={dados.cmmSolics.length} />}
-              {dados.cmmSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
+            <><SubTitle label="Em construção / Previstas" count={dados.cmmSolics.length} />
+              {dados.cmmSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}
             </>
           )}
         </SectionCard>
 
-        {/* 4. Salas Lilás */}
-        <SectionCard numero={4} titulo="Salas Lilás" cor="lilas"
-          funcionando={dados.lilas.length} emAndamento={dados.lilasSolics.length} delay={0.25}>
-          {dados.lilas.length > 0 ? (
-            <>{<SubTitle label="Em funcionamento" count={dados.lilas.length} />}
-              {dados.lilas.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="lilas" />)}
+        {/* 4. Salas Lilás Municipal */}
+        <SectionCard numero={4} titulo="Salas Lilás Municipal" cor="lilasMunicipal"
+          funcionando={dados.lilasMunicipal.length} emAndamento={dados.lilasMunicipalSolics.length} delay={0.25}>
+          {dados.lilasMunicipal.length > 0 ? (
+            <><SubTitle label="Em funcionamento" count={dados.lilasMunicipal.length} />
+              {dados.lilasMunicipal.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="lilasMunicipal" />)}
             </>
-          ) : <EmptyState msg="Nenhuma Sala Lilás em funcionamento." />}
-          {dados.lilasSolics.length > 0 && (
-            <>{<SubTitle label="Previstas" count={dados.lilasSolics.length} />}
-              {dados.lilasSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
-            </>
-          )}
-        </SectionCard>
-
-        {/* 5. Sala em Delegacia */}
-        <SectionCard numero={5} titulo="Salas em Delegacia (Polícia Civil)" cor="salaDelegacia"
-          funcionando={dados.salaDelegacia.length} emAndamento={dados.salaDelegaciaSolics.length} delay={0.28}>
-          {dados.salaDelegacia.length > 0 ? (
-            <>{<SubTitle label="Em funcionamento" count={dados.salaDelegacia.length} />}
-              {dados.salaDelegacia.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="salaDelegacia" />)}
-            </>
-          ) : <EmptyState msg="Nenhuma Sala em Delegacia em funcionamento." />}
-          {dados.salaDelegaciaSolics.length > 0 && (
-            <>{<SubTitle label="Previstas" count={dados.salaDelegaciaSolics.length} />}
-              {dados.salaDelegaciaSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
+          ) : <EmptyState msg="Nenhuma Sala Lilás Municipal em funcionamento." />}
+          {dados.lilasMunicipalSolics.length > 0 && (
+            <><SubTitle label="Em andamento" count={dados.lilasMunicipalSolics.length} />
+              {dados.lilasMunicipalSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}
             </>
           )}
         </SectionCard>
 
-        {/* 6. DDM */}
-        <SectionCard numero={6} titulo="Delegacias de Defesa da Mulher (DDM)" cor="ddm"
+        {/* 5. Salas Lilás Governo do Estado */}
+        <SectionCard numero={5} titulo="Salas Lilás Governo do Estado" cor="lilasEstado"
+          funcionando={dados.lilasEstado.length} emAndamento={dados.lilasEstadoSolics.length} delay={0.3}>
+          {dados.lilasEstado.length > 0 ? (
+            <><SubTitle label="Em funcionamento" count={dados.lilasEstado.length} />
+              {dados.lilasEstado.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="lilasEstado" />)}
+            </>
+          ) : <EmptyState msg="Nenhuma Sala Lilás Governo do Estado em funcionamento." />}
+          {dados.lilasEstadoSolics.length > 0 && (
+            <><SubTitle label="Em andamento" count={dados.lilasEstadoSolics.length} />
+              {dados.lilasEstadoSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}
+            </>
+          )}
+        </SectionCard>
+
+        {/* 6. Salas Lilás em Delegacia */}
+        <SectionCard numero={6} titulo="Salas Lilás em Delegacia" cor="lilasDelegacia"
+          funcionando={dados.lilasDelegacia.length} emAndamento={dados.lilasDelegaciaSolics.length} delay={0.35}>
+          {dados.lilasDelegacia.length > 0 ? (
+            <><SubTitle label="Em funcionamento" count={dados.lilasDelegacia.length} />
+              {dados.lilasDelegacia.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="lilasDelegacia" />)}
+            </>
+          ) : <EmptyState msg="Nenhuma Sala Lilás em Delegacia em funcionamento." />}
+          {dados.lilasDelegaciaSolics.length > 0 && (
+            <><SubTitle label="Em andamento" count={dados.lilasDelegaciaSolics.length} />
+              {dados.lilasDelegaciaSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}
+            </>
+          )}
+        </SectionCard>
+
+        {/* 7. DDM */}
+        <SectionCard numero={7} titulo="Delegacias de Defesa da Mulher (DDM)" cor="ddm"
           funcionando={dados.ddm.length} emAndamento={0}
           observacao="Gerenciadas pela Polícia Civil do Ceará — não passam pelo fluxo de solicitações desta Secretaria."
           delay={0.3}>
           {dados.ddm.length > 0 ? (
-            <>{<SubTitle label="Em funcionamento" count={dados.ddm.length} />}
+            <><SubTitle label="Em funcionamento" count={dados.ddm.length} />
               {dados.ddm.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} cor="ddm" />)}
             </>
           ) : <EmptyState msg="Nenhuma DDM cadastrada." />}
         </SectionCard>
 
-        {/* 7. Patrulhas */}
-        <SectionCard numero={7} titulo="Patrulhas Maria da Penha" cor="patrulha"
+        {/* 8. Patrulhas */}
+        <SectionCard numero={8} titulo="Patrulhas Maria da Penha" cor="patrulha"
           funcionando={dados.totalPatrulhas} emAndamento={0} delay={0.35}>
           {dados.equipsComPatrulha.length > 0 && (
-            <>{<SubTitle label="Vinculadas a equipamentos" count={dados.equipsComPatrulha.length} />}
+            <><SubTitle label="Vinculadas a equipamentos" count={dados.equipsComPatrulha.length} />
               {dados.equipsComPatrulha.map(e => (
                 <div key={e.id} className="flex items-start gap-3 py-2 border-b border-border/40 last:border-0">
                   <ShieldCheck className="w-4 h-4 text-cyan-500 shrink-0 mt-0.5" />
@@ -672,15 +700,15 @@ export default function RelatorioEVM() {
             </>
           )}
           {dados.solicsComPatrulha.length > 0 && (
-            <>{<SubTitle label="Aguardando equipamento" count={dados.solicsComPatrulha.length} />}
-              {dados.solicsComPatrulha.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.suite_implantada} />)}
+            <><SubTitle label="Aguardando equipamento" count={dados.solicsComPatrulha.length} />
+              {dados.solicsComPatrulha.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}
             </>
           )}
           {dados.totalPatrulhas === 0 && <EmptyState msg="Nenhuma Patrulha Maria da Penha cadastrada." />}
         </SectionCard>
 
-        {/* 8. Viaturas PMCE */}
-        <SectionCard numero={8} titulo="Viaturas PMCE" cor="patrulha"
+        {/* 9. Viaturas PMCE */}
+        <SectionCard numero={9} titulo="Viaturas PMCE" cor="patrulha"
           funcionando={dados.totalViaturasPMCE} emAndamento={0} delay={0.4}>
           {dados.viats.length > 0 ? (
             <>

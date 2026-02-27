@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -39,8 +40,11 @@ import {
   Plus, Pencil, Trash2, Search, Building2, CheckCircle, XCircle,
   Download, FileSpreadsheet, FileText as FilePdf, ChevronDown,
   MapPin, Phone, User, FileText, AlertCircle, ShieldCheck,
+  Package, GraduationCap, Hash,
+  Eye as EyeIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { HistoricoPanel } from '@/components/HistoricoPanel';
 import { exportEquipamentosToPDF, exportEquipamentosToExcel } from '@/lib/exportUtils';
 import {
   DropdownMenu,
@@ -53,9 +57,10 @@ const tipoStyles: Record<TipoEquipamento, string> = {
   'Casa da Mulher Brasileira': 'equipment-brasileira',
   'Casa da Mulher Cearense': 'equipment-cearense',
   'Casa da Mulher Municipal': 'equipment-municipal',
-  'Sala Lilás': 'equipment-lilas',
+  'Sala Lilás Municipal': 'equipment-lilas',
+  'Sala Lilás Governo do Estado': 'equipment-lilas-estado',
+  'Sala Lilás em Delegacia': 'equipment-lilas-delegacia',
   'DDM': 'equipment-ddm',
-  'Sala em Delegacia': 'equipment-sala-delegacia',
 };
 
 const tipoColors: Record<TipoEquipamento, { bg: string; text: string; border: string; icon: string }> = {
@@ -77,11 +82,23 @@ const tipoColors: Record<TipoEquipamento, { bg: string; text: string; border: st
     border: 'border-orange-500/20',
     icon: 'bg-orange-500/15',
   },
-  'Sala Lilás': {
-    bg: 'bg-pink-500/10',
-    text: 'text-pink-600',
-    border: 'border-pink-500/20',
-    icon: 'bg-pink-500/15',
+  'Sala Lilás Municipal': {
+    bg: 'bg-fuchsia-800/10',
+    text: 'text-fuchsia-900',
+    border: 'border-fuchsia-800/20',
+    icon: 'bg-fuchsia-800/15',
+  },
+  'Sala Lilás Governo do Estado': {
+    bg: 'bg-fuchsia-500/10',
+    text: 'text-fuchsia-700',
+    border: 'border-fuchsia-500/20',
+    icon: 'bg-fuchsia-500/15',
+  },
+  'Sala Lilás em Delegacia': {
+    bg: 'bg-fuchsia-300/10',
+    text: 'text-fuchsia-600',
+    border: 'border-fuchsia-300/20',
+    icon: 'bg-fuchsia-300/15',
   },
   'DDM': {
     bg: 'bg-green-700/10',
@@ -89,12 +106,7 @@ const tipoColors: Record<TipoEquipamento, { bg: string; text: string; border: st
     border: 'border-green-700/20',
     icon: 'bg-green-700/15',
   },
-  'Sala em Delegacia': {
-    bg: 'bg-green-400/10',
-    text: 'text-green-600',
-    border: 'border-green-400/20',
-    icon: 'bg-green-400/15',
-  },
+
 };
 
 // ── Calcula completude do cadastro ──────────────────────────────────────────
@@ -149,10 +161,12 @@ function EquipamentoRow({
   equipamento,
   onEdit,
   onDelete,
+  canEdit,
 }: {
   equipamento: Equipamento;
   onEdit: () => void;
   onDelete: () => void;
+  canEdit: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const regiao = getRegiao(equipamento.municipio);
@@ -198,17 +212,21 @@ function EquipamentoRow({
         </td>
         <td onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-1">
-            <Button variant="ghost" size="icon" onClick={onEdit}>
-              <Pencil className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-destructive hover:text-destructive"
-              onClick={onDelete}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {canEdit && (
+              <>
+                <Button variant="ghost" size="icon" onClick={onEdit}>
+                  <Pencil className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive hover:text-destructive"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
         </td>
       </tr>
@@ -269,6 +287,44 @@ function EquipamentoRow({
                       <p className="text-sm">{equipamento.observacoes || <span className="text-muted-foreground/60 italic">Nenhuma</span>}</p>
                     </div>
                   </div>
+
+                  {/* Checklist implantação */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-violet-500" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Implantação</p>
+                      <div className="flex items-center gap-1.5 text-sm">
+                        {equipamento.kit_athena_entregue
+                          ? <CheckCircle className="w-4 h-4 text-success shrink-0" />
+                          : <XCircle className="w-4 h-4 text-muted-foreground/40 shrink-0" />}
+                        <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className={equipamento.kit_athena_entregue ? '' : 'text-muted-foreground'}>Kit Athena</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-sm">
+                        {equipamento.capacitacao_realizada
+                          ? <CheckCircle className="w-4 h-4 text-success shrink-0" />
+                          : <XCircle className="w-4 h-4 text-muted-foreground/40 shrink-0" />}
+                        <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className={equipamento.capacitacao_realizada ? '' : 'text-muted-foreground'}>Capacitação</span>
+                      </div>
+                      {equipamento.nup && (
+                        <div className="flex items-center gap-1.5 text-sm">
+                          <Hash className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="font-mono text-xs">{equipamento.nup}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Histórico de alterações */}
+                  <div className="col-span-2">
+                    <HistoricoPanel
+                      registroId={equipamento.id}
+                      tabela="equipamentos"
+                    />
+                  </div>
                 </div>
               </motion.div>
             </td>
@@ -281,6 +337,8 @@ function EquipamentoRow({
 
 // ── Página principal ─────────────────────────────────────────────────────────
 export default function Equipamentos() {
+  const { role } = useAuthContext();
+  const canEdit = role !== 'atividades_editor' && role !== 'viewer';
   const { equipamentos, addEquipamento, updateEquipamento, deleteEquipamento, isAdding, isUpdating } = useEquipamentos();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<string>('all');
@@ -299,6 +357,9 @@ export default function Equipamentos() {
     telefone: '',
     responsavel: '',
     observacoes: '',
+    kit_athena_entregue: false,
+    capacitacao_realizada: false,
+    nup: '',
   });
 
   const filteredEquipamentos = equipamentos.filter((e) => {
@@ -330,7 +391,7 @@ export default function Equipamentos() {
 
   const openCreateDialog = () => {
     setEditingEquipamento(null);
-    setFormData({ municipio: '', tipo: '', possui_patrulha: false, endereco: '', telefone: '', responsavel: '', observacoes: '' });
+    setFormData({ municipio: '', tipo: '', possui_patrulha: false, endereco: '', telefone: '', responsavel: '', observacoes: '', kit_athena_entregue: false, capacitacao_realizada: false, nup: '' });
     setIsDialogOpen(true);
   };
 
@@ -344,6 +405,9 @@ export default function Equipamentos() {
       telefone: equipamento.telefone || '',
       responsavel: equipamento.responsavel || '',
       observacoes: equipamento.observacoes || '',
+      kit_athena_entregue: equipamento.kit_athena_entregue ?? false,
+      capacitacao_realizada: equipamento.capacitacao_realizada ?? false,
+      nup: equipamento.nup || '',
     });
     setIsDialogOpen(true);
   };
@@ -358,6 +422,9 @@ export default function Equipamentos() {
       telefone: formData.telefone,
       responsavel: formData.responsavel,
       observacoes: formData.observacoes,
+      kit_athena_entregue: formData.kit_athena_entregue,
+      capacitacao_realizada: formData.capacitacao_realizada,
+      nup: formData.nup || null,
     };
     if (editingEquipamento) {
       updateEquipamento({ id: editingEquipamento.id, ...data });
@@ -377,6 +444,14 @@ export default function Equipamentos() {
 
   return (
     <AppLayout>
+
+      {/* Banner somente leitura para atividades_editor */}
+      {role === 'atividades_editor' && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm">
+          <EyeIcon className="w-4 h-4 shrink-0" />
+          <span>Você tem acesso de <strong>somente leitura</strong> nesta página. Para editar, acesse <strong>Atividades</strong>.</span>
+        </div>
+      )}
       <PageHeader title="Equipamentos" description="Gerencie os equipamentos de atendimento à mulher">
         <div className="flex gap-2">
           <DropdownMenu>
@@ -397,10 +472,12 @@ export default function Equipamentos() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={openCreateDialog}>
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Equipamento
-          </Button>
+          {canEdit && (
+            <Button onClick={openCreateDialog}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Equipamento
+            </Button>
+          )}
         </div>
       </PageHeader>
 
@@ -528,6 +605,7 @@ export default function Equipamentos() {
                   <EquipamentoRow
                     key={equipamento.id}
                     equipamento={equipamento}
+                    canEdit={canEdit}
                     onEdit={() => openEditDialog(equipamento)}
                     onDelete={() => {
                       setDeletingId(equipamento.id);
@@ -579,6 +657,22 @@ export default function Equipamentos() {
                 onCheckedChange={(v) => setFormData({ ...formData, possui_patrulha: v })}
               />
             </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="kit_athena">Kit Athena entregue</Label>
+              <Switch
+                id="kit_athena"
+                checked={formData.kit_athena_entregue}
+                onCheckedChange={(v) => setFormData({ ...formData, kit_athena_entregue: v })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="capacitacao">Capacitação realizada</Label>
+              <Switch
+                id="capacitacao"
+                checked={formData.capacitacao_realizada}
+                onCheckedChange={(v) => setFormData({ ...formData, capacitacao_realizada: v })}
+              />
+            </div>
 
             <div className="space-y-2">
               <Label>Endereço</Label>
@@ -608,6 +702,14 @@ export default function Equipamentos() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label>NUP (Número do Processo)</Label>
+              <Input
+                value={formData.nup}
+                onChange={(e) => setFormData({ ...formData, nup: e.target.value })}
+                placeholder="Ex: 00000.000000/0000-00"
+              />
+            </div>
             <div className="space-y-2">
               <Label>Observações</Label>
               <Textarea

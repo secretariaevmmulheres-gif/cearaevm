@@ -34,6 +34,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { HistoricoPanel } from '@/components/HistoricoPanel';
 
 const TIPOS_ATIVIDADE: TipoAtividade[] = ['Unidade Móvel', 'Palestra', 'Evento', 'Tenda Lilás', 'Visita a DDM', 'Visita a Delegacia', 'Outro'];
 const RECURSOS: RecursoAtividade[] = ['Unidade Móvel', 'Equipe', 'Unidade Móvel + Equipe'];
@@ -177,6 +178,12 @@ function AtividadeRow({ atividade, onEdit, onDelete, onDuplicate }: {
                       </div>
                     </div>
                   ))}
+                  {/* Histórico de alterações */}
+                  <HistoricoPanel
+                    registroId={atividade.id}
+                    tabela="atividades"
+                    className="mt-2"
+                  />
                 </div>
               </motion.div>
             </td>
@@ -312,7 +319,7 @@ export default function Atividades() {
     setFormData({ municipio: a.municipio, municipio_sede: a.municipio_sede, tipo: a.tipo, recurso: a.recurso,
       quantidade_equipe: a.quantidade_equipe ?? '', status: a.status, nup: a.nup ?? '',
       nome_evento: a.nome_evento ?? '', data: a.data, dias: a.dias ?? '', horario: a.horario ?? '',
-      atendimentos: a.atendimentos ?? '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '' });
+      atendimentos: a.atendimentos ?? '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '', tipo_personalizado: (a as any).tipo_personalizado ?? '' });
     setIsDialogOpen(true);
   };
 
@@ -326,7 +333,7 @@ export default function Atividades() {
       nup: '', nome_evento: a.nome_evento ?? '',
       data: new Date().toISOString().split('T')[0], // hoje
       dias: a.dias ?? '', horario: a.horario ?? '',
-      atendimentos: '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '',
+      atendimentos: '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '', tipo_personalizado: '',
     });
     setIsDialogOpen(true);
   };
@@ -341,7 +348,10 @@ export default function Atividades() {
       data: formData.data, dias: formData.dias === '' ? null : Number(formData.dias),
       horario: formData.horario || null,
       atendimentos: formData.atendimentos === '' ? null : Number(formData.atendimentos),
-      endereco: formData.endereco || null, observacoes: formData.observacoes || null,
+      endereco: formData.endereco || null,
+      observacoes: formData.tipo === 'Outro' && formData.tipo_personalizado
+        ? `[${formData.tipo_personalizado}] ${formData.observacoes || ''}`.trim()
+        : formData.observacoes || null,
     };
     if (editingId) { updateAtividade({ id: editingId, ...payload }); } else { addAtividade(payload); }
     setIsDialogOpen(false);

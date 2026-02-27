@@ -1,6 +1,6 @@
 import { TipoEquipamento, StatusSolicitacao, OrgaoResponsavel } from "@/data/municipios";
 
-export type AppRole = 'admin' | 'editor' | 'viewer';
+export type AppRole = 'admin' | 'editor' | 'viewer' | 'atividades_editor';
 
 // ── Atividades ────────────────────────────────────────────────────────────────
 export type TipoAtividade = 'Unidade Móvel' | 'Palestra' | 'Evento' | 'Tenda Lilás' | 'Visita a DDM' | 'Visita a Delegacia' | 'Outro';
@@ -60,6 +60,9 @@ export interface Equipamento {
   telefone: string;
   responsavel: string;
   observacoes: string;
+  kit_athena_entregue: boolean;
+  capacitacao_realizada: boolean;
+  nup: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -91,7 +94,7 @@ export interface Solicitacao {
   guarda_municipal_estruturada: boolean;
   kit_athena_entregue: boolean;
   capacitacao_realizada: boolean;
-  suite_implantada: string;
+  nup: string | null;
   observacoes: string;
   anexos: string[];
   created_at: string;

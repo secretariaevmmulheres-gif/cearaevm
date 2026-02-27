@@ -155,7 +155,13 @@ export function AppSidebar() {
               <User className="w-4 h-4" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs truncate">{user?.email}</p>
-                <p className="text-xs text-sidebar-foreground/60 capitalize">{role}</p>
+                <p className="text-xs text-sidebar-foreground/60">
+                  {role === 'atividades_editor' ? 'Editor de Atividades'
+                    : role === 'admin' ? 'Administrador'
+                    : role === 'editor' ? 'Editor'
+                    : role === 'viewer' ? 'Visualizador'
+                    : role}
+                </p>
               </div>
             </NavLink>
             <Button

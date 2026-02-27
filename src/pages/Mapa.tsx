@@ -59,11 +59,12 @@ const priorityColors: Record<number, string> = {
   1: '#0d9488',  // Casa da Mulher Brasileira — teal
   2: '#7c3aed',  // Casa da Mulher Cearense — violet
   3: '#ea580c',  // Casa da Mulher Municipal — orange
-  4: '#d946ef',  // Sala Lilás — fuchsia
-  5: '#15803d',  // DDM — verde escuro
-  6: '#4ade80',  // Sala em Delegacia — verde claro
-  7: '#06b6d4',  // Só Viatura — cyan
-  8: '#e5e7eb',  // Sem Cobertura — gray
+  4: '#c026d3',  // Sala Lilás Municipal — fuchsia escuro
+  5: '#e879f9',  // Sala Lilás Governo do Estado — fuchsia claro
+  6: '#f0abfc',  // Sala Lilás em Delegacia — fuchsia pastel
+  7: '#15803d',  // DDM — verde escuro
+  8: '#06b6d4',  // Só Viatura — cyan
+  9: '#e5e7eb',  // Sem Cobertura — gray
   0: '#9ca3af',  // Filtrado — gray opaco
 };
 
@@ -181,22 +182,23 @@ export default function Mapa() {
         const hasViatura = viats.length > 0 || eqs.some((e) => e.possui_patrulha) || sols.some((s) => s.recebeu_patrulha);
         if (!hasViatura) visible = false;
       }
-      let prioridade = 8; let cor = 'bg-muted'; let hexColor = priorityColors[8];
+      let prioridade = 9; let cor = 'bg-muted'; let hexColor = priorityColors[9];
       if (!visible) { prioridade = 0; cor = 'bg-muted/50'; hexColor = priorityColors[0]; }
       else if (eqs.some((e) => e.tipo === 'Casa da Mulher Brasileira')) { prioridade = 1; cor = 'bg-equipment-brasileira'; hexColor = priorityColors[1]; }
       else if (eqs.some((e) => e.tipo === 'Casa da Mulher Cearense')) { prioridade = 2; cor = 'bg-equipment-cearense'; hexColor = priorityColors[2]; }
       else if (eqs.some((e) => e.tipo === 'Casa da Mulher Municipal')) { prioridade = 3; cor = 'bg-equipment-municipal'; hexColor = priorityColors[3]; }
-      else if (eqs.some((e) => e.tipo === 'Sala Lilás')) { prioridade = 4; cor = 'bg-equipment-lilas'; hexColor = priorityColors[4]; }
-      else if (eqs.some((e) => e.tipo === 'DDM')) { prioridade = 5; cor = 'bg-equipment-ddm'; hexColor = priorityColors[5]; }
-      else if (eqs.some((e) => e.tipo === 'Sala em Delegacia')) { prioridade = 6; cor = 'bg-equipment-sala-delegacia'; hexColor = priorityColors[6]; }
-      else if (viats.length > 0) { prioridade = 7; cor = 'bg-equipment-viatura'; hexColor = priorityColors[7]; }
+      else if (eqs.some((e) => e.tipo === 'Sala Lilás Municipal')) { prioridade = 4; cor = 'bg-equipment-lilas'; hexColor = priorityColors[4]; }
+      else if (eqs.some((e) => e.tipo === 'Sala Lilás Governo do Estado')) { prioridade = 5; cor = 'bg-equipment-lilas-estado'; hexColor = priorityColors[5]; }
+      else if (eqs.some((e) => e.tipo === 'Sala Lilás em Delegacia')) { prioridade = 6; cor = 'bg-equipment-lilas-delegacia'; hexColor = priorityColors[6]; }
+      else if (eqs.some((e) => e.tipo === 'DDM')) { prioridade = 7; cor = 'bg-equipment-ddm'; hexColor = priorityColors[7]; }
+      else if (viats.length > 0) { prioridade = 8; cor = 'bg-equipment-viatura'; hexColor = priorityColors[8]; }
       dataMap.set(normalizarNome(nome), { nome, equipamentos: eqs, viaturas: viats, solicitacoes: sols, prioridade, cor, hexColor, visible });
     });
     return dataMap;
   }, [equipamentos, viaturas, solicitacoes, filterTipoEquipamento, filterStatusSolicitacao, filterApenasComViatura, filterRegiao]);
 
   const equipmentCounts = useMemo(() => {
-    const counts = { brasileira: 0, cearense: 0, municipal: 0, lilas: 0, ddm: 0, salaDelegacia: 0 };
+    const counts = { brasileira: 0, cearense: 0, municipal: 0, lilasMunicipal: 0, lilasEstado: 0, lilasDelegacia: 0, ddm: 0 };
     let vis = equipamentos;
     if (filterRegiao !== 'all') vis = vis.filter(e => getRegiao(e.municipio) === filterRegiao);
     if (filterTipoEquipamento !== 'all') vis = vis.filter(e => e.tipo === filterTipoEquipamento);
@@ -204,24 +206,26 @@ export default function Mapa() {
       if (e.tipo === 'Casa da Mulher Brasileira') counts.brasileira++;
       else if (e.tipo === 'Casa da Mulher Cearense') counts.cearense++;
       else if (e.tipo === 'Casa da Mulher Municipal') counts.municipal++;
-      else if (e.tipo === 'Sala Lilás') counts.lilas++;
+      else if (e.tipo === 'Sala Lilás Municipal') counts.lilasMunicipal++;
+      else if (e.tipo === 'Sala Lilás Governo do Estado') counts.lilasEstado++;
+      else if (e.tipo === 'Sala Lilás em Delegacia') counts.lilasDelegacia++;
       else if (e.tipo === 'DDM') counts.ddm++;
-      else if (e.tipo === 'Sala em Delegacia') counts.salaDelegacia++;
     });
     return counts;
   }, [equipamentos, filterRegiao, filterTipoEquipamento]);
 
   const stats = useMemo(() => {
-    const counts = { brasileira: 0, cearense: 0, municipal: 0, lilas: 0, ddm: 0, salaDelegacia: 0, viaturaOnly: 0, semCobertura: 0, filteredOut: 0 };
+    const counts = { brasileira: 0, cearense: 0, municipal: 0, lilasMunicipal: 0, lilasEstado: 0, lilasDelegacia: 0, ddm: 0, viaturaOnly: 0, semCobertura: 0, filteredOut: 0 };
     municipiosData.forEach((m) => {
       if (!m.visible) { counts.filteredOut++; return; }
       if (m.prioridade === 1) counts.brasileira++;
       else if (m.prioridade === 2) counts.cearense++;
       else if (m.prioridade === 3) counts.municipal++;
-      else if (m.prioridade === 4) counts.lilas++;
-      else if (m.prioridade === 5) counts.ddm++;
-      else if (m.prioridade === 6) counts.salaDelegacia++;
-      else if (m.prioridade === 7) counts.viaturaOnly++;
+      else if (m.prioridade === 4) counts.lilasMunicipal++;
+      else if (m.prioridade === 5) counts.lilasEstado++;
+      else if (m.prioridade === 6) counts.lilasDelegacia++;
+      else if (m.prioridade === 7) counts.ddm++;
+      else if (m.prioridade === 8) counts.viaturaOnly++;
       else counts.semCobertura++;
     });
     return counts;
@@ -253,7 +257,7 @@ export default function Mapa() {
       mouseover: (e) => { e.target.setStyle({ weight: 3, color: '#1f2937', fillOpacity: 0.9 }); e.target.bringToFront(); },
       mouseout: (e) => { e.target.setStyle({ weight: 1, color: '#ffffff', fillOpacity: 0.7 }); },
       click: () => {
-        setSelectedMunicipio(municipioData || { nome: municipioName, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 6, cor: 'bg-muted', hexColor: priorityColors[8], visible: true });
+        setSelectedMunicipio(municipioData || { nome: municipioName, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 9, cor: 'bg-muted', hexColor: priorityColors[9], visible: true });
       },
     });
     // Tooltip enriquecido com cobertura
@@ -261,9 +265,10 @@ export default function Mapa() {
       ? municipioData.prioridade === 1 ? '🏠 Casa da Mulher Brasileira'
       : municipioData.prioridade === 2 ? '🏠 Casa da Mulher Cearense'
       : municipioData.prioridade === 3 ? '🏠 Casa da Mulher Municipal'
-      : municipioData.prioridade === 4 ? '💜 Sala Lilás'
-      : municipioData.prioridade === 5 ? '🟢 DDM'
-      : municipioData.prioridade === 6 ? '🟢 Sala em Delegacia'
+      : municipioData.prioridade === 4 ? '💜 Sala Lilás Municipal'
+      : municipioData.prioridade === 5 ? '💜 Sala Lilás Governo do Estado'
+      : municipioData.prioridade === 6 ? '💜 Sala Lilás em Delegacia'
+      : municipioData.prioridade === 7 ? '🟢 DDM'
       : municipioData.prioridade === 7 ? '🚔 Só Viatura'
       : '⚪ Sem Cobertura'
       : '⚪ Sem Cobertura';
@@ -274,18 +279,20 @@ export default function Mapa() {
     );
   };
 
-  const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilas + stats.ddm + stats.salaDelegacia;
+  const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal + stats.lilasMunicipal + stats.lilasEstado + stats.lilasDelegacia + stats.ddm;
   const coberturaGeral = ((totalComEquipamento / 184) * 100);
 
   const legendItems = [
     { color: priorityColors[1], label: 'Casa da Mulher Brasileira', count: equipmentCounts.brasileira },
-    { color: priorityColors[2], label: 'Casa da Mulher Cearense', count: equipmentCounts.cearense },
+    { color: priorityColors[2], label: 'Casa da Mulher Cearense',   count: equipmentCounts.cearense },
     { color: priorityColors[3], label: 'Casa da Mulher Municipal', count: equipmentCounts.municipal },
-    { color: priorityColors[4], label: 'Sala Lilás', count: equipmentCounts.lilas },
+    { color: priorityColors[4], label: 'Sala Lilás Municipal',    count: equipmentCounts.lilasMunicipal },
+    { color: priorityColors[5], label: 'Sala Lilás Gov. Estado',  count: equipmentCounts.lilasEstado },
+    { color: priorityColors[6], label: 'Sala Lilás em Delegacia', count: equipmentCounts.lilasDelegacia },
     { color: priorityColors[5], label: 'DDM', count: equipmentCounts.ddm },
-    { color: priorityColors[6], label: 'Sala em Delegacia', count: equipmentCounts.salaDelegacia },
-    { color: priorityColors[7], label: 'Só Viatura', count: stats.viaturaOnly },
-    { color: priorityColors[8], label: 'Sem Cobertura', count: stats.semCobertura },
+    { color: priorityColors[6], label: 'Sala Lilás em Delegacia', count: equipmentCounts.lilasDelegacia },
+    { color: priorityColors[8], label: 'Só Viatura', count: stats.viaturaOnly },
+    { color: priorityColors[9], label: 'Sem Cobertura', count: stats.semCobertura },
   ];
 
   return (
@@ -609,7 +616,7 @@ export default function Mapa() {
                         { label: 'Patrulha M.P.', done: s.recebeu_patrulha },
                         { label: 'Kit Athena', done: s.kit_athena_entregue },
                         { label: 'Capacitação', done: s.capacitacao_realizada },
-                        { label: 'Suíte Implantada', done: !!s.suite_implantada },
+                        { label: 'NUP', done: !!s.nup },
                         { label: 'Guarda Municipal', done: s.guarda_municipal_estruturada },
                       ];
                       const done = checks.filter(c => c.done).length;

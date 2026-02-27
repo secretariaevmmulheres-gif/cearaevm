@@ -114,9 +114,11 @@ export default function Dashboard() {
     name: name === 'Casa da Mulher Brasileira' ? 'CMB'
         : name === 'Casa da Mulher Cearense' ? 'CMC'
         : name === 'Casa da Mulher Municipal' ? 'CMM'
-        : name === 'Sala Lilás' ? 'Sala Lilás'
+        : name === 'Sala Lilás Municipal' ? 'S.L. Municipal'
+        : name === 'Sala Lilás Governo do Estado' ? 'S.L. Estado'
+        : name === 'Sala Lilás em Delegacia' ? 'S.L. Delegacia'
         : name === 'DDM' ? 'DDM'
-        : name === 'Sala em Delegacia' ? 'Sala Deleg.'
+        : name === 'Sala Lilás em Delegacia' ? 'Sala Deleg.'
         : name,
     fullName: name,
     value,
@@ -201,9 +203,11 @@ export default function Dashboard() {
         name: name === 'Casa da Mulher Brasileira' ? 'CMB'
         : name === 'Casa da Mulher Cearense' ? 'CMC'
         : name === 'Casa da Mulher Municipal' ? 'CMM'
-        : name === 'Sala Lilás' ? 'Sala Lilás'
+        : name === 'Sala Lilás Municipal' ? 'S.L. Municipal'
+        : name === 'Sala Lilás Governo do Estado' ? 'S.L. Estado'
+        : name === 'Sala Lilás em Delegacia' ? 'S.L. Delegacia'
         : name === 'DDM' ? 'DDM'
-        : name === 'Sala em Delegacia' ? 'Sala Deleg.'
+        : name === 'Sala Lilás em Delegacia' ? 'Sala Deleg.'
         : name,
         fullName: name,
         value,
@@ -232,7 +236,7 @@ export default function Dashboard() {
 
   // ✅ NOVO: Progresso do checklist por tipo de equipamento (histórico completo)
   const checklistData = useMemo(() => {
-    const tipos = ['Casa da Mulher Brasileira', 'Casa da Mulher Cearense', 'Casa da Mulher Municipal', 'Sala Lilás'];
+    const tipos = ['Casa da Mulher Brasileira', 'Casa da Mulher Cearense', 'Casa da Mulher Municipal', 'Sala Lilás Municipal'];
 
     return tipos.map((tipo) => {
       const group = solicitacoes.filter((s) => s.tipo_equipamento === tipo);
@@ -244,7 +248,7 @@ export default function Dashboard() {
       const nao = (field: keyof typeof group[0]) => total - sim(field);
 
       return {
-        name: tipo.replace('Casa da Mulher ', 'C.M. ').replace('Sala Lilás', 'S. Lilás'),
+        name: tipo.replace('Casa da Mulher ', 'C.M. ').replace('Sala Lilás Municipal', 'S. Lilás'),
         fullName: tipo,
         total,
         // cada item: quantas TÊM o critério
@@ -254,8 +258,8 @@ export default function Dashboard() {
         kit_nao: nao('kit_athena_entregue'),
         capacitacao_sim: sim('capacitacao_realizada'),
         capacitacao_nao: nao('capacitacao_realizada'),
-        suite_sim: sim('suite_implantada'),
-        suite_nao: nao('suite_implantada'),
+        suite_sim: sim('nup'),
+        suite_nao: nao('nup'),
         guarda_sim: sim('guarda_municipal_estruturada'),
         guarda_nao: nao('guarda_municipal_estruturada'),
       };
@@ -376,7 +380,7 @@ export default function Dashboard() {
       </div>
 
       {/* DDM + Sala em Delegacia sub-stats */}
-      {((stats.equipamentosPorTipo['DDM'] ?? 0) > 0 || (stats.equipamentosPorTipo['Sala em Delegacia'] ?? 0) > 0) && (
+      {((stats.equipamentosPorTipo['DDM'] ?? 0) > 0 || (stats.equipamentosPorTipo['Sala Lilás em Delegacia'] ?? 0) > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
             className="bg-card rounded-2xl border border-green-700/20 shadow-sm p-4 flex items-center gap-4">
@@ -395,7 +399,7 @@ export default function Dashboard() {
               <Building2 className="w-5 h-5 text-green-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-2xl font-bold text-green-600">{stats.equipamentosPorTipo['Sala em Delegacia'] ?? 0}</p>
+              <p className="text-2xl font-bold text-green-600">{stats.equipamentosPorTipo['Sala Lilás em Delegacia'] ?? 0}</p>
               <p className="text-sm font-medium text-foreground">Salas em Delegacia</p>
               <p className="text-xs text-muted-foreground">Polícia Civil — em funcionamento</p>
             </div>

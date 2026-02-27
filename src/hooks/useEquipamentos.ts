@@ -27,13 +27,16 @@ export function useEquipamentos() {
       const { data, error } = await supabase
         .from('equipamentos')
         .insert({
-          municipio: equipamento.municipio,
-          tipo: equipamento.tipo as TipoEquipamento,
-          possui_patrulha: equipamento.possui_patrulha,
-          endereco: equipamento.endereco,
-          telefone: equipamento.telefone,
-          responsavel: equipamento.responsavel,
-          observacoes: equipamento.observacoes,
+          municipio:             equipamento.municipio,
+          tipo:                  equipamento.tipo as TipoEquipamento,
+          possui_patrulha:       equipamento.possui_patrulha,
+          endereco:              equipamento.endereco,
+          telefone:              equipamento.telefone,
+          responsavel:           equipamento.responsavel,
+          observacoes:           equipamento.observacoes,
+          kit_athena_entregue:   equipamento.kit_athena_entregue  ?? false,
+          capacitacao_realizada: equipamento.capacitacao_realizada ?? false,
+          nup:                   equipamento.nup ?? null,
         })
         .select()
         .single();
@@ -53,13 +56,16 @@ export function useEquipamentos() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<Equipamento> & { id: string }) => {
       const updateData: Record<string, unknown> = {};
-      if (data.municipio !== undefined) updateData.municipio = data.municipio;
-      if (data.tipo !== undefined) updateData.tipo = data.tipo;
-      if (data.possui_patrulha !== undefined) updateData.possui_patrulha = data.possui_patrulha;
-      if (data.endereco !== undefined) updateData.endereco = data.endereco;
-      if (data.telefone !== undefined) updateData.telefone = data.telefone;
-      if (data.responsavel !== undefined) updateData.responsavel = data.responsavel;
-      if (data.observacoes !== undefined) updateData.observacoes = data.observacoes;
+      if (data.municipio             !== undefined) updateData.municipio             = data.municipio;
+      if (data.tipo                  !== undefined) updateData.tipo                  = data.tipo;
+      if (data.possui_patrulha       !== undefined) updateData.possui_patrulha       = data.possui_patrulha;
+      if (data.endereco              !== undefined) updateData.endereco              = data.endereco;
+      if (data.telefone              !== undefined) updateData.telefone              = data.telefone;
+      if (data.responsavel           !== undefined) updateData.responsavel           = data.responsavel;
+      if (data.observacoes           !== undefined) updateData.observacoes           = data.observacoes;
+      if (data.kit_athena_entregue   !== undefined) updateData.kit_athena_entregue   = data.kit_athena_entregue;
+      if (data.capacitacao_realizada !== undefined) updateData.capacitacao_realizada = data.capacitacao_realizada;
+      if (data.nup                   !== undefined) updateData.nup                   = data.nup;
 
       const { error } = await supabase
         .from('equipamentos')
@@ -98,10 +104,10 @@ export function useEquipamentos() {
   return {
     equipamentos,
     isLoading,
-    addEquipamento: addMutation.mutate,
+    addEquipamento:    addMutation.mutate,
     updateEquipamento: updateMutation.mutate,
     deleteEquipamento: deleteMutation.mutate,
-    isAdding: addMutation.isPending,
+    isAdding:   addMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
   };

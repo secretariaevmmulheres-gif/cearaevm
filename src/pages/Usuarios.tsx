@@ -40,15 +40,17 @@ interface UserWithRole {
 }
 
 const roleLabels: Record<AppRole, string> = {
-  admin: 'Administrador',
-  editor: 'Editor',
-  viewer: 'Visualizador',
+  admin:              'Administrador',
+  editor:             'Editor',
+  viewer:             'Visualizador',
+  atividades_editor:  'Editor de Atividades',
 };
 
 const roleColors: Record<AppRole, string> = {
-  admin: 'bg-destructive/10 text-destructive',
-  editor: 'bg-primary/10 text-primary',
-  viewer: 'bg-muted text-muted-foreground',
+  admin:             'bg-destructive/10 text-destructive',
+  editor:            'bg-primary/10 text-primary',
+  viewer:            'bg-muted text-muted-foreground',
+  atividades_editor: 'bg-amber-500/10 text-amber-700',
 };
 
 export default function Usuarios() {
@@ -268,7 +270,7 @@ export default function Usuarios() {
                                 updateRoleMutation.mutate({ userId: user.id, role: value as AppRole, userEmail: user.email, isNewApproval: true })
                               }
                             >
-                              <SelectTrigger className="w-40">
+                              <SelectTrigger className="w-48">
                                 <SelectValue placeholder="Aprovar como..." />
                               </SelectTrigger>
                               <SelectContent>
@@ -278,10 +280,16 @@ export default function Usuarios() {
                                     <span className="text-xs text-muted-foreground">Apenas visualiza dados</span>
                                   </div>
                                 </SelectItem>
+                                <SelectItem value="atividades_editor">
+                                  <div className="flex flex-col items-start">
+                                    <span>Editor de Atividades</span>
+                                    <span className="text-xs text-muted-foreground">Edita somente atividades</span>
+                                  </div>
+                                </SelectItem>
                                 <SelectItem value="editor">
                                   <div className="flex flex-col items-start">
                                     <span>Editor</span>
-                                    <span className="text-xs text-muted-foreground">Pode criar e editar</span>
+                                    <span className="text-xs text-muted-foreground">Pode criar e editar tudo</span>
                                   </div>
                                 </SelectItem>
                                 <SelectItem value="admin">
@@ -305,7 +313,7 @@ export default function Usuarios() {
           {/* Role descriptions */}
           <div className="mt-4 bg-muted/50 rounded-xl p-4 border border-border">
             <h3 className="font-semibold text-sm mb-3">Atribuições por Permissão:</h3>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="bg-card rounded-lg p-3 border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <Shield className="w-4 h-4 text-muted-foreground" />
@@ -319,6 +327,18 @@ export default function Usuarios() {
                   <li>• Acessar mapa</li>
                 </ul>
               </div>
+              <div className="bg-card rounded-lg p-3 border border-amber-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-4 h-4 text-amber-600" />
+                  <span className="font-medium text-sm">Editor de Atividades</span>
+                </div>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  <li>• Tudo do Visualizador +</li>
+                  <li>• Criar atividades</li>
+                  <li>• Editar atividades</li>
+                  <li>• Excluir atividades</li>
+                </ul>
+              </div>
               <div className="bg-card rounded-lg p-3 border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <Shield className="w-4 h-4 text-primary" />
@@ -330,6 +350,7 @@ export default function Usuarios() {
                   <li>• Editar equipamentos</li>
                   <li>• Criar/editar viaturas</li>
                   <li>• Criar/editar solicitações</li>
+                  <li>• Criar/editar atividades</li>
                 </ul>
               </div>
               <div className="bg-card rounded-lg p-3 border border-border">
@@ -395,11 +416,12 @@ export default function Usuarios() {
                               updateRoleMutation.mutate({ userId: user.id, role: value as AppRole, userEmail: user.email, isNewApproval: false })
                             }
                           >
-                            <SelectTrigger className="w-40">
+                            <SelectTrigger className="w-48">
                               <SelectValue placeholder="Alterar permissão" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="viewer">Visualizador</SelectItem>
+                              <SelectItem value="atividades_editor">Editor de Atividades</SelectItem>
                               <SelectItem value="editor">Editor</SelectItem>
                               <SelectItem value="admin">Administrador</SelectItem>
                             </SelectContent>

@@ -112,6 +112,9 @@ export type Database = {
           id: string
           municipio: string
           observacoes: string | null
+          capacitacao_realizada: boolean
+          kit_athena_entregue: boolean
+          nup: string | null
           possui_patrulha: boolean
           responsavel: string | null
           telefone: string | null
@@ -119,10 +122,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          capacitacao_realizada?: boolean
           created_at?: string
           endereco?: string | null
           id?: string
+          kit_athena_entregue?: boolean
           municipio: string
+          nup?: string | null
           observacoes?: string | null
           possui_patrulha?: boolean
           responsavel?: string | null
@@ -131,10 +137,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          capacitacao_realizada?: boolean
           created_at?: string
           endereco?: string | null
           id?: string
+          kit_athena_entregue?: boolean
           municipio?: string
+          nup?: string | null
           observacoes?: string | null
           possui_patrulha?: boolean
           responsavel?: string | null
@@ -220,7 +229,7 @@ export type Database = {
           observacoes: string | null
           recebeu_patrulha: boolean
           status: Database["public"]["Enums"]["status_solicitacao"]
-          suite_implantada: string | null
+          nup: string | null
           tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento"]
           updated_at: string
         }
@@ -236,7 +245,7 @@ export type Database = {
           observacoes?: string | null
           recebeu_patrulha?: boolean
           status?: Database["public"]["Enums"]["status_solicitacao"]
-          suite_implantada?: string | null
+          nup?: string | null
           tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento"]
           updated_at?: string
         }
@@ -252,7 +261,7 @@ export type Database = {
           observacoes?: string | null
           recebeu_patrulha?: boolean
           status?: Database["public"]["Enums"]["status_solicitacao"]
-          suite_implantada?: string | null
+          nup?: string | null
           tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento"]
           updated_at?: string
         }
@@ -344,7 +353,7 @@ export type Database = {
       is_system_user: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "editor" | "viewer"
+      app_role: "admin" | "editor" | "viewer" | "atividades_editor"
       orgao_responsavel: "PMCE" | "Guarda Municipal" | "Outro"
       status_solicitacao:
         | "Recebida"
@@ -357,7 +366,10 @@ export type Database = {
         | "Casa da Mulher Brasileira"
         | "Casa da Mulher Cearense"
         | "Casa da Mulher Municipal"
-        | "Sala Lilás"
+        | "Sala Lilás Municipal"
+        | "Sala Lilás Governo do Estado"
+        | "Sala Lilás em Delegacia"
+        | "DDM"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -485,7 +497,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "editor", "viewer"],
+      app_role: ["admin", "editor", "viewer", "atividades_editor"],
       orgao_responsavel: ["PMCE", "Guarda Municipal", "Outro"],
       status_solicitacao: [
         "Recebida",
@@ -499,7 +511,10 @@ export const Constants = {
         "Casa da Mulher Brasileira",
         "Casa da Mulher Cearense",
         "Casa da Mulher Municipal",
-        "Sala Lilás",
+        "Sala Lilás Municipal",
+        "Sala Lilás Governo do Estado",
+        "Sala Lilás em Delegacia",
+        "DDM",
       ],
     },
   },
