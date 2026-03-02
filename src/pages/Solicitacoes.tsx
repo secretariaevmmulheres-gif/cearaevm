@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -24,25 +25,29 @@ import {
   TipoEquipamento, StatusSolicitacao, regioesList, getRegiao,
 } from '@/data/municipios';
 
-// DDM e Sala em Delegacia são da Polícia Civil — não passam pelo fluxo de solicitações
-const tiposEquipamentoSolicitacao = tiposEquipamento.filter(
-  t => t !== 'DDM' && t !== 'Sala em Delegacia'
-);
 import { Solicitacao } from '@/types';
 import {
   Plus, Pencil, Trash2, Search, FileText, ArrowRight, Building2,
   Download, FileSpreadsheet, FileText as FilePdf, ChevronDown,
-  ShieldCheck, Users, Package, GraduationCap, Hash, MapPin,
+  ShieldCheck, Users, Package, GraduationCap, Hash,
   CheckCircle2, Circle, CalendarDays, StickyNote,
+  Eye as EyeIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { HistoricoPanel } from '@/components/HistoricoPanel';
 import { exportSolicitacoesToPDF, exportSolicitacoesToExcel } from '@/lib/exportUtils';
 import {
+
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+// DDM e Sala Lilás em Delegacia são da Polícia Civil — não passam pelo fluxo de solicitações
+const tiposEquipamentoSolicitacao = tiposEquipamento.filter(
+  (t) => t !== 'DDM' && t !== 'Sala Lilás em Delegacia'
+);
 
 const statusStyles: Record<StatusSolicitacao, string> = {
   Recebida: 'badge-recebida',
@@ -68,8 +73,8 @@ function getProgresso(s: Solicitacao): { pct: number; itens: { label: string; ok
     { label: 'Patrulha M.P.',       ok: s.recebeu_patrulha,             icon: <ShieldCheck className="w-3.5 h-3.5" /> },
     { label: 'Guarda Municipal',    ok: s.guarda_municipal_estruturada,  icon: <Users className="w-3.5 h-3.5" /> },
     { label: 'Kit Athena',          ok: s.kit_athena_entregue,           icon: <Package className="w-3.5 h-3.5" /> },
-    { label: 'Capacitação',         ok: s.capacitacao_realizada,         icon: <GraduationCap className="w-3.5 h-3.5" /> },
-    { label: 'NUP',                 ok: !!(s.suite_implantada?.trim()),  icon: <Hash className="w-3.5 h-3.5" /> },
+    { label: 'Qualificação',         ok: s.capacitacao_realizada,         icon: <GraduationCap className="w-3.5 h-3.5" /> },
+    { label: 'NUP',                 ok: !!(s.nup?.trim()),  icon: <Hash className="w-3.5 h-3.5" /> },
   ];
   const ok = itens.filter(i => i.ok).length;
   return { pct: Math.round((ok / itens.length) * 100), itens };
@@ -102,11 +107,13 @@ function SolicitacaoRow({
   onEdit,
   onDelete,
   onTransform,
+  canEdit,
 }: {
   solicitacao: Solicitacao;
   onEdit: () => void;
   onDelete: () => void;
   onTransform: () => void;
+  canEdit: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const regiao = getRegiao(solicitacao.municipio);
@@ -141,7 +148,7 @@ function SolicitacaoRow({
         </td>
         <td onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-1">
-            {solicitacao.status === 'Inaugurada' && (
+            {canEdit && solicitacao.status === 'Inaugurada' && (
               <Button
                 variant="outline"
                 size="sm"
@@ -152,12 +159,16 @@ function SolicitacaoRow({
                 <ArrowRight className="w-3 h-3" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={onEdit}>
-              <Pencil className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={onDelete}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {canEdit && (
+              <>
+                <Button variant="ghost" size="icon" onClick={onEdit}>
+                  <Pencil className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={onDelete}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
         </td>
       </tr>
@@ -203,14 +214,14 @@ function SolicitacaoRow({
                   <div className="space-y-3">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Detalhes</p>
 
-                    {solicitacao.suite_implantada && (
+                    {solicitacao.nup && (
                       <div className="flex items-start gap-2">
                         <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                           <Hash className="w-3 h-3 text-primary" />
                         </div>
                         <div>
                           <p className="text-[10px] text-muted-foreground">NUP</p>
-                          <p className="text-xs font-mono font-medium">{solicitacao.suite_implantada}</p>
+                          <p className="text-xs font-mono font-medium">{solicitacao.nup}</p>
                         </div>
                       </div>
                     )}
@@ -239,9 +250,16 @@ function SolicitacaoRow({
                       </div>
                     )}
 
-                    {!solicitacao.suite_implantada && !solicitacao.observacoes && (
+                    {!solicitacao.nup && !solicitacao.observacoes && (
                       <p className="text-xs text-muted-foreground/60 italic">Sem detalhes adicionais</p>
                     )}
+                  </div>
+                  {/* Histórico de alterações */}
+                  <div className="lg:col-span-3">
+                    <HistoricoPanel
+                      registroId={solicitacao.id}
+                      tabela="solicitacoes"
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -255,6 +273,8 @@ function SolicitacaoRow({
 
 // ── Página principal ─────────────────────────────────────────────────────────
 export default function Solicitacoes() {
+  const { role } = useAuthContext();
+  const canEdit = role !== 'atividades_editor' && role !== 'viewer';
   const { solicitacoes, addSolicitacao, updateSolicitacao, deleteSolicitacao, transformarEmEquipamento, isAdding, isUpdating } =
     useSolicitacoes();
   const [searchTerm, setSearchTerm] = useState('');
@@ -277,8 +297,9 @@ export default function Solicitacoes() {
     recebeu_patrulha: false,
     guarda_municipal_estruturada: false,
     kit_athena_entregue: false,
+    kit_athena_previo: false,
     capacitacao_realizada: false,
-    suite_implantada: '',
+    nup: '',
     observacoes: '',
     anexos: [] as string[],
   });
@@ -305,8 +326,8 @@ export default function Solicitacoes() {
       municipio: '', data_solicitacao: format(new Date(), 'yyyy-MM-dd'),
       tipo_equipamento: '', status: 'Recebida',
       recebeu_patrulha: false, guarda_municipal_estruturada: false,
-      kit_athena_entregue: false, capacitacao_realizada: false,
-      suite_implantada: '', observacoes: '', anexos: [],
+      kit_athena_entregue: false, kit_athena_previo: false, capacitacao_realizada: false,
+      nup: '', observacoes: '', anexos: [],
     });
     setIsDialogOpen(true);
   };
@@ -321,8 +342,9 @@ export default function Solicitacoes() {
       recebeu_patrulha: s.recebeu_patrulha,
       guarda_municipal_estruturada: s.guarda_municipal_estruturada,
       kit_athena_entregue: s.kit_athena_entregue,
+      kit_athena_previo: s.kit_athena_previo ?? false,
       capacitacao_realizada: s.capacitacao_realizada,
-      suite_implantada: s.suite_implantada || '',
+      nup: s.nup || '',
       observacoes: s.observacoes || '',
       anexos: s.anexos || [],
     });
@@ -342,8 +364,9 @@ export default function Solicitacoes() {
       recebeu_patrulha: formData.recebeu_patrulha,
       guarda_municipal_estruturada: formData.guarda_municipal_estruturada,
       kit_athena_entregue: formData.kit_athena_entregue,
+      kit_athena_previo: formData.kit_athena_previo,
       capacitacao_realizada: formData.capacitacao_realizada,
-      suite_implantada: formData.suite_implantada,
+      nup: formData.nup,
       observacoes: formData.observacoes,
       anexos: formData.anexos,
     };
@@ -365,6 +388,14 @@ export default function Solicitacoes() {
 
   return (
     <AppLayout>
+
+      {/* Banner somente leitura para atividades_editor */}
+      {role === 'atividades_editor' && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm">
+          <EyeIcon className="w-4 h-4 shrink-0" />
+          <span>Você tem acesso de <strong>somente leitura</strong> nesta página. Para editar, acesse <strong>Atividades</strong>.</span>
+        </div>
+      )}
       <PageHeader title="Solicitações" description="Acompanhe os pedidos de implantação de equipamentos">
         <div className="flex gap-2">
           <DropdownMenu>
@@ -383,9 +414,11 @@ export default function Solicitacoes() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={openCreateDialog}>
-            <Plus className="w-4 h-4 mr-2" />Nova Solicitação
-          </Button>
+          {canEdit && (
+            <Button onClick={openCreateDialog}>
+              <Plus className="w-4 h-4 mr-2" />Nova Solicitação
+            </Button>
+          )}
         </div>
       </PageHeader>
 
@@ -492,6 +525,7 @@ export default function Solicitacoes() {
                   <SolicitacaoRow
                     key={s.id}
                     solicitacao={s}
+                    canEdit={canEdit}
                     onEdit={() => openEditDialog(s)}
                     onDelete={() => { setDeletingId(s.id); setIsDeleteDialogOpen(true); }}
                     onTransform={() => { setTransformingId(s.id); setIsTransformDialogOpen(true); }}
@@ -553,7 +587,7 @@ export default function Solicitacoes() {
                   { id: 'patrulha', label: 'Recebeu Patrulha Maria da Penha', key: 'recebeu_patrulha' },
                   { id: 'guarda',   label: 'Guarda Municipal estruturada',    key: 'guarda_municipal_estruturada' },
                   { id: 'kit',      label: 'Kit Athena entregue',             key: 'kit_athena_entregue' },
-                  { id: 'cap',      label: 'Capacitação realizada',           key: 'capacitacao_realizada' },
+                  { id: 'qualif', label: 'Qualificação realizada', key: 'capacitacao_realizada' },
                 ].map(item => (
                   <div key={item.id} className="flex items-center justify-between">
                     <Label htmlFor={item.id} className="text-sm font-normal">{item.label}</Label>
@@ -564,10 +598,23 @@ export default function Solicitacoes() {
                     />
                   </div>
                 ))}
+                {/* Sub-opção PréVio — visível apenas quando Kit Athena está ativo */}
+                  {formData.kit_athena_entregue && (
+                    <div className="flex items-center justify-between pl-4 border-l-2 border-amber-400">
+                    <Label htmlFor="kit_previo" className="text-sm font-normal text-amber-700">
+                      Entregue via <span className="font-semibold">PréVio</span>
+                    </Label>
+                  <Switch
+                    id="kit_previo"
+                    checked={formData.kit_athena_previo}
+                    onCheckedChange={(v) => setFormData({ ...formData, kit_athena_previo: v })}
+                  />
+                </div>
+              )}
                 <div className="space-y-2">
                   <Label>Número do Processo (NUP)</Label>
                   <Input
-                    value={formData.suite_implantada}
+                    value={formData.nup}
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, '');
                       let formatted = '';
@@ -577,7 +624,7 @@ export default function Solicitacoes() {
                         if (i === 15) formatted += '-';
                         formatted += value[i];
                       }
-                      setFormData({ ...formData, suite_implantada: formatted });
+                      setFormData({ ...formData, nup: formatted });
                     }}
                     placeholder="62000.001753/2025-56"
                   />

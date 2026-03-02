@@ -35,6 +35,7 @@ export function useEquipamentos() {
           responsavel:           equipamento.responsavel,
           observacoes:           equipamento.observacoes,
           kit_athena_entregue:   equipamento.kit_athena_entregue  ?? false,
+          kit_athena_previo:     equipamento.kit_athena_previo     ?? false,
           capacitacao_realizada: equipamento.capacitacao_realizada ?? false,
           nup:                   equipamento.nup ?? null,
         })
@@ -64,6 +65,7 @@ export function useEquipamentos() {
       if (data.responsavel           !== undefined) updateData.responsavel           = data.responsavel;
       if (data.observacoes           !== undefined) updateData.observacoes           = data.observacoes;
       if (data.kit_athena_entregue   !== undefined) updateData.kit_athena_entregue   = data.kit_athena_entregue;
+      if (data.kit_athena_previo     !== undefined) updateData.kit_athena_previo     = data.kit_athena_previo;
       if (data.capacitacao_realizada !== undefined) updateData.capacitacao_realizada = data.capacitacao_realizada;
       if (data.nup                   !== undefined) updateData.nup                   = data.nup;
 

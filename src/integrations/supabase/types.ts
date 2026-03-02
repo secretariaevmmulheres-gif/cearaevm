@@ -114,6 +114,7 @@ export type Database = {
           observacoes: string | null
           capacitacao_realizada: boolean
           kit_athena_entregue: boolean
+          kit_athena_previo: boolean
           nup: string | null
           possui_patrulha: boolean
           responsavel: string | null
@@ -127,6 +128,7 @@ export type Database = {
           endereco?: string | null
           id?: string
           kit_athena_entregue?: boolean
+          kit_athena_previo?: boolean
           municipio: string
           nup?: string | null
           observacoes?: string | null
@@ -142,6 +144,7 @@ export type Database = {
           endereco?: string | null
           id?: string
           kit_athena_entregue?: boolean
+          kit_athena_previo?: boolean
           municipio?: string
           nup?: string | null
           observacoes?: string | null

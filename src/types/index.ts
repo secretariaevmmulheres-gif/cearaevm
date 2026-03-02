@@ -61,6 +61,7 @@ export interface Equipamento {
   responsavel: string;
   observacoes: string;
   kit_athena_entregue: boolean;
+  kit_athena_previo: boolean;
   capacitacao_realizada: boolean;
   nup: string | null;
   created_at: string;
@@ -93,6 +94,7 @@ export interface Solicitacao {
   recebeu_patrulha: boolean;
   guarda_municipal_estruturada: boolean;
   kit_athena_entregue: boolean;
+  kit_athena_previo: boolean;
   capacitacao_realizada: boolean;
   nup: string | null;
   observacoes: string;

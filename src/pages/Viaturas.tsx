@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -22,12 +23,13 @@ import { useViaturas } from '@/hooks/useViaturas';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { municipiosCeara, orgaosResponsaveis, OrgaoResponsavel, regioesList, getRegiao } from '@/data/municipios';
-import { Viatura, Equipamento, Solicitacao } from '@/types';
+import { Viatura, Equipamento } from '@/types';
 import {
   Plus, Pencil, Trash2, Search, Truck, Download, FileSpreadsheet,
   FileText as FilePdf, Building2, ChevronDown, MapPin, User,
   CalendarDays, Link2, Link2Off, StickyNote, AlertCircle,
   ShieldCheck, Hash,
+  Eye as EyeIcon,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
@@ -76,11 +78,12 @@ function CompletudeBar({ v }: { v: Viatura }) {
 }
 
 // ── Linha expansível — Viatura PMCE ─────────────────────────────────────────
-function ViaturaRow({ viatura, equipamentos, onEdit, onDelete }: {
+function ViaturaRow({ viatura, equipamentos, onEdit, onDelete, canEdit }: {
   viatura: Viatura;
   equipamentos: Equipamento[];
   onEdit: () => void;
   onDelete: () => void;
+  canEdit: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const regiao = getRegiao(viatura.municipio);
@@ -120,10 +123,14 @@ function ViaturaRow({ viatura, equipamentos, onEdit, onDelete }: {
         </td>
         <td onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-1">
-            <Button variant="ghost" size="icon" onClick={onEdit}><Pencil className="w-4 h-4" /></Button>
-            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={onDelete}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {canEdit && (
+              <>
+                <Button variant="ghost" size="icon" onClick={onEdit}><Pencil className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={onDelete}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
         </td>
       </tr>
@@ -294,6 +301,8 @@ function PatrulhaRow({ patrulha }: { patrulha: PatrulhaCasa }) {
 
 // ── Página principal ─────────────────────────────────────────────────────────
 export default function Viaturas() {
+  const { role } = useAuthContext();
+  const canEdit = role !== 'atividades_editor' && role !== 'viewer';
   const { viaturas, addViatura, updateViatura, deleteViatura, isAdding, isUpdating } = useViaturas();
   const { equipamentos } = useEquipamentos();
   const { solicitacoes } = useSolicitacoes();
@@ -331,8 +340,12 @@ export default function Viaturas() {
     .sort((a, b) => a.municipio.localeCompare(b.municipio));
 
   const anosDisponiveis = Array.from(
-    new Set(viaturas.map(v => v.data_implantacao ? new Date(v.data_implantacao + 'T00:00:00').getFullYear() : null).filter(Boolean))
-  ).sort((a, b) => (b as number) - (a as number)) as number[];
+    new Set(
+      viaturas
+        .filter(v => !!v.data_implantacao)
+        .map(v => new Date(v.data_implantacao! + 'T00:00:00').getFullYear())
+    )
+  ).sort((a, b) => b - a);
 
   const patrulhasDeEquipamentos = equipamentos
     .filter(e => e.possui_patrulha)
@@ -417,6 +430,14 @@ export default function Viaturas() {
 
   return (
     <AppLayout>
+
+      {/* Banner somente leitura para atividades_editor */}
+      {role === 'atividades_editor' && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm">
+          <EyeIcon className="w-4 h-4 shrink-0" />
+          <span>Você tem acesso de <strong>somente leitura</strong> nesta página. Para editar, acesse <strong>Atividades</strong>.</span>
+        </div>
+      )}
       <PageHeader title="Viaturas" description="Gerencie as viaturas da Patrulha Maria da Penha">
         <div className="flex gap-2">
           <DropdownMenu>
@@ -432,7 +453,7 @@ export default function Viaturas() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={openCreateDialog}><Plus className="w-4 h-4 mr-2" />Nova Viatura</Button>
+          {canEdit && <Button onClick={openCreateDialog}><Plus className="w-4 h-4 mr-2" />Nova Viatura</Button>}
         </div>
       </PageHeader>
 
@@ -594,6 +615,7 @@ export default function Viaturas() {
                         key={v.id}
                         viatura={v}
                         equipamentos={equipamentos}
+                        canEdit={canEdit}
                         onEdit={() => openEditDialog(v)}
                         onDelete={() => { setDeletingId(v.id); setIsDeleteDialogOpen(true); }}
                       />

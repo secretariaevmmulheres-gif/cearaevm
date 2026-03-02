@@ -358,6 +358,7 @@ export default function Equipamentos() {
     responsavel: '',
     observacoes: '',
     kit_athena_entregue: false,
+    kit_athena_previo: false,
     capacitacao_realizada: false,
     nup: '',
   });
@@ -391,7 +392,7 @@ export default function Equipamentos() {
 
   const openCreateDialog = () => {
     setEditingEquipamento(null);
-    setFormData({ municipio: '', tipo: '', possui_patrulha: false, endereco: '', telefone: '', responsavel: '', observacoes: '', kit_athena_entregue: false, capacitacao_realizada: false, nup: '' });
+    setFormData({ municipio: '', tipo: '', possui_patrulha: false, endereco: '', telefone: '', responsavel: '', observacoes: '', kit_athena_entregue: false, kit_athena_previo: false, capacitacao_realizada: false, nup: '' });
     setIsDialogOpen(true);
   };
 
@@ -406,6 +407,7 @@ export default function Equipamentos() {
       responsavel: equipamento.responsavel || '',
       observacoes: equipamento.observacoes || '',
       kit_athena_entregue: equipamento.kit_athena_entregue ?? false,
+      kit_athena_previo:     equipamento.kit_athena_previo    ?? false,
       capacitacao_realizada: equipamento.capacitacao_realizada ?? false,
       nup: equipamento.nup || '',
     });
@@ -423,6 +425,7 @@ export default function Equipamentos() {
       responsavel: formData.responsavel,
       observacoes: formData.observacoes,
       kit_athena_entregue: formData.kit_athena_entregue,
+      kit_athena_previo:    formData.kit_athena_previo,
       capacitacao_realizada: formData.capacitacao_realizada,
       nup: formData.nup || null,
     };
@@ -665,6 +668,18 @@ export default function Equipamentos() {
                 onCheckedChange={(v) => setFormData({ ...formData, kit_athena_entregue: v })}
               />
             </div>
+            {formData.kit_athena_entregue && (
+              <div className="flex items-center justify-between pl-4 border-l-2 border-amber-400">
+                <Label htmlFor="kit_athena_previo" className="text-sm text-amber-700">
+                  Entregue via <span className="font-semibold">PréVio</span>
+                </Label>
+                <Switch
+                  id="kit_athena_previo"
+                  checked={formData.kit_athena_previo}
+                  onCheckedChange={(v) => setFormData({ ...formData, kit_athena_previo: v })}
+                />
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <Label htmlFor="capacitacao">Capacitação realizada</Label>
               <Switch
