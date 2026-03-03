@@ -7,13 +7,13 @@ import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useViaturas } from '@/hooks/useViaturas';
 import { getRegiao, regioesList } from '@/data/municipios';
-import { exportCpdiToPDF } from '@/lib/exportUtils';
+import { exportCpdiToPDF, exportDiagnosticoToPDF } from '@/lib/exportUtils';
 import { useMapaContext, MapaCapturada } from '@/contexts/MapaContext';
 import { cn } from '@/lib/utils';
 import {
   Download, ShieldCheck, Loader2,
   CheckCircle2, Clock, AlertCircle, LayoutList,
-  Filter, X, Settings2, Map, ImageOff, Camera,
+  Filter, X, Settings2, Map, ImageOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -70,7 +70,7 @@ function ConfiguracaoPDF({
   setRegiaoFiltro: (r: string) => void;
   dataRef: string;
   setDataRef: (d: string) => void;
-  onExportar: () => void;
+  onExportar: (resumo?: boolean) => void;
   exporting: boolean;
   contagens: Record<SecaoId, number>;
   mapaCapturado: MapaCapturada | null;
@@ -177,17 +177,14 @@ function ConfiguracaoPDF({
                       : 'border-border bg-muted/30 opacity-60 hover:opacity-80'
                   )}
                 >
-                  {/* Checkbox visual */}
                   <div className={cn(
                     'w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
                     ativa ? 'bg-primary border-primary' : 'border-muted-foreground/40'
                   )}>
                     {ativa && <CheckCircle2 className="w-3 h-3 text-white" />}
                   </div>
-                  {/* Dot colorido */}
                   <div className={cn('w-2 h-2 rounded-full shrink-0', secao.dot)} />
                   <span className="text-sm font-medium flex-1 min-w-0 truncate">{secao.label}</span>
-                  {/* Badge de contagem */}
                   <span className={cn(
                     'text-xs font-bold px-1.5 py-0.5 rounded-md shrink-0',
                     count > 0 ? 'bg-foreground/10 text-foreground' : 'text-muted-foreground/50'
@@ -268,16 +265,26 @@ function ConfiguracaoPDF({
           </div>
         </div>
 
-        {/* Botão exportar */}
-        <div className="flex justify-end pt-1">
+        {/* Botões exportar */}
+        <div className="flex justify-end gap-2 pt-1">
           <Button
-            onClick={onExportar}
+            variant="outline"
+            onClick={() => onExportar(true)}
+            disabled={exporting || nenhum}
+            className="gap-2"
+          >
+            {exporting
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando...</>
+              : <><Download className="w-4 h-4" />Resumo</>}
+          </Button>
+          <Button
+            onClick={() => onExportar(false)}
             disabled={exporting || nenhum}
             className="gap-2 min-w-[160px]"
           >
             {exporting
               ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando PDF...</>
-              : <><Download className="w-4 h-4" />Exportar PDF</>}
+              : <><Download className="w-4 h-4" />Exportar PDF Completo</>}
           </Button>
         </div>
       </div>
@@ -427,6 +434,7 @@ export default function RelatorioEVM() {
   const { mapaCapturado, dataCapturaMap } = useMapaContext();
   const [incluirMapa, setIncluirMapa] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [exportingDiag, setExportingDiag] = useState(false);
   const [dataRef, setDataRef] = useState(new Date().toISOString().split('T')[0]);
   const [regiaoFiltro, setRegiaoFiltro] = useState('all');
   const [secoesAtivas, setSecoesAtivas] = useState<Set<SecaoId>>(
@@ -456,47 +464,46 @@ export default function RelatorioEVM() {
     const solicsComPatrulha  = sols.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio));
 
     const kitAthenaTotal =
-  equips.filter(e => e.kit_athena_entregue).length +
-  sols.filter(s =>
-    s.kit_athena_entregue &&
-    s.status !== 'Inaugurada' &&
-    s.status !== 'Cancelada' &&
-    !municipiosComEquip.has(s.municipio)
-  ).length;
+      equips.filter(e => e.kit_athena_entregue).length +
+      sols.filter(s =>
+        s.kit_athena_entregue &&
+        s.status !== 'Inaugurada' &&
+        s.status !== 'Cancelada' &&
+        !municipiosComEquip.has(s.municipio)
+      ).length;
 
-// Qualificação: mesma lógica
-const qualificacaoTotal =
-  equips.filter(e => e.capacitacao_realizada).length +
-  sols.filter(s =>
-    s.capacitacao_realizada &&
-    s.status !== 'Inaugurada' &&
-    s.status !== 'Cancelada' &&
-    !municipiosComEquip.has(s.municipio)
-  ).length;
+    const qualificacaoTotal =
+      equips.filter(e => e.capacitacao_realizada).length +
+      sols.filter(s =>
+        s.capacitacao_realizada &&
+        s.status !== 'Inaugurada' &&
+        s.status !== 'Cancelada' &&
+        !municipiosComEquip.has(s.municipio)
+      ).length;
 
     const getSolics = (tipo: string) => sols.filter(
       s => s.tipo_equipamento === tipo && s.status !== 'Cancelada' && s.status !== 'Inaugurada'
     ).sort((a, b) => a.status.localeCompare(b.status));
 
     return {
-  cmb, cmc, cmm, lilasMunicipal, lilasEstado, lilasDelegacia, ddm,
-  equipsComPatrulha, solicsComPatrulha,
-  viats,
-  cmbSolics:             getSolics('Casa da Mulher Brasileira'),
-  cmcSolics:             getSolics('Casa da Mulher Cearense'),
-  cmmSolics:             getSolics('Casa da Mulher Municipal'),
-  lilasMunicipalSolics:  getSolics('Sala Lilás Municipal'),
-  lilasEstadoSolics:     getSolics('Sala Lilás Governo do Estado'),
-  lilasDelegaciaSolics:  getSolics('Sala Lilás em Delegacia'),
-  totalPatrulhas:        equipsComPatrulha.length + solicsComPatrulha.length,
-  totalViaturasPMCE:     viats.reduce((s, v) => s + v.quantidade, 0),
-  solicsAtivas:          sols.filter(s => s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
-  kitAthenaTotal,
-  qualificacaoTotal,
+      cmb, cmc, cmm, lilasMunicipal, lilasEstado, lilasDelegacia, ddm,
+      equipsComPatrulha, solicsComPatrulha,
+      viats,
+      cmbSolics:             getSolics('Casa da Mulher Brasileira'),
+      cmcSolics:             getSolics('Casa da Mulher Cearense'),
+      cmmSolics:             getSolics('Casa da Mulher Municipal'),
+      lilasMunicipalSolics:  getSolics('Sala Lilás Municipal'),
+      lilasEstadoSolics:     getSolics('Sala Lilás Governo do Estado'),
+      lilasDelegaciaSolics:  getSolics('Sala Lilás em Delegacia'),
+      totalPatrulhas:        equipsComPatrulha.length + solicsComPatrulha.length,
+      totalViaturasPMCE:     viats.reduce((s, v) => s + v.quantidade, 0),
+      solicsAtivas:          sols.filter(s => s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
+      kitAthenaTotal,
+      qualificacaoTotal,
     };
   }, [equipamentos, solicitacoes, viaturas, regiaoFiltro]);
 
-  // ── Contagens para o painel de config (sem filtro de região para dar contexto) ──
+  // ── Contagens para o painel de config ─────────────────────────────────────
   const contagens = useMemo((): Record<SecaoId, number> => ({
     cmb:           equipamentos.filter(e => e.tipo === 'Casa da Mulher Brasileira').length,
     cmc:           equipamentos.filter(e => e.tipo === 'Casa da Mulher Cearense').length,
@@ -511,7 +518,7 @@ const qualificacaoTotal =
 
   const dados = dadosFiltrados;
 
-  const handleExport = async () => {
+  const handleExport = async (resumo = false) => {
     setExporting(true);
     try {
       await new Promise(r => setTimeout(r, 50));
@@ -523,12 +530,28 @@ const qualificacaoTotal =
         regiaoFiltro:   regiaoFiltro === 'all' ? undefined : regiaoFiltro,
         secoesAtivas:   Array.from(secoesAtivas),
         mapaImagem:     incluirMapa && mapaCapturado ? mapaCapturado : undefined,
+        modoResumo:     resumo,
       });
-      toast.success('Relatório EVM exportado com sucesso!');
+      toast.success(resumo ? 'Resumo EVM exportado!' : 'Relatório EVM exportado com sucesso!');
     } catch {
       toast.error('Erro ao exportar o relatório');
     } finally {
       setExporting(false);
+    }
+  };
+  const handleDiagnostico = async () => {
+    setExportingDiag(true);
+    try {
+      await new Promise(r => setTimeout(r, 50));
+      exportDiagnosticoToPDF(equipamentos, solicitacoes, {
+        regiaoFiltro: regiaoFiltro === 'all' ? undefined : regiaoFiltro,
+        diasSemMovimento: 60,
+      });
+      toast.success('Diagnóstico de pendências exportado!');
+    } catch {
+      toast.error('Erro ao gerar diagnóstico');
+    } finally {
+      setExportingDiag(false);
     }
   };
 
@@ -557,22 +580,35 @@ const qualificacaoTotal =
         incluirMapa={incluirMapa}
         setIncluirMapa={setIncluirMapa}
       />
+      {/* Botão diagnóstico */}
+      <div className="flex justify-end mb-6">
+        <Button
+          variant="outline"
+          onClick={handleDiagnostico}
+          disabled={exportingDiag}
+          className="gap-2 border-red-300 text-red-700 hover:bg-red-50"
+        >
+          {exportingDiag
+            ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando...</>
+            : <><Download className="w-4 h-4" />Diagnóstico de Pendências</>}
+        </Button>
+      </div>
 
       {/* Cards de resumo executivo */}
       <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3 mb-8">
         {[
-          { label: 'CMB',          value: dados.cmb.length,           cor: 'bg-teal-500',    text: 'text-teal-700'    },
-          { label: 'CMC',          value: dados.cmc.length,           cor: 'bg-violet-500',  text: 'text-violet-700'  },
-          { label: 'CMM',          value: dados.cmm.length,           cor: 'bg-orange-500',  text: 'text-orange-700'  },
-          { label: 'S.L. Municipal',  value: dados.lilasMunicipal.length,  cor: 'bg-fuchsia-800', text: 'text-fuchsia-900' },
-          { label: 'S.L. Estado',     value: dados.lilasEstado.length,    cor: 'bg-fuchsia-500', text: 'text-fuchsia-700' },
-          { label: 'S.L. Delegacia',  value: dados.lilasDelegacia.length, cor: 'bg-fuchsia-300', text: 'text-fuchsia-600' },
-          { label: 'DDM',          value: dados.ddm.length,           cor: 'bg-green-700',   text: 'text-green-900'   },
-          { label: 'Patrulhas',    value: dados.totalPatrulhas,       cor: 'bg-cyan-500',    text: 'text-cyan-700'    },
-          { label: 'Viaturas',     value: dados.totalViaturasPMCE,    cor: 'bg-indigo-500',  text: 'text-indigo-700'  },
-          { label: 'Em andamento', value: dados.solicsAtivas.length,  cor: 'bg-amber-500',   text: 'text-amber-700'   },
-          { label: 'Kit Athena entregues',   value: dados.kitAthenaTotal,      cor: 'bg-amber-500',  text: 'text-amber-700'  },
-          { label: 'Qualificações realizadas', value: dados.qualificacaoTotal, cor: 'bg-emerald-500', text: 'text-emerald-700' },
+          { label: 'CMB',                value: dados.cmb.length,             cor: 'bg-teal-500',    text: 'text-teal-700'    },
+          { label: 'CMC',                value: dados.cmc.length,             cor: 'bg-violet-500',  text: 'text-violet-700'  },
+          { label: 'CMM',                value: dados.cmm.length,             cor: 'bg-orange-500',  text: 'text-orange-700'  },
+          { label: 'S.L. Municipal',     value: dados.lilasMunicipal.length,  cor: 'bg-fuchsia-800', text: 'text-fuchsia-900' },
+          { label: 'S.L. Estado',        value: dados.lilasEstado.length,     cor: 'bg-fuchsia-500', text: 'text-fuchsia-700' },
+          { label: 'S.L. Delegacia',     value: dados.lilasDelegacia.length,  cor: 'bg-fuchsia-300', text: 'text-fuchsia-600' },
+          { label: 'DDM',                value: dados.ddm.length,             cor: 'bg-green-700',   text: 'text-green-900'   },
+          { label: 'Patrulhas',          value: dados.totalPatrulhas,         cor: 'bg-cyan-500',    text: 'text-cyan-700'    },
+          { label: 'Viaturas',           value: dados.totalViaturasPMCE,      cor: 'bg-indigo-500',  text: 'text-indigo-700'  },
+          { label: 'Em andamento',       value: dados.solicsAtivas.length,    cor: 'bg-amber-500',   text: 'text-amber-700'   },
+          { label: 'Kit Athena entregues',     value: dados.kitAthenaTotal,      cor: 'bg-amber-500',   text: 'text-amber-700'   },
+          { label: 'Qualificações realizadas', value: dados.qualificacaoTotal,   cor: 'bg-emerald-500', text: 'text-emerald-700' },
         ].map(({ label, value, cor, text }) => (
           <motion.div
             key={label}
@@ -653,7 +689,7 @@ const qualificacaoTotal =
           )}
         </SectionCard>
 
-        {/* 4. Salas Lilás */}
+        {/* 4. Salas Lilás Municipal */}
         <SectionCard numero={4} titulo="Salas Lilás Municipal" cor="lilasMunicipal"
           funcionando={dados.lilasMunicipal.length} emAndamento={dados.lilasMunicipalSolics.length} delay={0.25}>
           {dados.lilasMunicipal.length > 0 ? (
@@ -668,7 +704,7 @@ const qualificacaoTotal =
           )}
         </SectionCard>
 
-                {/* 5. Salas Lilás Governo do Estado */}
+        {/* 5. Salas Lilás Governo do Estado */}
         <SectionCard numero={5} titulo="Salas Lilás Governo do Estado" cor="lilasEstado"
           funcionando={dados.lilasEstado.length} emAndamento={dados.lilasEstadoSolics.length} delay={0.3}>
           {dados.lilasEstado.length > 0 ? (
@@ -711,7 +747,7 @@ const qualificacaoTotal =
           ) : <EmptyState msg="Nenhuma DDM cadastrada." />}
         </SectionCard>
 
-        {/* 7. Patrulhas */}
+        {/* 8. Patrulhas */}
         <SectionCard numero={8} titulo="Patrulhas Maria da Penha" cor="patrulha"
           funcionando={dados.totalPatrulhas} emAndamento={0} delay={0.35}>
           {dados.equipsComPatrulha.length > 0 && (
@@ -739,7 +775,7 @@ const qualificacaoTotal =
           {dados.totalPatrulhas === 0 && <EmptyState msg="Nenhuma Patrulha Maria da Penha cadastrada." />}
         </SectionCard>
 
-        {/* 8. Viaturas PMCE */}
+        {/* 9. Viaturas PMCE */}
         <SectionCard numero={9} titulo="Viaturas PMCE" cor="viaturas"
           funcionando={dados.totalViaturasPMCE} emAndamento={0} delay={0.4}>
           {dados.viats.length > 0 ? (

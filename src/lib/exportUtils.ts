@@ -15,13 +15,17 @@ function ts(): string {
   const d = now.toLocaleDateString('pt-BR').split('/').reverse().join('-');
   const t = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }).replace(':', '-');
   return `${d}_${t}`;
+
+}
+/** Formata data string "YYYY-MM-DD" sem problema de timezone */
+function fmtDate(dateStr: string): string {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR');
 }
 
 /** Cabeçalho padrão EVM em todas as páginas de um PDF */
 function addPdfHeader(doc: jsPDF, title: string, subtitle?: string): number {
   const PW = doc.internal.pageSize.getWidth();
 
-  // Faixa azul no topo
   doc.setFillColor(31, 81, 140);
   doc.rect(0, 0, PW, 16, 'F');
 
@@ -73,7 +77,6 @@ function styleWorksheet(ws: XLSX.WorkSheet, headerColor = '1F518C'): void {
   if (!ws['!ref']) return;
   const range = XLSX.utils.decode_range(ws['!ref']);
 
-  // Auto-largura de colunas
   const colWidths: number[] = [];
   for (let C = range.s.c; C <= range.e.c; C++) {
     let maxLen = 10;
@@ -88,7 +91,6 @@ function styleWorksheet(ws: XLSX.WorkSheet, headerColor = '1F518C'): void {
   }
   ws['!cols'] = colWidths.map(w => ({ wch: w }));
 
-  // Cabeçalho em negrito com cor de fundo
   for (let C = range.s.c; C <= range.e.c; C++) {
     const addr = XLSX.utils.encode_cell({ r: 0, c: C });
     if (!ws[addr]) continue;
@@ -103,7 +105,6 @@ function styleWorksheet(ws: XLSX.WorkSheet, headerColor = '1F518C'): void {
     };
   }
 
-  // Zebra nas linhas de dados
   for (let R = 1; R <= range.e.r; R++) {
     const bg = R % 2 === 0 ? 'EEF2FA' : 'FFFFFF';
     for (let C = range.s.c; C <= range.e.c; C++) {
@@ -421,7 +422,6 @@ export function exportAllRegionsToPDF(regionStats: RegionStatsExport[], equipame
 export function exportAllRegionsToExcel(regionStats: RegionStatsExport[], equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
   const wb = XLSX.utils.book_new();
 
-  // Aba 1 - Resumo por região
   const summaryData = regionStats.map((r, idx) => ({
     'Posição': idx + 1,
     'Região': r.regiao,
@@ -439,7 +439,6 @@ export function exportAllRegionsToExcel(regionStats: RegionStatsExport[], equipa
   styleWorksheet(summaryWs, '1F518C');
   XLSX.utils.book_append_sheet(wb, summaryWs, 'Resumo Regiões');
 
-  // Aba 2 - Equipamentos completos (todas as regiões)
   const allEqData = equipamentos.map(e => ({
     'Município': e.municipio,
     'Região': getRegiao(e.municipio) || '',
@@ -454,7 +453,6 @@ export function exportAllRegionsToExcel(regionStats: RegionStatsExport[], equipa
   styleWorksheet(allEqWs, '0D9488');
   XLSX.utils.book_append_sheet(wb, allEqWs, 'Equipamentos');
 
-  // Aba 3 - Viaturas completas (todas as regiões)
   const allVData = viaturas.map(v => ({
     'Município': v.municipio,
     'Região': getRegiao(v.municipio) || '',
@@ -469,7 +467,6 @@ export function exportAllRegionsToExcel(regionStats: RegionStatsExport[], equipa
   styleWorksheet(allVWs, '7C3AED');
   XLSX.utils.book_append_sheet(wb, allVWs, 'Viaturas PMCE');
 
-  // Aba 4 - Solicitações completas (todas as regiões)
   const allSData = solicitacoes.map(s => ({
     'Município': s.municipio,
     'Região': getRegiao(s.municipio) || '',
@@ -480,7 +477,7 @@ export function exportAllRegionsToExcel(regionStats: RegionStatsExport[], equipa
     'Guarda Municipal': s.guarda_municipal_estruturada ? 'Sim' : 'Não',
     'Recebeu Patrulha': s.recebeu_patrulha ? 'Sim' : 'Não',
     'Kit Athena': s.kit_athena_entregue ? 'Sim' : 'Não',
-    'Capacitação': s.capacitacao_realizada ? 'Sim' : 'Não',
+    'Qualificação': s.capacitacao_realizada ? 'Sim' : 'Não',
     'Observações': s.observacoes || '',
   }));
   const allSWs = XLSX.utils.json_to_sheet(allSData);
@@ -590,7 +587,7 @@ export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[], filterRegia
   doc.text(`Total: ${solicitacoes.length} registros${filterRegiao && filterRegiao !== 'all' ? ` — Região: ${filterRegiao}` : ''}`, 14, startY);
   doc.setTextColor(0, 0, 0);
   autoTable(doc, {
-    head: [['Município', 'Região', 'Tipo', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Capacitação']],
+    head: [['Município', 'Região', 'Tipo', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Qualificação']],
     body: solicitacoes.map(s => [s.municipio, getRegiao(s.municipio) || '-', s.tipo_equipamento, s.status, new Date(s.data_solicitacao + 'T00:00:00').toLocaleDateString('pt-BR'), s.nup || '-', s.guarda_municipal_estruturada ? 'Sim' : 'Não', s.recebeu_patrulha ? 'Sim' : 'Não', s.kit_athena_entregue ? 'Sim' : 'Não', s.capacitacao_realizada ? 'Sim' : 'Não']),
     startY: startY + 6,
     styles: { fontSize: 6.5 },
@@ -602,7 +599,7 @@ export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[], filterRegia
 }
 
 export function exportSolicitacoesToExcel(solicitacoes: Solicitacao[]) {
-  const data = solicitacoes.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Status': s.status, 'Data da Solicitação': new Date(s.data_solicitacao).toLocaleDateString('pt-BR'), 'NUP': s.nup || '', 'Guarda Municipal Estruturada': s.guarda_municipal_estruturada ? 'Sim' : 'Não', 'Recebeu Patrulha': s.recebeu_patrulha ? 'Sim' : 'Não', 'Kit Athena Entregue': s.kit_athena_entregue ? 'Sim' : 'Não', 'Capacitação Realizada': s.capacitacao_realizada ? 'Sim' : 'Não', 'Observações': s.observacoes || '' }));
+  const data = solicitacoes.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Status': s.status, 'Data da Solicitação': new Date(s.data_solicitacao).toLocaleDateString('pt-BR'), 'NUP': s.nup || '', 'Guarda Municipal Estruturada': s.guarda_municipal_estruturada ? 'Sim' : 'Não', 'Recebeu Patrulha': s.recebeu_patrulha ? 'Sim' : 'Não', 'Kit Athena Entregue': s.kit_athena_entregue ? 'Sim' : 'Não', 'Qualificação Realizada': s.capacitacao_realizada ? 'Sim' : 'Não', 'Observações': s.observacoes || '' }));
   const wb = XLSX.utils.book_new();
   const sWs2 = XLSX.utils.json_to_sheet(data);
   styleWorksheet(sWs2, 'EA580C');
@@ -697,14 +694,13 @@ export function exportAllToPDF(equipamentos: Equipamento[], viaturas: Viatura[],
   doc.setFontSize(12);
   doc.text('Solicitações:', 14, currentY);
   autoTable(doc, {
-    head: [['Município', 'Região', 'Tipo', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Capacitação']],
+    head: [['Município', 'Região', 'Tipo', 'Status', 'Data', 'NUP', 'Guarda', 'Patrulha', 'Kit Athena', 'Qualificação']],
     body: solicitacoes.map(s => [s.municipio, getRegiao(s.municipio) || '-', s.tipo_equipamento, s.status, new Date(s.data_solicitacao + 'T00:00:00').toLocaleDateString('pt-BR'), s.nup || '-', s.guarda_municipal_estruturada ? 'Sim' : 'Não', s.recebeu_patrulha ? 'Sim' : 'Não', s.kit_athena_entregue ? 'Sim' : 'Não', s.capacitacao_realizada ? 'Sim' : 'Não']),
     startY: currentY + 5,
     styles: { fontSize: 6.5 },
     headStyles: { fillColor: [31, 81, 140] },
   });
 
-  // Atividades
   if (atividades.length > 0) {
     doc.addPage(); currentY = 22;
     doc.setFontSize(12);
@@ -735,17 +731,15 @@ export function exportAllToExcel(equipamentos: Equipamento[], viaturas: Viatura[
   const patrulhasEquip = equipamentos.filter(e => e.possui_patrulha);
   const municipiosComPatrulhaEquip = new Set(patrulhasEquip.map(e => e.municipio));
   const patrulhasSolic = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([...patrulhasEquip.map(e => ({ 'Município': e.municipio, 'Região': getRegiao(e.municipio) || '', 'Tipo de Equipamento': e.tipo, 'Origem': 'Equipamento', 'Status': '-', 'Endereço': e.endereco || '', 'Responsável': e.responsavel || '', 'Telefone': e.telefone || '', 'Kit Athena': e.kit_athena_entregue ? 'Sim' : 'Não', 'Capacitação': e.capacitacao_realizada ? 'Sim' : 'Não', 'NUP': e.nup || '', 'Observações': e.observacoes || '', 'Data Criação': new Date(e.created_at).toLocaleDateString('pt-BR') })), ...patrulhasSolic.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Origem': 'Solicitação', 'Status': s.status, 'Endereço': '', 'Responsável': '', 'Telefone': '', 'Observações': s.observacoes || '', 'Data Criação': new Date(s.created_at).toLocaleDateString('pt-BR') }))]), 'Patrulhas Casas');
-  // Planilhas separadas por tipo de Sala Lilás
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([...patrulhasEquip.map(e => ({ 'Município': e.municipio, 'Região': getRegiao(e.municipio) || '', 'Tipo de Equipamento': e.tipo, 'Origem': 'Equipamento', 'Status': '-', 'Endereço': e.endereco || '', 'Responsável': e.responsavel || '', 'Telefone': e.telefone || '', 'Kit Athena': e.kit_athena_entregue ? 'Sim' : 'Não', 'Qualificação': e.capacitacao_realizada ? 'Sim' : 'Não', 'NUP': e.nup || '', 'Observações': e.observacoes || '', 'Data Criação': new Date(e.created_at).toLocaleDateString('pt-BR') })), ...patrulhasSolic.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Origem': 'Solicitação', 'Status': s.status, 'Endereço': '', 'Responsável': '', 'Telefone': '', 'Observações': s.observacoes || '', 'Data Criação': new Date(s.created_at).toLocaleDateString('pt-BR') }))]), 'Patrulhas Casas');
   const lilasMunicipalEquip  = equipamentos.filter(e => e.tipo === 'Sala Lilás Municipal');
   const lilasEstadoEquip     = equipamentos.filter(e => e.tipo === 'Sala Lilás Governo do Estado');
   const lilasDelegaciaEquip  = equipamentos.filter(e => e.tipo === 'Sala Lilás em Delegacia');
-  const toEquipRow = (e: typeof equipamentos[0]) => ({ 'Município': e.municipio, 'Região': getRegiao(e.municipio) || '', 'Tipo': e.tipo, 'Endereço': e.endereco || '', 'Responsável': e.responsavel || '', 'Telefone': e.telefone || '', 'Kit Athena': e.kit_athena_entregue ? 'Sim' : 'Não', 'Capacitação': e.capacitacao_realizada ? 'Sim' : 'Não', 'NUP': e.nup || '', 'Observações': e.observacoes || '' });
+  const toEquipRow = (e: typeof equipamentos[0]) => ({ 'Município': e.municipio, 'Região': getRegiao(e.municipio) || '', 'Tipo': e.tipo, 'Endereço': e.endereco || '', 'Responsável': e.responsavel || '', 'Telefone': e.telefone || '', 'Kit Athena': e.kit_athena_entregue ? 'Sim' : 'Não', 'Qualificação': e.capacitacao_realizada ? 'Sim' : 'Não', 'NUP': e.nup || '', 'Observações': e.observacoes || '' });
   if (lilasMunicipalEquip.length)  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lilasMunicipalEquip.map(toEquipRow)),  'Salas Lilás Municipal');
   if (lilasEstadoEquip.length)     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lilasEstadoEquip.map(toEquipRow)),    'Salas Lilás Estado');
   if (lilasDelegaciaEquip.length)  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lilasDelegaciaEquip.map(toEquipRow)), 'Salas Lilás Delegacia');
-
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(solicitacoes.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Status': s.status, 'Data da Solicitação': new Date(s.data_solicitacao + 'T00:00:00').toLocaleDateString('pt-BR'), 'NUP': s.nup || '', 'Guarda Municipal Estruturada': s.guarda_municipal_estruturada ? 'Sim' : 'Não', 'Recebeu Patrulha': s.recebeu_patrulha ? 'Sim' : 'Não', 'Kit Athena Entregue': s.kit_athena_entregue ? 'Sim' : 'Não', 'Capacitação Realizada': s.capacitacao_realizada ? 'Sim' : 'Não', 'Observações': s.observacoes || '' }))), 'Solicitações');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(solicitacoes.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Status': s.status, 'Data da Solicitação': new Date(s.data_solicitacao + 'T00:00:00').toLocaleDateString('pt-BR'), 'NUP': s.nup || '', 'Guarda Municipal Estruturada': s.guarda_municipal_estruturada ? 'Sim' : 'Não', 'Recebeu Patrulha': s.recebeu_patrulha ? 'Sim' : 'Não', 'Kit Athena Entregue': s.kit_athena_entregue ? 'Sim' : 'Não', 'Qualificação Realizada': s.capacitacao_realizada ? 'Sim' : 'Não', 'Observações': s.observacoes || '' }))), 'Solicitações');
   if (atividades.length > 0) {
     const atividadesWs = XLSX.utils.json_to_sheet(atividades.map(a => ({
       'Município': a.municipio, 'Sede (CMB/CMC)': a.municipio_sede,
@@ -805,34 +799,22 @@ export function exportRegionalGoalsToPDF(payload: RegionalGoalsExportPayload) {
   doc.save(`metas-regionais-${payload.monthLabel.toLowerCase().replace(/\s+/g, '-')}_${ts()}.pdf`);
 }
 
-// Captured map image data type
 export interface CapturedMapImage {
   dataUrl: string;
   width: number;
   height: number;
 }
 
-// Capture map image for preview
-// FIX: scroll the element to the top of the viewport before capturing,
-// then pass scrollX:0/scrollY:0 so html2canvas captures it without offset.
 export async function captureMapImage(
   mapElement: HTMLElement,
   highResolution: boolean = false
 ): Promise<CapturedMapImage> {
   const html2canvasLib = (await import('html2canvas')).default;
-
-  // Save current scroll position
   const originalScrollY = window.scrollY;
-
-  // Scroll so the map is flush with the top of the viewport
   const elementTop = mapElement.getBoundingClientRect().top + window.scrollY;
   window.scrollTo({ top: elementTop, behavior: 'instant' });
-
-  // Wait for repaint + tile re-render after scroll
   await new Promise(resolve => setTimeout(resolve, 1200));
-
   const scale = highResolution ? 3 : 2;
-
   const canvas = await html2canvasLib(mapElement, {
     useCORS: true,
     allowTaint: true,
@@ -841,7 +823,6 @@ export async function captureMapImage(
     backgroundColor: '#f8fafc',
     width: mapElement.offsetWidth,
     height: mapElement.offsetHeight,
-    // After scrolling to the element, it sits at top of viewport → no offset needed
     scrollX: 0,
     scrollY: 0,
     foreignObjectRendering: false,
@@ -851,8 +832,6 @@ export async function captureMapImage(
       clonedElement.style.position = 'relative';
       clonedElement.style.left = '0';
       clonedElement.style.top = '0';
-
-      // Ensure SVG path fills are preserved in the clone
       const paths = _clonedDoc.querySelectorAll('path');
       paths.forEach(path => {
         const fill = path.getAttribute('fill');
@@ -862,10 +841,7 @@ export async function captureMapImage(
       });
     },
   });
-
-  // Restore original scroll position
   window.scrollTo({ top: originalScrollY, behavior: 'instant' });
-
   return {
     dataUrl: canvas.toDataURL('image/png', 1.0),
     width: canvas.width,
@@ -882,21 +858,16 @@ export async function exportMapToPDF(
   preCapturedImage?: CapturedMapImage
 ) {
   const { highResolution = false, embedLegend = false } = options;
-
-  // ── Page 1: capa com filtros e estatísticas ──
   const doc = new jsPDF('landscape');
-  const PW = doc.internal.pageSize.getWidth();   // 297mm
-  const PH = doc.internal.pageSize.getHeight();  // 210mm
+  const PW = doc.internal.pageSize.getWidth();
+  const PH = doc.internal.pageSize.getHeight();
 
-  doc.setFontSize(16);
-  doc.setFont(undefined, 'bold');
-  doc.text('Mapa do Ceará — EVM', 14, 18);
-  doc.setFont(undefined, 'normal');
+  doc.setFontSize(16); doc.setFont(undefined, 'bold');
+  doc.text('Mapa do Ceará — EVM', 14, 18); doc.setFont(undefined, 'normal');
   doc.setFontSize(9);
   doc.text('Enfrentamento à Violência contra as Mulheres', 14, 25);
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 31);
 
-  // Filtros
   doc.setFontSize(11); doc.setFont(undefined, 'bold');
   doc.text('Filtros Aplicados', 14, 44); doc.setFont(undefined, 'normal');
   doc.setFontSize(9);
@@ -905,7 +876,6 @@ export async function exportMapToPDF(
   doc.text(`Status de Solicitação: ${filters.statusSolicitacao === 'all' ? 'Todos' : filters.statusSolicitacao}`, 14, 63);
   doc.text(`Apenas com Viatura: ${filters.apenasComViatura ? 'Sim' : 'Não'}`, 14, 69);
 
-  // Estatísticas
   doc.setFontSize(11); doc.setFont(undefined, 'bold');
   doc.text('Estatísticas', 14, 82); doc.setFont(undefined, 'normal');
   doc.setFontSize(9);
@@ -918,7 +888,6 @@ export async function exportMapToPDF(
     ['Sala Lilás Gov. Estado',     String(equipmentCounts?.lilasEstado     ?? stats.lilasEstado)],
     ['Sala Lilás em Delegacia',    String(equipmentCounts?.lilasDelegacia  ?? stats.lilasDelegacia)],
     ['DDM',                       String(equipmentCounts?.ddm             ?? stats.ddm)],
-
     ['Só Viatura (sem equipamento)', String(stats.viaturaOnly)],
     ['Sem Cobertura',             String(stats.semCobertura)],
     ['Cobertura Total (%)',       `${(totalComEquipamento / 184 * 100).toFixed(2)}% (${totalComEquipamento}/184)`],
@@ -930,56 +899,35 @@ export async function exportMapToPDF(
     doc.setFont(undefined, 'normal');
   });
 
-  // ── Page 2: mapa grande e centralizado ──
   doc.addPage();
-
   const captured = preCapturedImage ?? await captureMapImage(mapElement, highResolution);
   const imgAspect = captured.width / captured.height;
-
-  // Margens
   const margin = 10;
-  const headerH = 12; // espaço para título no topo
+  const headerH = 12;
   const footerH = 8;
   const availW = PW - margin * 2;
   const availH = PH - margin * 2 - headerH - footerH;
-
-  // Calcular dimensões mantendo aspect ratio, ocupando o máximo possível
   let imgW = availW;
   let imgH = imgW / imgAspect;
-  if (imgH > availH) {
-    imgH = availH;
-    imgW = imgH * imgAspect;
-  }
-
-  // Centralizar na página
+  if (imgH > availH) { imgH = availH; imgW = imgH * imgAspect; }
   const imgX = margin + (availW - imgW) / 2;
   const imgY = margin + headerH;
-
-  // Título da página
   doc.setFontSize(10); doc.setFont(undefined, 'bold');
   doc.text('Mapa de Cobertura — Estado do Ceará', PW / 2, margin + 7, { align: 'center' });
   doc.setFont(undefined, 'normal');
-
-  // Imagem do mapa
   doc.addImage(captured.dataUrl, 'PNG', imgX, imgY, imgW, imgH);
-
-  // Rodapé
   doc.setFontSize(7); doc.setTextColor(120, 120, 120);
   doc.text(`Cobertura: ${(totalComEquipamento / 184 * 100).toFixed(1)}% — ${totalComEquipamento} de 184 municípios com equipamento`, PW / 2, imgY + imgH + 5, { align: 'center' });
   doc.setTextColor(0, 0, 0);
 
-  // Legenda sobreposta (canto inferior direito da imagem)
   if (embedLegend) {
     const lgW = 62, lgH = 62;
     const lgX = imgX + imgW - lgW - 3;
     const lgY = imgY + imgH - lgH - 3;
-
     doc.setFillColor(255, 255, 255); doc.setDrawColor(180, 180, 180);
     doc.roundedRect(lgX, lgY, lgW, lgH, 2, 2, 'FD');
-
     doc.setFontSize(7); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
     doc.text('Legenda', lgX + 3, lgY + 6); doc.setFont(undefined, 'normal');
-
     const legendItems = [
       { color: [13, 148, 136]  as [number,number,number], label: 'C.M. Brasileira',  count: equipmentCounts?.brasileira ?? stats.brasileira },
       { color: [124, 58, 237]  as [number,number,number], label: 'C.M. Cearense',    count: equipmentCounts?.cearense   ?? stats.cearense   },
@@ -1009,92 +957,53 @@ export async function exportMapToPDF(
 export function exportAtividadesToPDF(atividades: Atividade[], filterLabel?: string) {
   const doc = new jsPDF('landscape');
   let startY = addPdfHeader(doc, 'Atividades', 'Relatório de Atividades');
-
   doc.setFontSize(9); doc.setTextColor(80, 80, 80);
-  doc.text(
-    `Total: ${atividades.length} registro(s)${filterLabel ? ` — ${filterLabel}` : ''}`,
-    14, startY,
-  );
+  doc.text(`Total: ${atividades.length} registro(s)${filterLabel ? ` — ${filterLabel}` : ''}`, 14, startY);
   doc.setTextColor(0, 0, 0);
-
   const realizadas = atividades.filter(a => a.status === 'Realizado').length;
   const agendadas  = atividades.filter(a => a.status === 'Agendado').length;
   const totalAtend = atividades.reduce((s, a) => s + (a.atendimentos ?? 0), 0);
-
   startY += 5;
   doc.setFontSize(8);
   doc.text(`Realizadas: ${realizadas}  |  Agendadas: ${agendadas}  |  Total de atendimentos: ${totalAtend}`, 14, startY);
   startY += 8;
-
-  // Agrupar por sede e gerar uma tabela por grupo
   const sedes = Array.from(new Set(atividades.map(a => a.municipio_sede))).sort();
-
   sedes.forEach((sede, idx) => {
     const grupo = atividades.filter(a => a.municipio_sede === sede);
     const atendSede = grupo.reduce((s, a) => s + (a.atendimentos ?? 0), 0);
-
-    // Título do grupo
     doc.setFontSize(10); doc.setFont(undefined, 'bold');
     doc.setTextColor(124, 58, 237);
     doc.text(`${sede}`, 14, startY);
     doc.setFont(undefined, 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
     doc.text(`${grupo.length} atividade(s) | ${atendSede} atendimento(s)`, 14, startY + 5);
     doc.setTextColor(0, 0, 0);
-
     autoTable(doc, {
       head: [['Município', 'Região', 'Tipo', 'Recurso', 'Data', 'Dias', 'Horário', 'Status', 'Atend.', 'NUP', 'Evento']],
-      body: grupo.map(a => [
-        a.municipio,
-        getRegiao(a.municipio) || '-',
-        a.tipo,
-        a.recurso,
-        new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR'),
-        a.dias?.toString() || '-',
-        a.horario || '-',
-        a.status,
-        a.atendimentos?.toString() || '-',
-        a.nup || '-',
-        a.nome_evento || '-',
-      ]),
+      body: grupo.map(a => [a.municipio, getRegiao(a.municipio) || '-', a.tipo, a.recurso, new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR'), a.dias?.toString() || '-', a.horario || '-', a.status, a.atendimentos?.toString() || '-', a.nup || '-', a.nome_evento || '-']),
       startY: startY + 9,
       styles: { fontSize: 6.5 },
       headStyles: { fillColor: [124, 58, 237] },
       alternateRowStyles: { fillColor: [245, 243, 255] },
     });
-
     startY = (doc as any).lastAutoTable.finalY + 10;
-
-    // Nova página entre sedes (exceto na última)
     if (idx < sedes.length - 1 && startY > 160) {
       doc.addPage();
       startY = addPdfHeader(doc, 'Atividades', 'Relatório de Atividades (cont.)') + 5;
     }
   });
-
   addPdfFooters(doc);
   doc.save(`atividades_${ts()}.pdf`);
 }
 
 export function exportAtividadesToExcel(atividades: Atividade[]) {
   const data = atividades.map(a => ({
-    'Município':           a.municipio,
-    'Região':              getRegiao(a.municipio) || '',
-    'Sede (CMB/CMC)':     a.municipio_sede,
-    'Tipo':                a.tipo,
-    'Recurso':             a.recurso,
-    'Qtd. Equipe':         a.quantidade_equipe ?? '',
-    'Status':              a.status,
-    'Data':                new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR'),
-    'Duração (dias)':      a.dias ?? '',
-    'Horário':             a.horario || '',
-    'Atendimentos':        a.atendimentos ?? '',
-    'NUP':                 a.nup || '',
-    'Nome do Evento':      a.nome_evento || '',
-    'Endereço / Tel':      a.endereco || '',
-    'Observações':         a.observacoes || '',
-    'Data de Criação':     new Date(a.created_at).toLocaleDateString('pt-BR'),
+    'Município': a.municipio, 'Região': getRegiao(a.municipio) || '', 'Sede (CMB/CMC)': a.municipio_sede,
+    'Tipo': a.tipo, 'Recurso': a.recurso, 'Qtd. Equipe': a.quantidade_equipe ?? '',
+    'Status': a.status, 'Data': new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR'),
+    'Duração (dias)': a.dias ?? '', 'Horário': a.horario || '', 'Atendimentos': a.atendimentos ?? '',
+    'NUP': a.nup || '', 'Nome do Evento': a.nome_evento || '', 'Endereço / Tel': a.endereco || '',
+    'Observações': a.observacoes || '', 'Data de Criação': new Date(a.created_at).toLocaleDateString('pt-BR'),
   }));
-
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
   styleWorksheet(ws, '7C3AED');
@@ -1110,23 +1019,21 @@ export interface CpdiReportData {
   equipamentos: Equipamento[];
   solicitacoes: Solicitacao[];
   viaturas: Viatura[];
-  dataReferencia?: string;  // 'YYYY-MM-DD' — padrão: hoje
-  regiaoFiltro?: string;    // filtra por região; undefined = todas
-  secoesAtivas?: string[];  // seções a incluir; undefined = todas
-  mapaImagem?: CapturedMapImage; // captura do mapa para embutir como página extra
+  dataReferencia?: string;
+  regiaoFiltro?: string;
+  secoesAtivas?: string[];
+  mapaImagem?: CapturedMapImage;
+  modoResumo?: boolean; // true = apenas resumo executivo + equipamentos em funcionamento (sem solicitações)
 }
 
 export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
-  const { equipamentos: eqAll, solicitacoes: solAll, viaturas: viAll, dataReferencia, regiaoFiltro, secoesAtivas, mapaImagem } = data;
+  const { equipamentos: eqAll, solicitacoes: solAll, viaturas: viAll, dataReferencia, regiaoFiltro, secoesAtivas, mapaImagem, modoResumo = false } = data;
 
-  // ── Aplicar filtro de região ───────────────────────────────────────────────
-  const inclui = (regiao?: string | null) =>
-    !regiaoFiltro || !regiao || regiao === regiaoFiltro;
+  const inclui = (regiao?: string | null) => !regiaoFiltro || !regiao || regiao === regiaoFiltro;
   const equipamentos  = eqAll.filter(e => inclui(getRegiao(e.municipio)));
   const solicitacoes  = solAll.filter(s => inclui(getRegiao(s.municipio)));
   const viaturas      = viAll.filter(v  => inclui(getRegiao(v.municipio)));
 
-  // ── Verificar se seção deve ser incluída ─────────────────────────────────
   const temSecao = (id: string) => !secoesAtivas || secoesAtivas.includes(id);
   const refDate = dataReferencia ? new Date(dataReferencia + 'T00:00:00') : new Date();
   const doc = new jsPDF();
@@ -1136,7 +1043,6 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
   doc.setFillColor(31, 81, 140);
   doc.rect(0, 0, PW, 55, 'F');
 
-  // Carregar logo do projeto (public/logo.png)
   try {
     const res = await fetch('/logo.png');
     if (res.ok) {
@@ -1146,13 +1052,9 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
       });
-      // Centralizar logo: largura máx 36mm, altura proporcional
-      const logoW = 64;
-      const logoH = 18;
-      doc.addImage(logoB64, 'PNG', (PW - logoW) / 2, 6, logoW, logoH, undefined, 'FAST');
+      doc.addImage(logoB64, 'PNG', (PW - 64) / 2, 6, 64, 18, undefined, 'FAST');
     }
   } catch (_) {
-    // fallback: círculo decorativo se logo não carregar
     doc.setFillColor(255, 255, 255);
     doc.circle(PW / 2, 15, 8, 'F');
     doc.setFillColor(31, 81, 140);
@@ -1160,16 +1062,13 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
   }
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
-  doc.setFont(undefined, 'bold');
+  doc.setFontSize(16); doc.setFont(undefined, 'bold');
   doc.text('RELATÓRIO DA REDE DE PROTEÇÃO', PW / 2, 38, { align: 'center' });
-  doc.setFontSize(10);
-  doc.setFont(undefined, 'normal');
+  doc.setFontSize(10); doc.setFont(undefined, 'normal');
   doc.text('Secretaria das Mulheres do Estado do Ceará', PW / 2, 45, { align: 'center' });
   doc.text('Enfrentamento à Violência contra as Mulheres — EVM', PW / 2, 51, { align: 'center' });
   doc.setTextColor(0, 0, 0);
-  doc.setFontSize(9);
-  doc.setTextColor(100, 100, 100);
+  doc.setFontSize(9); doc.setTextColor(100, 100, 100);
   doc.text(
     `Data de referência: ${refDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${regiaoFiltro ? ' | Região: ' + regiaoFiltro : ''}`,
     PW / 2, 62, { align: 'center' }
@@ -1193,15 +1092,13 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
   const totalViaturasPMCE = viaturas.reduce((s, v) => s + v.quantidade, 0);
   const solicsAtivas      = solicitacoes.filter(s => s.status !== 'Cancelada' && s.status !== 'Inaugurada');
 
-  // ── Resumo executivo — 9 cards ────────────────────────────────────────────
+  // ── Resumo executivo ──────────────────────────────────────────────────────
   let y = 72;
-  doc.setFontSize(12);
-  doc.setFont(undefined, 'bold');
+  doc.setFontSize(12); doc.setFont(undefined, 'bold');
   doc.text('Resumo Executivo', 14, y);
   doc.setFont(undefined, 'normal');
   y += 2;
-  doc.setDrawColor(31, 81, 140);
-  doc.setLineWidth(0.5);
+  doc.setDrawColor(31, 81, 140); doc.setLineWidth(0.5);
   doc.line(14, y, PW - 14, y);
   y += 6;
 
@@ -1212,7 +1109,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     { label: 'Salas Lilás Municipal',             valor: lilasMunicipal.length,  cor: [192,38,211]  },
     { label: 'Salas Lilás Gov. Estado',          valor: lilasEstado.length,     cor: [217,70,239]  },
     { label: 'Salas Lilás em Delegacia',         valor: lilasDelegacia.length,  cor: [240,171,252] },
-    { label: 'DDM — Delegacia de Defesa da Mulher',    valor: ddm.length,             cor: [21,128,61]   },
+    { label: 'DDM — Delegacia de Defesa da Mulher', valor: ddm.length,          cor: [21,128,61]   },
     { label: 'Qualificações realizadas',
       valor: (() => { const ms = new Set(equipamentos.map(e => e.municipio)); return equipamentos.filter(e => e.capacitacao_realizada).length + solicitacoes.filter(s => s.capacitacao_realizada && s.status !== 'Inaugurada' && s.status !== 'Cancelada' && !ms.has(s.municipio)).length; })(),
       cor: [16,185,129] },
@@ -1225,7 +1122,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     { label: 'Patrulhas Maria da Penha',         valor: totalPatrulhas,       cor: [6,182,212]   },
     { label: 'Viaturas PMCE',                    valor: totalViaturasPMCE,    cor: [99,102,241]  },
     { label: 'Solicitações em andamento',        valor: solicsAtivas.length,  cor: [251,146,60]  },
-    { label: 'Total de Equipamentos',            valor: totalEquipamentos,    cor: [75,85,99]    }, 
+    { label: 'Total de Equipamentos',            valor: totalEquipamentos,    cor: [75,85,99]    },
   ];
 
   const cardW = (PW - 28 - 6) / 2;
@@ -1239,12 +1136,10 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     doc.roundedRect(cx, cy, 4, cardH, 1, 1, 'F');
     doc.setFillColor(248, 250, 252);
     doc.roundedRect(cx + 4, cy, cardW - 4, cardH, 1, 1, 'F');
-    doc.setFontSize(18);
-    doc.setFont(undefined, 'bold');
+    doc.setFontSize(18); doc.setFont(undefined, 'bold');
     doc.setTextColor(item.cor[0], item.cor[1], item.cor[2]);
     doc.text(String(item.valor), cx + cardW - 6, cy + 10, { align: 'right' });
-    doc.setFontSize(7.5);
-    doc.setFont(undefined, 'normal');
+    doc.setFontSize(7.5); doc.setFont(undefined, 'normal');
     doc.setTextColor(60, 60, 60);
     doc.text(item.label, cx + 8, cy + 5.5);
     doc.setTextColor(0, 0, 0);
@@ -1252,39 +1147,104 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
 
   y += Math.ceil(resumoItems.length / 2) * (cardH + 4) + 8;
 
-  // ── Helper: cabeçalho de seção ────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
   function addSecHeader(title: string, color: [number,number,number], yPos: number): number {
     if (yPos > 245) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
     doc.setFillColor(color[0], color[1], color[2]);
     doc.roundedRect(14, yPos, PW - 28, 8, 1.5, 1.5, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont(undefined, 'bold');
     doc.text(title, 18, yPos + 5.5);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0); doc.setFont(undefined, 'normal');
     return yPos + 12;
   }
 
-  // ── Helper: nota em itálico ────────────────────────────────────────────────
   function addNote(note: string, yPos: number): number {
-    doc.setFontSize(7.5);
-    doc.setTextColor(120, 120, 120);
-    doc.setFont(undefined, 'italic');
+    doc.setFontSize(7.5); doc.setTextColor(120, 120, 120); doc.setFont(undefined, 'italic');
     const lines = doc.splitTextToSize(note, PW - 28) as string[];
     doc.text(lines, 14, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
     return yPos + lines.length * 4 + 3;
   }
 
-  // ── Helper: tabela de equipamentos + solicitações ─────────────────────────
+  // ── tableEquip ────────────────────────────────────────────────────────────
+  // Todas as tabelas de equipamentos usam as MESMAS larguras absolutas (182mm total).
+  // A diferença entre variantes é apenas quais colunas de status aparecem no final.
+  //
+  // Variante A (semPatrulha + semKitAthena): CMB, CMC, DDM
+  //   Município(40) | Região(28) | Endereço(72) | Responsável(42)  = 182mm
+  // Variante B (semPatrulha, com Kit Athena): Salas Lilás
+  //   Município(36) | Região(26) | Endereço(62) | Responsável(36) | Kit Athena(11) | Qualificação(11) = 182mm
+  // Variante C (padrão, com Patrulha + Kit Athena): CMM
+  //   Município(34) | Região(24) | Endereço(56) | Responsável(34) | Patrulha(11) | KitAthena(11) | Qualif(12) = 182mm
+  //
+  // No modoResumo a tabela é ainda mais compacta: só Município | Região | Endereço
   function tableEquip(
     items: Equipamento[],
     yPos: number,
     hColor: [number,number,number],
     solics?: Solicitacao[],
+    opcoes?: { semPatrulha?: boolean; semKitAthena?: boolean },
   ): number {
+    const semPatrulha  = opcoes?.semPatrulha  ?? false;
+    const semKitAthena = opcoes?.semKitAthena ?? false;
+
+    // Modo resumo: tabela mínima Município | Região | Endereço
+    if (modoResumo) {
+      if (items.length === 0) {
+        doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+        doc.text('Nenhuma unidade em funcionamento.', 18, yPos);
+        doc.setTextColor(0, 0, 0); return yPos + 8;
+      }
+      if (yPos > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
+      autoTable(doc, {
+        head: [['Município','Região','Endereço']],
+        body: items.map(e => [e.municipio, getRegiao(e.municipio) || '—', e.endereco || '—']),
+        startY: yPos,
+        styles: { fontSize: 7, cellPadding: 2.5 },
+        headStyles: { fillColor: hColor, textColor: [255,255,255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248,250,252] },
+        columnStyles: { 0:{cellWidth:50},1:{cellWidth:42},2:{cellWidth:90} },
+        margin: { left: 14, right: 14, top: 32 },
+        didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
+      });
+      return (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // Modo completo
+    const headEquip =
+      semPatrulha && semKitAthena
+        ? [['Município','Região','Endereço','Responsável']]
+        : semPatrulha
+        ? [['Município','Região','Endereço','Responsável','Kit Athena','Qualificação']]
+        : [['Município','Região','Endereço','Responsável','Patrulha M.P.','Kit Athena','Qualificação']];
+
+    // Larguras padronizadas: todas somam 182mm (margens left=14 right=14 em A4=210mm)
+    // Colunas de status com mínimo 20mm para evitar quebra de linha
+    const colEquip =
+      semPatrulha && semKitAthena
+        ? { 0:{cellWidth:40},1:{cellWidth:28},2:{cellWidth:72},3:{cellWidth:42} }
+        : semPatrulha
+        ? { 0:{cellWidth:34},1:{cellWidth:24},2:{cellWidth:56},3:{cellWidth:30},4:{cellWidth:19,halign:'center' as const},5:{cellWidth:19,halign:'center' as const} }
+        : { 0:{cellWidth:30},1:{cellWidth:22},2:{cellWidth:44},3:{cellWidth:28},4:{cellWidth:19,halign:'center' as const},5:{cellWidth:20,halign:'center' as const},6:{cellWidth:19,halign:'center' as const} };
+
+    const bodyEquip = (e: Equipamento) => {
+      const base = [e.municipio, getRegiao(e.municipio) || '—', e.endereco || '—', e.responsavel || '—'];
+      if (semPatrulha && semKitAthena) {
+        return base;
+      } else if (semPatrulha) {
+        return [...base,
+          e.kit_athena_entregue ? (e.kit_athena_previo ? 'Sim (PréVio)' : 'Sim') : 'Não',
+          e.capacitacao_realizada ? 'Sim' : 'Não',
+        ];
+      } else {
+        return [...base,
+          e.possui_patrulha ? 'Sim' : 'Não',
+          e.kit_athena_entregue ? (e.kit_athena_previo ? 'Sim (PréVio)' : 'Sim') : 'Não',
+          e.capacitacao_realizada ? 'Sim' : 'Não',
+        ];
+      }
+    };
+
     if (items.length > 0) {
       if (yPos > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
       doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
@@ -1292,19 +1252,13 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
       doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
       yPos += 3;
       autoTable(doc, {
-        head: [['Município','Região','Endereço','Responsável','Patrulha M.P.','Kit Athena','Qualificação']],
-        body: items.map(e => [
-          e.municipio, getRegiao(e.municipio) || '—',
-          e.endereco || '—', e.responsavel || '—',
-          e.possui_patrulha ? 'Entregue' : 'Não',
-          e.kit_athena_entregue ? (e.kit_athena_previo ? 'Entregue (PréVio)' : 'Entregue') : 'Não',
-          e.capacitacao_realizada ? 'Realizada' : 'Não',
-        ]),
+        head: headEquip,
+        body: items.map(bodyEquip),
         startY: yPos,
         styles: { fontSize: 7, cellPadding: 2.5 },
         headStyles: { fillColor: hColor, textColor: [255,255,255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248,250,252] },
-        columnStyles: { 0:{cellWidth:32},1:{cellWidth:26},2:{cellWidth:46},3:{cellWidth:32},4:{cellWidth:16,halign:'center'},5:{cellWidth:18,halign:'center'},6:{cellWidth:16,halign:'center'} },
+        columnStyles: colEquip,
         margin: { left: 14, right: 14, top: 32 },
         didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
       });
@@ -1314,7 +1268,9 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
       doc.text('Nenhuma unidade em funcionamento.', 18, yPos);
       doc.setTextColor(0, 0, 0); yPos += 8;
     }
-    if (solics && solics.length > 0) {
+
+    // Solicitações só aparecem no modo completo
+    if (!modoResumo && solics && solics.length > 0) {
       if (yPos > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
       doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
       doc.text('Em andamento / Previstas (' + solics.length + ')', 14, yPos);
@@ -1326,15 +1282,15 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
           s.municipio, getRegiao(s.municipio) || '—', s.status,
           new Date(s.data_solicitacao + 'T00:00:00').toLocaleDateString('pt-BR'),
           s.nup || '—',
-          s.recebeu_patrulha ? 'Recebeu' : 'Não',
-          s.kit_athena_entregue ? 'Entregue' : 'Não',
-          s.capacitacao_realizada ? 'Realizada' : 'Não',
+          s.recebeu_patrulha ? 'Sim' : 'Não',
+          s.kit_athena_entregue ? 'Sim' : 'Não',
+          s.capacitacao_realizada ? 'Sim' : 'Não',
         ]),
         startY: yPos,
         styles: { fontSize: 6.5, cellPadding: 2 },
         headStyles: { fillColor: [Math.round(hColor[0]*0.6), Math.round(hColor[1]*0.6), Math.round(hColor[2]*0.6)] as [number,number,number], textColor:[255,255,255], fontStyle:'bold' },
         alternateRowStyles: { fillColor: [252,252,248] },
-        columnStyles: { 0:{cellWidth:35},1:{cellWidth:28},2:{cellWidth:24},3:{cellWidth:22},4:{cellWidth:20},5:{cellWidth:14,halign:'center'},6:{cellWidth:14,halign:'center'},7:{cellWidth:16,halign:'center'} },
+        columnStyles: { 0:{cellWidth:35},1:{cellWidth:26},2:{cellWidth:22},3:{cellWidth:20},4:{cellWidth:22},5:{cellWidth:14,halign:'center' as const},6:{cellWidth:14,halign:'center' as const},7:{cellWidth:16,halign:'center' as const} },
         margin: { left: 14, right: 14, top: 32 },
         didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
       });
@@ -1343,23 +1299,27 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     return yPos;
   }
 
-  // ── 1. Casa da Mulher Brasileira ──────────────────────────────────────────
+  // ── Seções ────────────────────────────────────────────────────────────────
+
+  // 1. CMB — sem Patrulha, sem Kit Athena
   if (temSecao('cmb')) {
     if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('1. Casa da Mulher Brasileira (CMB)', [13,148,136], y);
     y = tableEquip(cmb, y, [13,148,136],
-      solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Brasileira' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+      solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Brasileira' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
+      { semPatrulha: true, semKitAthena: true });
   }
 
-  // ── 2. Casa da Mulher Cearense ────────────────────────────────────────────
+  // 2. CMC — sem Patrulha, sem Kit Athena
   if (temSecao('cmc')) {
     if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('2. Casa da Mulher Cearense (CMC)', [124,58,237], y);
     y = tableEquip(cmc, y, [124,58,237],
-      solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Cearense' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+      solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Cearense' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
+      { semPatrulha: true, semKitAthena: true });
   }
 
-  // ── 3. Casa da Mulher Municipal ───────────────────────────────────────────
+  // 3. CMM — com Patrulha e Kit Athena (única com patrulha)
   if (temSecao('cmm')) {
     if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('3. Casa da Mulher Municipal (CMM)', [234,88,12], y);
@@ -1367,141 +1327,130 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
       solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Municipal' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
   }
 
-  // ── 4. Salas Lilás ────────────────────────────────────────────────────────
+  // 4. Salas Lilás Municipal — sem Patrulha, com Kit Athena
   if (temSecao('lilasMunicipal')) {
     if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('4. Salas Lilás Municipal', [192,38,211], y);
     y = tableEquip(lilasMunicipal, y, [192,38,211],
-      solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás Municipal' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+      solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás Municipal' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
+      { semPatrulha: true });
   }
 
-  // ── 5. Salas Lilás Governo do Estado
+  // 5. Salas Lilás Estado — sem Patrulha, com Kit Athena
   if (temSecao('lilasEstado')) {
     if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('5. Salas Lilás Governo do Estado', [232,121,249], y);
     y = tableEquip(lilasEstado, y, [232,121,249],
-      solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás Governo do Estado' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+      solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás Governo do Estado' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
+      { semPatrulha: true });
   }
 
-  // ── 6. Salas Lilás em Delegacia
+  // 6. Salas Lilás Delegacia — sem Patrulha, com Kit Athena
   if (temSecao('lilasDelegacia')) {
     if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('6. Salas Lilás em Delegacia', [240,171,252], y);
     y = tableEquip(lilasDelegacia, y, [240,171,252],
-      solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás em Delegacia' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
+      solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás em Delegacia' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'),
+      { semPatrulha: true });
   }
 
-  // ── 7. DDM ────────────────────────────────────────────────────────────────
+  // 7. DDM — sem Patrulha, sem Kit Athena
   if (temSecao('ddm')) {
     if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('7. Delegacias de Defesa da Mulher (DDM)', [21,128,61], y);
     y = addNote('As DDMs são gerenciadas pela Polícia Civil do Ceará e não passam pelo fluxo de solicitações desta Secretaria.', y);
-    y = tableEquip(ddm, y, [21,128,61]);
+    y = tableEquip(ddm, y, [21,128,61], undefined, { semPatrulha: true, semKitAthena: true });
   }
 
-  // ── 7. Patrulhas Maria da Penha ───────────────────────────────────────────
+  // 8. Patrulhas Maria da Penha
   if (temSecao('patrulha')) {
     if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('8. Patrulhas Maria da Penha', [6,182,212], y);
 
-  if (equipsComPatrulha.length > 0) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
-    doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
-    doc.text('Vinculadas a equipamentos (' + equipsComPatrulha.length + ')', 14, y);
-    doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0); y += 3;
-    autoTable(doc, {
-      head: [['Município','Região','Equipamento','Endereço','Responsável']],
-      body: equipsComPatrulha.map(e => [e.municipio, getRegiao(e.municipio)||'—', e.tipo, e.endereco||'—', e.responsavel||'—']),
-      startY: y,
-      styles: { fontSize: 7, cellPadding: 2.5 },
-      headStyles: { fillColor: [6,182,212], textColor:[255,255,255], fontStyle:'bold' },
-      alternateRowStyles: { fillColor: [240,253,254] },
-      columnStyles: { 0:{cellWidth:38},1:{cellWidth:30},2:{cellWidth:45},3:{cellWidth:45},4:{cellWidth:25} },
-      margin: { left: 14, right: 14, top: 32 },
-      didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
+    if (equipsComPatrulha.length > 0) {
+      if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+      doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
+      doc.text('Vinculadas a equipamentos (' + equipsComPatrulha.length + ')', 14, y);
+      doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0); y += 3;
+      autoTable(doc, {
+        head: [['Município','Região','Equipamento','Endereço','Responsável']],
+        body: equipsComPatrulha.map(e => [e.municipio, getRegiao(e.municipio)||'—', e.tipo, e.endereco||'—', e.responsavel||'—']),
+        startY: y,
+        styles: { fontSize: 7, cellPadding: 2.5 },
+        headStyles: { fillColor: [6,182,212], textColor:[255,255,255], fontStyle:'bold' },
+        alternateRowStyles: { fillColor: [240,253,254] },
+        columnStyles: { 0:{cellWidth:38},1:{cellWidth:30},2:{cellWidth:45},3:{cellWidth:45},4:{cellWidth:25} },
+        margin: { left: 14, right: 14, top: 32 },
+        didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
+      });
+      y = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    if (solicsComPatrulha.length > 0) {
+      if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+      doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
+      doc.text('Aguardando equipamento — já com patrulha (' + solicsComPatrulha.length + ')', 14, y);
+      doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0); y += 3;
+      autoTable(doc, {
+        head: [['Município','Região','Tipo Solicitado','Status','Kit Athena','Qualificação']],
+        body: solicsComPatrulha.map(s => [s.municipio, getRegiao(s.municipio)||'—', s.tipo_equipamento, s.status, s.kit_athena_entregue?'Sim':'Não', s.capacitacao_realizada?'Sim':'Não']),
+        startY: y,
+        styles: { fontSize: 7, cellPadding: 2.5 },
+        headStyles: { fillColor: [8,145,178], textColor:[255,255,255], fontStyle:'bold' },
+        alternateRowStyles: { fillColor: [240,253,254] },
+        columnStyles: { 0:{cellWidth:38},1:{cellWidth:30},2:{cellWidth:42},3:{cellWidth:32},4:{cellWidth:20,halign:'center' as const},5:{cellWidth:20,halign:'center' as const} },
+        margin: { left: 14, right: 14, top: 32 },
+        didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
+      });
+      y = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    if (totalPatrulhas === 0) {
+      doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+      doc.text('Nenhuma Patrulha Maria da Penha cadastrada.', 18, y);
+      doc.setTextColor(0, 0, 0);
+    }
   }
 
-  if (solicsComPatrulha.length > 0) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
-    doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
-    doc.text('Aguardando equipamento — já com patrulha (' + solicsComPatrulha.length + ')', 14, y);
-    doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0); y += 3;
-    autoTable(doc, {
-      head: [['Município','Região','Tipo Solicitado','Status','Kit Athena','Qualificação']],
-      body: solicsComPatrulha.map(s => [s.municipio, getRegiao(s.municipio)||'—', s.tipo_equipamento, s.status, s.kit_athena_entregue?'✓':'—', s.capacitacao_realizada?'✓':'—']),
-      startY: y,
-      styles: { fontSize: 7, cellPadding: 2.5 },
-      headStyles: { fillColor: [8,145,178], textColor:[255,255,255], fontStyle:'bold' },
-      alternateRowStyles: { fillColor: [240,253,254] },
-      columnStyles: { 0:{cellWidth:38},1:{cellWidth:30},2:{cellWidth:42},3:{cellWidth:32},4:{cellWidth:16,halign:'center'},5:{cellWidth:16,halign:'center'} },
-      margin: { left: 14, right: 14, top: 32 },
-      didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-  }
-
-  if (totalPatrulhas === 0) {
-    doc.setFontSize(8); doc.setTextColor(150, 150, 150);
-    doc.text('Nenhuma Patrulha Maria da Penha cadastrada.', 18, y);
-    doc.setTextColor(0, 0, 0);
-  }
-  } // end temSecao('patrulha')
-
-  // ── 8. Viaturas PMCE ─────────────────────────────────────────────────────
+  // 9. Viaturas PMCE
   if (temSecao('viaturas')) {
-  if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
-  y = addSecHeader('9. Viaturas PMCE', [99,102,241], y);
+    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    y = addSecHeader('9. Viaturas PMCE', [99,102,241], y);
 
-  if (viaturas.length > 0) {
-    autoTable(doc, {
-      head: [['Município','Região','Tipo de Patrulha','Órgão','Qtd.','Vinc. Equipamento','Data Implantação']],
-      body: viaturas.map(v => [
-        v.municipio, getRegiao(v.municipio)||'—',
-        v.tipo_patrulha, v.orgao_responsavel,
-        String(v.quantidade),
-        v.vinculada_equipamento ? '✓ Sim' : 'Não',
-        new Date(v.data_implantacao + 'T00:00:00').toLocaleDateString('pt-BR'),
-      ]),
-      startY: y,
-      styles: { fontSize: 7, cellPadding: 2.5 },
-      headStyles: { fillColor: [99,102,241], textColor:[255,255,255], fontStyle:'bold' },
-      alternateRowStyles: { fillColor: [245,245,255] },
-      columnStyles: { 0:{cellWidth:35},1:{cellWidth:28},2:{cellWidth:35},3:{cellWidth:22},4:{cellWidth:10,halign:'center'},5:{cellWidth:22,halign:'center'},6:{cellWidth:24} },
-      margin: { left: 14, right: 14, top: 32 },
-      didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
-      foot: [['Total','','','',String(totalViaturasPMCE),'','']],
-      footStyles: { fillColor: [99,102,241], textColor:[255,255,255], fontStyle:'bold' },
-    });
-  } else {
-    doc.setFontSize(8); doc.setTextColor(150, 150, 150);
-    doc.text('Nenhuma viatura PMCE cadastrada.', 18, y);
-    doc.setTextColor(0, 0, 0);
+    if (viaturas.length > 0) {
+      autoTable(doc, {
+        head: [['Município','Região','Tipo de Patrulha','Órgão','Qtd.','Vinc. Equipamento','Data Implantação']],
+        body: viaturas.map(v => [v.municipio, getRegiao(v.municipio)||'—', v.tipo_patrulha, v.orgao_responsavel, String(v.quantidade), v.vinculada_equipamento ? '✓ Sim' : 'Não', new Date(v.data_implantacao + 'T00:00:00').toLocaleDateString('pt-BR')]),
+        startY: y,
+        styles: { fontSize: 7, cellPadding: 2.5 },
+        headStyles: { fillColor: [99,102,241], textColor:[255,255,255], fontStyle:'bold' },
+        alternateRowStyles: { fillColor: [245,245,255] },
+        columnStyles: { 0:{cellWidth:35},1:{cellWidth:28},2:{cellWidth:35},3:{cellWidth:22},4:{cellWidth:10,halign:'center' as const},5:{cellWidth:22,halign:'center' as const},6:{cellWidth:24} },
+        margin: { left: 14, right: 14, top: 32 },
+        didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
+        foot: [['Total','','','',String(totalViaturasPMCE),'','']],
+        footStyles: { fillColor: [99,102,241], textColor:[255,255,255], fontStyle:'bold' },
+      });
+    } else {
+      doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+      doc.text('Nenhuma viatura PMCE cadastrada.', 18, y);
+      doc.setTextColor(0, 0, 0);
+    }
   }
 
-  } // end temSecao('viaturas')
-
-  // ── Página extra: Mapa de Cobertura ──────────────────────────────────────
+  // ── Página do Mapa ────────────────────────────────────────────────────────
   if (mapaImagem) {
     doc.addPage();
     const PW2 = doc.internal.pageSize.getWidth();
     const PH2 = doc.internal.pageSize.getHeight();
-
-    // Cabeçalho azul
     doc.setFillColor(31, 81, 140);
     doc.rect(0, 0, PW2, 14, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont(undefined, 'bold');
     doc.text('Mapa de Cobertura — Estado do Ceará', PW2 / 2, 9, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-    doc.setFont(undefined, 'normal');
-
-    // Calcular dimensões mantendo aspect ratio
+    doc.setTextColor(0, 0, 0); doc.setFont(undefined, 'normal');
     const margin2 = 10;
     const topOffset = 18;
-    const botOffset = 14; // espaço para rodapé
+    const botOffset = 14;
     const availW2 = PW2 - margin2 * 2;
     const availH2 = PH2 - topOffset - botOffset;
     const aspect = mapaImagem.width / mapaImagem.height;
@@ -1510,10 +1459,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     if (mH > availH2) { mH = availH2; mW = mH * aspect; }
     const mX = margin2 + (availW2 - mW) / 2;
     const mY = topOffset;
-
     doc.addImage(mapaImagem.dataUrl, 'PNG', mX, mY, mW, mH);
-
-    // Legenda compacta sobreposta (canto inferior direito)
     const lgW = 56, lgItemH = 7;
     const legendItems2 = [
       { color: [13, 148, 136]  as [number,number,number], label: 'C.M. Brasileira'  },
@@ -1528,14 +1474,10 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     const lgH2 = 10 + legendItems2.length * lgItemH;
     const lgX2 = mX + mW - lgW - 3;
     const lgY2 = mY + mH - lgH2 - 3;
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(180, 180, 180);
+    doc.setFillColor(255, 255, 255); doc.setDrawColor(180, 180, 180);
     doc.roundedRect(lgX2, lgY2, lgW, lgH2, 2, 2, 'FD');
-    doc.setFontSize(6.5);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text('Legenda', lgX2 + 3, lgY2 + 5.5);
-    doc.setFont(undefined, 'normal');
+    doc.setFontSize(6.5); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Legenda', lgX2 + 3, lgY2 + 5.5); doc.setFont(undefined, 'normal');
     legendItems2.forEach((item, i) => {
       const ly = lgY2 + 10 + i * lgItemH;
       doc.setFillColor(...item.color);
@@ -1543,18 +1485,229 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
       doc.setTextColor(0, 0, 0);
       doc.text(item.label, lgX2 + 9, ly);
     });
-
-    // Rodapé da página do mapa
-    doc.setFontSize(7);
-    doc.setTextColor(120, 120, 120);
-    doc.text(
-      'Imagem capturada da página Mapa do sistema EVM',
-      PW2 / 2, PH2 - 6, { align: 'center' }
-    );
+    doc.setFontSize(7); doc.setTextColor(120, 120, 120);
+    doc.text('Imagem capturada da página Mapa do sistema EVM', PW2 / 2, PH2 - 6, { align: 'center' });
     doc.setTextColor(0, 0, 0);
   }
 
-  // ── Rodapés e salvar ──────────────────────────────────────────────────────
   addPdfFooters(doc);
-  doc.save('relatorio-evm_' + ts() + '.pdf');
+  doc.save((modoResumo ? 'relatorio-evm-resumo_' : 'relatorio-evm_') + ts() + '.pdf');
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// DIAGNÓSTICO DE PENDÊNCIAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TIPOS_COM_PATRULHA = new Set(['Casa da Mulher Municipal']);
+const TIPOS_SEM_KIT = new Set(['Casa da Mulher Brasileira', 'Casa da Mulher Cearense', 'DDM']);
+
+export interface DiagnosticoFiltros {
+  regiaoFiltro?: string;
+  diasSemMovimento?: number; // default: 60
+}
+
+interface PendenciaMunicipio {
+  municipio: string;
+  regiao: string;
+  tipo: string;
+  pendencias: string[];
+  origem: 'Equipamento' | 'Solicitação';
+  status?: string;
+  diasSemMovimento?: number;
+}
+
+export function gerarDiagnostico(
+  equipamentos: Equipamento[],
+  solicitacoes: Solicitacao[],
+  filtros: DiagnosticoFiltros = {}
+): PendenciaMunicipio[] {
+  const { regiaoFiltro, diasSemMovimento = 60 } = filtros;
+  const hoje = new Date();
+  const resultado: PendenciaMunicipio[] = [];
+
+  const equips = regiaoFiltro
+    ? equipamentos.filter(e => getRegiao(e.municipio) === regiaoFiltro)
+    : equipamentos;
+
+  equips.forEach(e => {
+    const pendencias: string[] = [];
+    if (TIPOS_COM_PATRULHA.has(e.tipo) && !e.possui_patrulha)  pendencias.push('Sem Patrulha M.P.');
+    if (!TIPOS_SEM_KIT.has(e.tipo) && !e.kit_athena_entregue)  pendencias.push('Sem Kit Athena');
+    if (!e.capacitacao_realizada)                               pendencias.push('Sem Qualificação');
+    if (pendencias.length > 0) {
+      resultado.push({
+        municipio: e.municipio,
+        regiao:    getRegiao(e.municipio) || '—',
+        tipo:      e.tipo,
+        pendencias,
+        origem:    'Equipamento',
+      });
+    }
+  });
+
+  const solics = regiaoFiltro
+    ? solicitacoes.filter(s => getRegiao(s.municipio) === regiaoFiltro)
+    : solicitacoes;
+
+  solics
+    .filter(s => s.status !== 'Cancelada' && s.status !== 'Inaugurada')
+    .forEach(s => {
+      const dataRef = new Date(((s as any).updated_at || s.data_solicitacao) + 'T00:00:00');
+      const dias    = Math.floor((hoje.getTime() - dataRef.getTime()) / 86_400_000);
+      const pendencias: string[] = [];
+      if (dias >= diasSemMovimento) pendencias.push(`Parada há ${dias} dias`);
+      if (!s.nup)                   pendencias.push('Sem NUP registrado');
+      if (pendencias.length > 0) {
+        resultado.push({
+          municipio:        s.municipio,
+          regiao:           getRegiao(s.municipio) || '—',
+          tipo:             s.tipo_equipamento,
+          pendencias,
+          origem:           'Solicitação',
+          status:           s.status,
+          diasSemMovimento: dias,
+        });
+      }
+    });
+
+  return resultado.sort(
+    (a, b) =>
+      a.regiao.localeCompare(b.regiao, 'pt-BR') ||
+      a.municipio.localeCompare(b.municipio, 'pt-BR')
+  );
+}
+
+export function exportDiagnosticoToPDF(
+  equipamentos: Equipamento[],
+  solicitacoes: Solicitacao[],
+  filtros: DiagnosticoFiltros = {}
+): void {
+  const pendencias = gerarDiagnostico(equipamentos, solicitacoes, filtros);
+  const doc = new jsPDF();
+  const PW  = doc.internal.pageSize.getWidth();
+  const PH  = doc.internal.pageSize.getHeight();
+
+  const checkPage = (y: number, threshold = 230): number => {
+    if (y > threshold) {
+      doc.addPage();
+      return addPdfHeader(doc, 'Diagnóstico EVM');
+    }
+    return y;
+  };
+
+  let y = addPdfHeader(doc, 'Diagnóstico EVM', 'Diagnóstico de Pendências por Município');
+
+  doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+  doc.text(
+    [
+      filtros.regiaoFiltro ? `Região: ${filtros.regiaoFiltro}` : 'Todas as regiões',
+      `Solicitações paradas há +${filtros.diasSemMovimento ?? 60} dias`,
+      `Gerado em: ${new Date().toLocaleDateString('pt-BR')}`,
+    ].join('  |  '),
+    14, y
+  );
+  doc.setTextColor(0, 0, 0);
+  y += 7;
+
+  // ── Sem pendências ────────────────────────────────────────────────────────
+  if (pendencias.length === 0) {
+    doc.setFontSize(12); doc.setTextColor(16, 185, 129);
+    doc.text('✓ Nenhuma pendência identificada para os filtros aplicados.', 14, y + 10);
+    addPdfFooters(doc);
+    doc.save(`diagnostico-evm_${ts()}.pdf`);
+    return;
+  }
+
+  // ── Resumo por tipo de pendência ──────────────────────────────────────────
+  const contPorTipo: Record<string, number> = {};
+  pendencias.forEach(p => p.pendencias.forEach(pen => {
+    contPorTipo[pen] = (contPorTipo[pen] || 0) + 1;
+  }));
+
+  doc.setFontSize(10); doc.setFont(undefined, 'bold');
+  doc.text('Resumo das Pendências', 14, y);
+  doc.setFont(undefined, 'normal');
+  y += 3;
+  doc.setDrawColor(239, 68, 68); doc.setLineWidth(0.4);
+  doc.line(14, y, PW - 14, y);
+  y += 5;
+
+  const cardW = (PW - 28 - 6) / 2;
+  const coresCard: [number, number, number][] = [
+    [239,68,68],[245,158,11],[234,88,12],[124,58,237],[6,182,212],[21,128,61],
+  ];
+  const tiposOrdenados = Object.entries(contPorTipo).sort((a, b) => b[1] - a[1]);
+  tiposOrdenados.forEach(([pen, cnt], i) => {
+    const col = i % 2, row = Math.floor(i / 2);
+    const cx  = 14 + col * (cardW + 6);
+    const cy  = y + row * 18;
+    const cor = coresCard[i % coresCard.length];
+    doc.setFillColor(...cor); doc.roundedRect(cx, cy, 4, 14, 1, 1, 'F');
+    doc.setFillColor(255, 245, 245); doc.roundedRect(cx + 4, cy, cardW - 4, 14, 1, 1, 'F');
+    doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(...cor);
+    doc.text(String(cnt), cx + cardW - 6, cy + 10, { align: 'right' });
+    doc.setFontSize(7); doc.setFont(undefined, 'normal'); doc.setTextColor(60, 60, 60);
+    doc.text(pen, cx + 8, cy + 5.5);
+    doc.setTextColor(0, 0, 0);
+  });
+  y += Math.ceil(tiposOrdenados.length / 2) * 18 + 8;
+
+  // ── Tabelas por região ────────────────────────────────────────────────────
+  const regioes = Array.from(new Set(pendencias.map(p => p.regiao))).sort();
+
+  regioes.forEach(regiao => {
+    const grupo     = pendencias.filter(p => p.regiao === regiao);
+    const grpEquips = grupo.filter(p => p.origem === 'Equipamento');
+    const grpSolics = grupo.filter(p => p.origem === 'Solicitação');
+
+    y = checkPage(y, 200);
+
+    // Header da região
+    doc.setFillColor(239, 68, 68);
+    doc.roundedRect(14, y, PW - 28, 7, 1.5, 1.5, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(9); doc.setFont(undefined, 'bold');
+    doc.text(`${regiao}  (${grupo.length} ocorrência${grupo.length !== 1 ? 's' : ''})`, 18, y + 5);
+    doc.setTextColor(0, 0, 0); doc.setFont(undefined, 'normal');
+    y += 10;
+
+    if (grpEquips.length > 0) {
+      y = checkPage(y, 230);
+      doc.setFontSize(7.5); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
+      doc.text(`Equipamentos em funcionamento — ${grpEquips.length} pendência(s)`, 16, y);
+      doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0); y += 3;
+      autoTable(doc, {
+        head: [['Município', 'Tipo de Equipamento', 'Pendências']],
+        body: grpEquips.map(p => [p.municipio, p.tipo, p.pendencias.join(' · ')]),
+        startY: y,
+        styles: { fontSize: 7, cellPadding: 2.5 },
+        headStyles: { fillColor: [239,68,68], textColor: [255,255,255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [255,245,245] },
+        columnStyles: { 0:{cellWidth:42}, 1:{cellWidth:52}, 2:{cellWidth:88} },
+        margin: { left: 14, right: 14, top: 32 },
+        didDrawPage: () => { addPdfHeader(doc, 'Diagnóstico EVM'); },
+      });
+      y = (doc as any).lastAutoTable.finalY + 5;
+    }
+
+    if (grpSolics.length > 0) {
+      y = checkPage(y, 230);
+      doc.setFontSize(7.5); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
+      doc.text(`Solicitações em andamento — ${grpSolics.length} alerta(s)`, 16, y);
+      doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0); y += 3;
+      autoTable(doc, {
+        head: [['Município', 'Tipo', 'Status', 'Alertas']],
+        body: grpSolics.map(p => [p.municipio, p.tipo, p.status || '—', p.pendencias.join(' · ')]),
+        startY: y,
+        styles: { fontSize: 7, cellPadding: 2.5 },
+        headStyles: { fillColor: [245,158,11], textColor: [255,255,255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [255,251,235] },
+        columnStyles: { 0:{cellWidth:42}, 1:{cellWidth:52}, 2:{cellWidth:30}, 3:{cellWidth:58} },
+        margin: { left: 14, right: 14, top: 32 },
+        didDrawPage: () => { addPdfHeader(doc, 'Diagnóstico EVM'); },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+  });
+
+  addPdfFooters(doc);
+  doc.save(`diagnostico-evm_${ts()}.pdf`);
 }
