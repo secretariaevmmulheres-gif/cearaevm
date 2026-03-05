@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useHistoricoRecente, getCampoLabel, HistoricoAlteracao } from '@/hooks/UseHistorico';
+import { useHistoricoRecente, getCampoLabel, HistoricoAlteracao } from '@/hooks/useHistorico';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';

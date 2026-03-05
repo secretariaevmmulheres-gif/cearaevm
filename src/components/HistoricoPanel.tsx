@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { History, ChevronDown, Plus, Pencil, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useHistorico, getCampoLabel } from '@/hooks/UseHistorico';
+import { useHistorico, getCampoLabel } from '@/hooks/useHistorico';
 
 // ── Helpers de exibição ───────────────────────────────────────────────────────
 function formatValor(v: string | null): string {
