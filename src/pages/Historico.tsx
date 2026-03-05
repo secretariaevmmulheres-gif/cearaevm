@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import {
   History, Plus, Pencil, Trash2, Loader2, AlertCircle,
   Search, Filter, Building2, CalendarDays, FileText, RefreshCw,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,8 +22,8 @@ const ACAO_CONFIG = {
 };
 
 const TABELA_CONFIG = {
-  equipamentos: { label: 'Equipamento', icon: Building2,   bg: 'bg-teal-500/10',   text: 'text-teal-700'   },
-  solicitacoes: { label: 'Solicitação', icon: FileText,    bg: 'bg-violet-500/10', text: 'text-violet-700' },
+  equipamentos: { label: 'Equipamento', icon: Building2,    bg: 'bg-teal-500/10',   text: 'text-teal-700'   },
+  solicitacoes: { label: 'Solicitação', icon: FileText,     bg: 'bg-violet-500/10', text: 'text-violet-700' },
   atividades:   { label: 'Atividade',   icon: CalendarDays, bg: 'bg-orange-500/10', text: 'text-orange-700' },
 };
 
@@ -46,17 +47,17 @@ function formatValor(v: string | null): string {
 
 // ── Linha de evento ───────────────────────────────────────────────────────────
 function EventoLinha({ item, delay }: { item: HistoricoAlteracao; delay: number }) {
-  const acao    = ACAO_CONFIG[item.acao] ?? ACAO_CONFIG.UPDATE;
-  const tabela  = TABELA_CONFIG[item.tabela] ?? TABELA_CONFIG.equipamentos;
-  const AcaoIcon  = acao.icon;
+  const acao       = ACAO_CONFIG[item.acao] ?? ACAO_CONFIG.UPDATE;
+  const tabela     = TABELA_CONFIG[item.tabela] ?? TABELA_CONFIG.equipamentos;
+  const AcaoIcon   = acao.icon;
   const TabelaIcon = tabela.icon;
-  const date    = new Date(item.created_at);
+  const date       = new Date(item.created_at);
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
+      transition={{ delay: Math.min(delay, 0.3) }} // limita delay p/ evitar lentidão com muitos itens
       className="flex gap-4 py-4 border-b border-border/40 last:border-0"
     >
       {/* Ícone da ação */}
@@ -79,9 +80,7 @@ function EventoLinha({ item, delay }: { item: HistoricoAlteracao; delay: number 
             {tabela.label}
           </span>
           {item.municipio && (
-            <span className="text-xs font-semibold text-foreground">
-              {item.municipio}
-            </span>
+            <span className="text-xs font-semibold text-foreground">{item.municipio}</span>
           )}
         </div>
 
@@ -107,7 +106,7 @@ function EventoLinha({ item, delay }: { item: HistoricoAlteracao; delay: number 
           </div>
         )}
 
-        {(item.acao === 'INSERT' || item.acao === 'DELETE') && item.valor_antes || item.valor_depois ? (
+        {(item.acao === 'INSERT' || item.acao === 'DELETE') && (item.valor_antes || item.valor_depois) ? (
           <p className="text-xs text-muted-foreground mt-1">
             {item.acao === 'INSERT' ? 'Registro criado' : 'Registro excluído'}
             {item.municipio ? ` em ${item.municipio}` : ''}
@@ -145,31 +144,55 @@ export default function Historico() {
   const [filtroAcao,   setFiltroAcao]   = useState<string>('');
   const [busca,        setBusca]        = useState('');
 
-  const { historico, isLoading, error, refetch } = useHistoricoRecente(200, filtroTabela || undefined);
+  // Item 11 — paginação cursor-based
+  const {
+    historico,
+    isLoading,
+    isLoadingMore,
+    error,
+    hasMore,
+    total,
+    refetch,
+    loadMore,
+  } = useHistoricoRecente(50, filtroTabela || undefined);
 
-  // Filtros locais
+  // Sentinel para infinite scroll automático
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting && hasMore && !isLoadingMore) loadMore(); },
+      { rootMargin: '200px' }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, loadMore]);
+
+  // Filtros locais (ação + busca — sem re-fetch, só filtram o que já veio)
   const filtrado = useMemo(() => {
     let list = historico;
-    if (filtroAcao)  list = list.filter(h => h.acao === filtroAcao);
+    if (filtroAcao) list = list.filter(h => h.acao === filtroAcao);
     if (busca) {
       const q = busca.toLowerCase();
       list = list.filter(h =>
-        (h.municipio ?? '').toLowerCase().includes(q) ||
-        (h.usuario_email ?? '').toLowerCase().includes(q) ||
-        (h.campo ?? '').toLowerCase().includes(q) ||
-        (h.valor_antes ?? '').toLowerCase().includes(q) ||
-        (h.valor_depois ?? '').toLowerCase().includes(q)
+        (h.municipio      ?? '').toLowerCase().includes(q) ||
+        (h.usuario_email  ?? '').toLowerCase().includes(q) ||
+        (h.campo          ?? '').toLowerCase().includes(q) ||
+        (h.valor_antes    ?? '').toLowerCase().includes(q) ||
+        (h.valor_depois   ?? '').toLowerCase().includes(q)
       );
     }
     return list;
   }, [historico, filtroAcao, busca]);
 
-  // Contadores por ação
+  // Contadores por ação (sobre o total já carregado)
   const contadores = useMemo(() => ({
     INSERT: historico.filter(h => h.acao === 'INSERT').length,
     UPDATE: historico.filter(h => h.acao === 'UPDATE').length,
     DELETE: historico.filter(h => h.acao === 'DELETE').length,
   }), [historico]);
+
+  const temFiltro = filtroAcao || filtroTabela || busca;
 
   return (
     <AppLayout>
@@ -186,11 +209,11 @@ export default function Historico() {
 
       {/* Cards de contagem */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        {([ 
+        {(([
           { acao: 'INSERT', label: 'Criações',  ...ACAO_CONFIG.INSERT },
           { acao: 'UPDATE', label: 'Edições',   ...ACAO_CONFIG.UPDATE },
           { acao: 'DELETE', label: 'Exclusões', ...ACAO_CONFIG.DELETE },
-        ] as const).map(({ acao, label, bg, text, border, dot }) => (
+        ]) as const).map(({ acao, label, bg, text, border, dot }) => (
           <button
             key={acao}
             onClick={() => setFiltroAcao(filtroAcao === acao ? '' : acao)}
@@ -229,10 +252,9 @@ export default function Historico() {
           <option value="solicitacoes">Solicitações</option>
           <option value="atividades">Atividades</option>
         </select>
-        {(filtroAcao || filtroTabela || busca) && (
+        {temFiltro && (
           <Button
-            variant="ghost"
-            size="sm"
+            variant="ghost" size="sm"
             onClick={() => { setFiltroAcao(''); setFiltroTabela(''); setBusca(''); }}
             className="gap-1.5 text-muted-foreground shrink-0"
           >
@@ -272,11 +294,39 @@ export default function Historico() {
         {!isLoading && !error && filtrado.map((item, i) => (
           <EventoLinha key={item.id} item={item} delay={i * 0.02} />
         ))}
+
+        {/* Sentinel para scroll infinito */}
+        <div ref={sentinelRef} />
+
+        {/* Loading more */}
+        {isLoadingMore && (
+          <div className="flex items-center justify-center gap-2 py-6">
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Carregando mais registros...</span>
+          </div>
+        )}
+
+        {/* Botão manual "Carregar mais" (fallback se scroll não disparar) */}
+        {!isLoading && !isLoadingMore && hasMore && !temFiltro && (
+          <div className="flex justify-center py-4">
+            <Button variant="ghost" size="sm" onClick={loadMore} className="gap-2 text-muted-foreground">
+              <ChevronDown className="w-4 h-4" />
+              Carregar mais
+            </Button>
+          </div>
+        )}
       </div>
 
-      {!isLoading && filtrado.length > 0 && (
+      {/* Rodapé com contagem */}
+      {!isLoading && historico.length > 0 && (
         <p className="text-xs text-muted-foreground text-center mt-4">
-          Exibindo {filtrado.length} de {historico.length} registros
+          {temFiltro
+            ? `${filtrado.length} resultado${filtrado.length !== 1 ? 's' : ''} (de ${historico.length} carregados)`
+            : `${historico.length} registros carregados${total !== null && total > historico.length ? ` de ${total} no total` : ''}`
+          }
+          {hasMore && !temFiltro && (
+            <span className="text-muted-foreground/50"> · role para ver mais</span>
+          )}
         </p>
       )}
     </AppLayout>

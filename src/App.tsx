@@ -15,6 +15,7 @@ import Solicitacoes from "./pages/Solicitacoes";
 import Atividades from "./pages/Atividades";
 import Mapa from "./pages/Mapa";
 import RelatorioEVM from "./pages/RelatorioEVM";
+import Diagnostico from '@/pages/Diagnostico';
 import Historico from "./pages/Historico";
 import Usuarios from "./pages/Usuarios";
 import Perfil from "./pages/Perfil";
@@ -103,6 +104,15 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route 
+        path="/diagnostico" 
+        element={
+          <ProtectedRoute>
+            <Diagnostico />
+          </ProtectedRoute>
+        } 
+      />
+
       <Route
         path="/historico"
         element={

@@ -9,28 +9,20 @@ export type StatusAtividade = 'Agendado' | 'Realizado' | 'Cancelado';
 
 export interface Atividade {
   id: string;
-  // Localização
   municipio: string;
   municipio_sede: string;
-  // Tipo e recurso
   tipo: TipoAtividade;
   recurso: RecursoAtividade;
   quantidade_equipe: number | null;
   status: StatusAtividade;
-  // Identificação
   nup: string | null;
   nome_evento: string | null;
-  // Datas e tempo
-  data: string;           // ISO date "YYYY-MM-DD"
+  data: string;
   dias: number | null;
   horario: string | null;
-  // Resultado
   atendimentos: number | null;
-  // Localização física
   endereco: string | null;
-  // Texto livre
   observacoes: string | null;
-  // Auditoria
   created_at: string;
   updated_at: string;
 }
@@ -100,7 +92,7 @@ export interface Solicitacao {
   observacoes: string;
   anexos: string[];
   created_at: string;
-  updated_at: string;
+  updated_at: string; // usado pelo diagnóstico para calcular dias sem movimento
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────

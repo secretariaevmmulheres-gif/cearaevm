@@ -30,6 +30,7 @@ const menuItems = [
   { path: '/atividades',          label: 'Atividades',   icon: CalendarDays    },
   { path: '/mapa',                label: 'Mapa',         icon: Map             },
   { path: '/relatorio-cpdi',      label: 'Rel. EVM',     icon: ClipboardList   },
+  { path: '/diagnostico',      label: 'Diagnóstico',     icon: Shield   },
   { path: '/historico',           label: 'Histórico',    icon: History         },
 ];
 

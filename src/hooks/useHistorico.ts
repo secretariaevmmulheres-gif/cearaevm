@@ -49,11 +49,11 @@ export function getCampoLabel(campo: string | null): string {
   return CAMPO_LABELS[campo] ?? campo;
 }
 
-// ── Hook principal ────────────────────────────────────────────────────────────
+// ── Hook para histórico de um registro específico ─────────────────────────────
 export function useHistorico(registroId?: string, tabela?: string) {
-  const [historico, setHistorico]   = useState<HistoricoAlteracao[]>([]);
-  const [isLoading, setIsLoading]   = useState(false);
-  const [error, setError]           = useState<string | null>(null);
+  const [historico, setHistorico] = useState<HistoricoAlteracao[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError]         = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!registroId) { setHistorico([]); return; }
@@ -72,8 +72,7 @@ export function useHistorico(registroId?: string, tabela?: string) {
       if (err) throw err;
       setHistorico((data ?? []) as HistoricoAlteracao[]);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao carregar histórico';
-      setError(msg);
+      setError(e instanceof Error ? e.message : 'Erro ao carregar histórico');
     } finally {
       setIsLoading(false);
     }
@@ -84,36 +83,113 @@ export function useHistorico(registroId?: string, tabela?: string) {
   return { historico, isLoading, error, refetch: fetchData };
 }
 
-// ── Hook para histórico geral (feed recente) ──────────────────────────────────
-export function useHistoricoRecente(limit = 50, filtroTabela?: string) {
-  const [historico, setHistorico]   = useState<HistoricoAlteracao[]>([]);
-  const [isLoading, setIsLoading]   = useState(false);
-  const [error, setError]           = useState<string | null>(null);
+// ── Item 11: paginação cursor-based ──────────────────────────────────────────
+// Estratégia: cursor = created_at do último item carregado.
+// Cada página usa `.lt('created_at', cursor)` para buscar registros anteriores.
+// Isso evita offset e é eficiente mesmo com milhares de registros.
 
-  const fetchData = useCallback(async () => {
+const PAGE_SIZE = 50;
+
+export interface UseHistoricoRecenteResult {
+  historico: HistoricoAlteracao[];
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  error: string | null;
+  hasMore: boolean;
+  total: number | null;
+  refetch: () => void;
+  loadMore: () => void;
+}
+
+export function useHistoricoRecente(
+  _limit = 50,             // mantido por compatibilidade, não usado internamente
+  filtroTabela?: string
+): UseHistoricoRecenteResult {
+  const [historico,     setHistorico]     = useState<HistoricoAlteracao[]>([]);
+  const [isLoading,     setIsLoading]     = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
+  const [cursor,        setCursor]        = useState<string | null>(null);   // created_at do último item
+  const [hasMore,       setHasMore]       = useState(true);
+  const [total,         setTotal]         = useState<number | null>(null);
+
+  // ── Carrega a primeira página + total ──────────────────────────────────────
+  const fetchFirst = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setHasMore(true);
+    setCursor(null);
+
+    try {
+      // Query de contagem total (respeita filtro de tabela)
+      let countQuery = db
+        .from('historico_alteracoes')
+        .select('*', { count: 'exact', head: true });
+      if (filtroTabela) countQuery = countQuery.eq('tabela', filtroTabela);
+      const { count } = await countQuery;
+      setTotal(count ?? null);
+
+      // Primeira página
+      let query = db
+        .from('historico_alteracoes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE);
+      if (filtroTabela) query = query.eq('tabela', filtroTabela);
+
+      const { data, error: err } = await query;
+      if (err) throw err;
+
+      const rows = (data ?? []) as HistoricoAlteracao[];
+      setHistorico(rows);
+      setHasMore(rows.length === PAGE_SIZE);
+      setCursor(rows.length > 0 ? rows[rows.length - 1].created_at : null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao carregar histórico');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filtroTabela]);
+
+  // ── Carrega próxima página via cursor ─────────────────────────────────────
+  const loadMore = useCallback(async () => {
+    if (!cursor || isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+
     try {
       let query = db
         .from('historico_alteracoes')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(limit);
-
+        .lt('created_at', cursor)          // cursor-based: pega registros mais antigos
+        .limit(PAGE_SIZE);
       if (filtroTabela) query = query.eq('tabela', filtroTabela);
 
       const { data, error: err } = await query;
       if (err) throw err;
-      setHistorico((data ?? []) as HistoricoAlteracao[]);
+
+      const rows = (data ?? []) as HistoricoAlteracao[];
+      setHistorico(prev => [...prev, ...rows]);
+      setHasMore(rows.length === PAGE_SIZE);
+      setCursor(rows.length > 0 ? rows[rows.length - 1].created_at : null);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao carregar histórico';
-      setError(msg);
+      setError(e instanceof Error ? e.message : 'Erro ao carregar mais registros');
     } finally {
-      setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  }, [limit, filtroTabela]);
+  }, [cursor, filtroTabela, hasMore, isLoadingMore]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Re-busca quando filtro muda
+  useEffect(() => { fetchFirst(); }, [fetchFirst]);
 
-  return { historico, isLoading, error, refetch: fetchData };
+  return {
+    historico,
+    isLoading,
+    isLoadingMore,
+    error,
+    hasMore,
+    total,
+    refetch: fetchFirst,
+    loadMore,
+  };
 }
