@@ -16,7 +16,7 @@ export function useEquipamentos() {
         .from('equipamentos')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as Equipamento[];
     },
@@ -41,7 +41,7 @@ export function useEquipamentos() {
         })
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -67,13 +67,13 @@ export function useEquipamentos() {
       if (data.kit_athena_entregue   !== undefined) updateData.kit_athena_entregue   = data.kit_athena_entregue;
       if (data.kit_athena_previo     !== undefined) updateData.kit_athena_previo     = data.kit_athena_previo;
       if (data.capacitacao_realizada !== undefined) updateData.capacitacao_realizada = data.capacitacao_realizada;
-      if (data.nup                   !== undefined) updateData.nup                   = data.nup;
+      if (data.nup                   !== undefined) updateData.nup                   = data.nup ?? null;
 
       const { error } = await supabase
         .from('equipamentos')
         .update(updateData)
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -91,7 +91,7 @@ export function useEquipamentos() {
         .from('equipamentos')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {

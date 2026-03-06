@@ -6,22 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
+import { usePendenciasResolvidas } from '@/hooks/usePendenciasResolvidas';
 import { getRegiao, regioesList } from '@/data/municipios';
 import {
-  gerarDiagnostico,
-  exportDiagnosticoToPDF,
-  exportDiagnosticoToExcel,
-  PendenciaMunicipio,
+  gerarDiagnostico, exportDiagnosticoToPDF, exportDiagnosticoToExcel, PendenciaMunicipio,
 } from '@/lib/exportUtils';
 import { cn } from '@/lib/utils';
 import {
-  AlertTriangle, CheckCircle2, Download, FileSpreadsheet,
-  Loader2, Search, Filter, X, ChevronUp, ChevronDown,
-  ChevronsUpDown, RefreshCw, Eye, EyeOff,
+  CheckCircle2, Download, FileSpreadsheet, Loader2, Search, Filter, X,
+  ChevronUp, ChevronDown, ChevronsUpDown, RefreshCw, Eye, EyeOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// ── Config visual por tipo de pendência ───────────────────────────────────────
 const PENDENCIA_CORES: Record<string, { bg: string; text: string; border: string }> = {
   'Sem Patrulha M.P.':  { bg: 'bg-cyan-500/10',   text: 'text-cyan-700',   border: 'border-cyan-500/20'   },
   'Sem Kit Athena':     { bg: 'bg-amber-500/10',  text: 'text-amber-700',  border: 'border-amber-500/20'  },
@@ -29,17 +25,12 @@ const PENDENCIA_CORES: Record<string, { bg: string; text: string; border: string
   'Sem NUP registrado': { bg: 'bg-slate-500/10',  text: 'text-slate-600',  border: 'border-slate-500/20'  },
   'default':            { bg: 'bg-red-500/10',    text: 'text-red-700',    border: 'border-red-500/20'    },
 };
-
-const getPendenciaCor = (p: string) =>
-  PENDENCIA_CORES[p] ?? PENDENCIA_CORES['default'];
-
+const getPendenciaCor = (p: string) => PENDENCIA_CORES[p] ?? PENDENCIA_CORES['default'];
 const ORIGEM_COR = {
   'Equipamento': { bg: 'bg-teal-500/10',  text: 'text-teal-700',  dot: 'bg-teal-500'  },
   'Solicitação': { bg: 'bg-amber-500/10', text: 'text-amber-700', dot: 'bg-amber-500' },
 };
-
 const THRESHOLD_OPTIONS = [30, 45, 60, 90, 120] as const;
-
 type SortField = 'municipio' | 'regiao' | 'tipo' | 'pendencias' | 'origem';
 type SortDir   = 'asc' | 'desc';
 
@@ -50,39 +41,38 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
     : <ChevronDown className="w-3.5 h-3.5 text-primary ml-1 shrink-0" />;
 }
 
-function PendenciaBadge({ texto }: { texto: string }) {
+function PendenciaBadge({ texto, resolvido, onToggle }: { texto: string; resolvido: boolean; onToggle: () => void }) {
   const cor = getPendenciaCor(texto);
   return (
-    <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap', cor.bg, cor.text, cor.border)}>
+    <button onClick={onToggle} title={resolvido ? 'Desmarcar como resolvido' : 'Marcar como resolvido'}
+      className={cn(
+        'text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap transition-all',
+        resolvido
+          ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20 line-through opacity-60'
+          : cn(cor.bg, cor.text, cor.border, 'hover:opacity-80')
+      )}>
+      {resolvido && <CheckCircle2 className="w-2.5 h-2.5 inline mr-1" />}
       {texto}
-    </span>
+    </button>
   );
 }
 
-function LinhaTabela({
-  item, resolvido, onToggle, delay,
-}: {
-  item: PendenciaMunicipio;
-  resolvido: boolean;
-  onToggle: () => void;
-  delay: number;
+function LinhaTabela({ item, delay, isResolvido, onTogglePendencia, itemResolvido }: {
+  item: PendenciaMunicipio; delay: number;
+  isResolvido: (pendencia: string) => boolean;
+  onTogglePendencia: (pendencia: string) => void;
+  itemResolvido: boolean;
 }) {
   const origemCor = ORIGEM_COR[item.origem as keyof typeof ORIGEM_COR] ?? ORIGEM_COR['Equipamento'];
-
   return (
-    <motion.tr
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
+    <motion.tr initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(delay, 0.2) }}
-      className={cn(
-        'border-b border-border/40 last:border-0 transition-all',
-        resolvido ? 'opacity-40' : 'hover:bg-muted/30'
-      )}
-    >
+      className={cn('border-b border-border/40 last:border-0 transition-all',
+        itemResolvido ? 'opacity-40 bg-emerald-500/3' : 'hover:bg-muted/30')}>
       <td className="py-3 pl-4 pr-3">
         <div className="flex items-center gap-2">
           <div className={cn('w-1.5 h-1.5 rounded-full shrink-0', origemCor.dot)} />
-          <span className={cn('text-sm font-semibold', resolvido && 'line-through text-muted-foreground')}>
+          <span className={cn('text-sm font-semibold', itemResolvido && 'line-through text-muted-foreground')}>
             {item.municipio}
           </span>
         </div>
@@ -100,91 +90,73 @@ function LinhaTabela({
       </td>
       <td className="py-3 px-3">
         <div className="flex flex-wrap gap-1">
-          {item.pendencias.map(p => <PendenciaBadge key={p} texto={p} />)}
+          {item.pendencias.map(p => (
+            <PendenciaBadge key={p} texto={p} resolvido={isResolvido(p)} onToggle={() => onTogglePendencia(p)} />
+          ))}
         </div>
         {item.diasSemMovimento !== undefined && (
-          <p className="text-[10px] text-muted-foreground/60 mt-1">
-            {item.diasSemMovimento} dias sem atualização
-          </p>
+          <p className="text-[10px] text-muted-foreground/60 mt-1">{item.diasSemMovimento} dias sem atualização</p>
         )}
-      </td>
-      <td className="py-3 pl-3 pr-4 text-right">
-        <button
-          onClick={onToggle}
-          title={resolvido ? 'Marcar como pendente' : 'Marcar como resolvido'}
-          className={cn(
-            'w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all',
-            resolvido
-              ? 'bg-emerald-500 border-emerald-500 text-white'
-              : 'border-muted-foreground/30 hover:border-emerald-400 hover:text-emerald-600'
-          )}
-        >
-          <CheckCircle2 className={cn('w-3.5 h-3.5', !resolvido && 'opacity-40')} />
-        </button>
       </td>
     </motion.tr>
   );
 }
 
-// ── Página principal ──────────────────────────────────────────────────────────
 export default function Diagnostico() {
   const { equipamentos } = useEquipamentos();
   const { solicitacoes } = useSolicitacoes();
+  const { isResolvido, toggleResolvido, limparTodos, isLoading: isLoadingResolvidos } = usePendenciasResolvidas();
 
-  const [regiaoFiltro,     setRegiaoFiltro]    = useState('');
-  const [origemFiltro,     setOrigemFiltro]    = useState('');
-  const [pendenciaFiltro,  setPendenciaFiltro] = useState('');
-  const [busca,            setBusca]           = useState('');
+  const [regiaoFiltro,     setRegiaoFiltro]     = useState('');
+  const [origemFiltro,     setOrigemFiltro]     = useState('');
+  const [pendenciaFiltro,  setPendenciaFiltro]  = useState('');
+  const [busca,            setBusca]            = useState('');
   const [diasSemMovimento, setDiasSemMovimento] = useState(60);
-  const [sortField, setSortField] = useState<SortField>('pendencias');
-  const [sortDir,   setSortDir]   = useState<SortDir>('desc');
-  const [resolvidos,        setResolvidos]        = useState<Set<string>>(new Set());
+  const [sortField,        setSortField]        = useState<SortField>('pendencias');
+  const [sortDir,          setSortDir]          = useState<SortDir>('desc');
   const [ocultarResolvidos, setOcultarResolvidos] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const todasPendencias = useMemo(() =>
-    gerarDiagnostico(equipamentos, solicitacoes, {
-      regiaoFiltro:    regiaoFiltro || undefined,
-      diasSemMovimento,
-    }),
+    gerarDiagnostico(equipamentos, solicitacoes, { regiaoFiltro: regiaoFiltro || undefined, diasSemMovimento }),
     [equipamentos, solicitacoes, regiaoFiltro, diasSemMovimento]
   );
 
+  const itemTotalmenteResolvido = (item: PendenciaMunicipio) =>
+    item.pendencias.every(p => isResolvido(item.municipio, item.tipo, item.origem, p));
+
+  const totalResolvidos = todasPendencias.filter(itemTotalmenteResolvido).length;
+
   const pendenciasFiltradas = useMemo(() => {
     let list = todasPendencias;
-    if (origemFiltro)   list = list.filter(p => p.origem === origemFiltro);
+    if (origemFiltro)    list = list.filter(p => p.origem === origemFiltro);
     if (pendenciaFiltro) list = list.filter(p => p.pendencias.some(pen => pen === pendenciaFiltro));
     if (busca) {
       const q = busca.toLowerCase();
       list = list.filter(p =>
-        p.municipio.toLowerCase().includes(q) ||
-        p.regiao.toLowerCase().includes(q) ||
-        p.tipo.toLowerCase().includes(q) ||
-        p.pendencias.some(pen => pen.toLowerCase().includes(q))
+        p.municipio.toLowerCase().includes(q) || p.regiao.toLowerCase().includes(q) ||
+        p.tipo.toLowerCase().includes(q) || p.pendencias.some(pen => pen.toLowerCase().includes(q))
       );
     }
-    if (ocultarResolvidos) list = list.filter(p => !resolvidos.has(chave(p)));
-
+    if (ocultarResolvidos) list = list.filter(p => !itemTotalmenteResolvido(p));
     list = [...list].sort((a, b) => {
       let va: string | number = '';
       let vb: string | number = '';
-      if (sortField === 'municipio')  { va = a.municipio;          vb = b.municipio;          }
-      if (sortField === 'regiao')     { va = a.regiao;             vb = b.regiao;             }
-      if (sortField === 'tipo')       { va = a.tipo;               vb = b.tipo;               }
-      if (sortField === 'origem')     { va = a.origem;             vb = b.origem;             }
-      if (sortField === 'pendencias') { va = a.pendencias.length;  vb = b.pendencias.length;  }
+      if (sortField === 'municipio')  { va = a.municipio;         vb = b.municipio;         }
+      if (sortField === 'regiao')     { va = a.regiao;            vb = b.regiao;            }
+      if (sortField === 'tipo')       { va = a.tipo;              vb = b.tipo;              }
+      if (sortField === 'origem')     { va = a.origem;            vb = b.origem;            }
+      if (sortField === 'pendencias') { va = a.pendencias.length; vb = b.pendencias.length; }
       if (typeof va === 'string') {
         return sortDir === 'asc' ? va.localeCompare(vb as string, 'pt-BR') : (vb as string).localeCompare(va, 'pt-BR');
       }
       return sortDir === 'asc' ? (va as number) - (vb as number) : (vb as number) - (va as number);
     });
     return list;
-  }, [todasPendencias, origemFiltro, pendenciaFiltro, busca, sortField, sortDir, resolvidos, ocultarResolvidos]);
-
-  const chave = (p: PendenciaMunicipio) => `${p.municipio}|${p.tipo}|${p.origem}`;
+  }, [todasPendencias, origemFiltro, pendenciaFiltro, busca, sortField, sortDir, ocultarResolvidos, isResolvido]);
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir(field === 'pendencias' ? 'desc' : 'asc'); }
   };
 
@@ -195,29 +167,24 @@ export default function Diagnostico() {
   }, [todasPendencias]);
 
   const temFiltro = regiaoFiltro || origemFiltro || pendenciaFiltro || busca;
-
   const filtrosDiag = { regiaoFiltro: regiaoFiltro || undefined, diasSemMovimento };
 
   const handleExportPDF = async () => {
     setExporting(true);
     try { await new Promise(r => setTimeout(r, 50)); exportDiagnosticoToPDF(equipamentos, solicitacoes, filtrosDiag); toast.success('PDF exportado!'); }
-    catch { toast.error('Erro ao exportar PDF'); }
-    finally { setExporting(false); }
+    catch { toast.error('Erro ao exportar PDF'); } finally { setExporting(false); }
   };
   const handleExportExcel = async () => {
     setExporting(true);
     try { await new Promise(r => setTimeout(r, 50)); exportDiagnosticoToExcel(equipamentos, solicitacoes, filtrosDiag); toast.success('Excel exportado!'); }
-    catch { toast.error('Erro ao exportar Excel'); }
-    finally { setExporting(false); }
+    catch { toast.error('Erro ao exportar Excel'); } finally { setExporting(false); }
   };
 
   return (
     <AppLayout>
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-        <PageHeader
-          title="Diagnóstico de Pendências"
-          description="Equipamentos e solicitações com pendências identificadas automaticamente"
-        />
+        <PageHeader title="Diagnóstico de Pendências"
+          description="Equipamentos e solicitações com pendências identificadas automaticamente" />
         <div className="flex gap-2 shrink-0">
           <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting}
             className="gap-2 border-red-200 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400">
@@ -230,19 +197,16 @@ export default function Diagnostico() {
         </div>
       </div>
 
-      {/* Cards de resumo por tipo */}
+      {/* Cards resumo */}
       {resumo.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
           {resumo.slice(0, 8).map(([pendencia, count]) => {
-            const cor = getPendenciaCor(pendencia);
+            const cor   = getPendenciaCor(pendencia);
             const ativo = pendenciaFiltro === pendencia;
             return (
-              <button key={pendencia}
-                onClick={() => setPendenciaFiltro(ativo ? '' : pendencia)}
-                className={cn(
-                  'rounded-xl border p-3 text-left transition-all',
-                  ativo ? cn(cor.bg, cor.border, 'ring-2') : 'bg-card border-border hover:border-primary/30'
-                )}>
+              <button key={pendencia} onClick={() => setPendenciaFiltro(ativo ? '' : pendencia)}
+                className={cn('rounded-xl border p-3 text-left transition-all',
+                  ativo ? cn(cor.bg, cor.border, 'ring-2') : 'bg-card border-border hover:border-primary/30')}>
                 <p className={cn('text-2xl font-bold', cor.text)}>{count}</p>
                 <p className="text-xs text-muted-foreground leading-tight mt-0.5 line-clamp-2">{pendencia}</p>
               </button>
@@ -251,7 +215,7 @@ export default function Diagnostico() {
         </div>
       )}
 
-      {/* Configurações */}
+      {/* Configurações e filtros */}
       <div className="bg-card border border-border rounded-2xl p-5 mb-6 space-y-4">
         <div>
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
@@ -305,23 +269,26 @@ export default function Diagnostico() {
           <span className="font-bold text-foreground">{pendenciasFiltradas.length}</span>
           {pendenciasFiltradas.length !== todasPendencias.length && ` de ${todasPendencias.length}`}
           {' '}item{pendenciasFiltradas.length !== 1 ? 's' : ''} com pendências
-          {resolvidos.size > 0 && <span className="ml-2 text-emerald-600">· {resolvidos.size} resolvido{resolvidos.size !== 1 ? 's' : ''}</span>}
-        </p>
-        <div className="flex items-center gap-3">
-          {resolvidos.size > 0 && (
-            <>
-              <button onClick={() => setOcultarResolvidos(v => !v)}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                {ocultarResolvidos ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                {ocultarResolvidos ? 'Mostrar resolvidos' : 'Ocultar resolvidos'}
-              </button>
-              <button onClick={() => setResolvidos(new Set())}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                <RefreshCw className="w-3.5 h-3.5" /> Limpar resolvidos
-              </button>
-            </>
+          {totalResolvidos > 0 && (
+            <span className="ml-2 text-emerald-600">
+              · {totalResolvidos} totalmente resolvido{totalResolvidos !== 1 ? 's' : ''}
+              {isLoadingResolvidos && <Loader2 className="w-3 h-3 inline ml-1 animate-spin" />}
+            </span>
           )}
-        </div>
+        </p>
+        {totalResolvidos > 0 && (
+          <div className="flex items-center gap-3">
+            <button onClick={() => setOcultarResolvidos(v => !v)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              {ocultarResolvidos ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              {ocultarResolvidos ? 'Mostrar resolvidos' : 'Ocultar resolvidos'}
+            </button>
+            <button onClick={async () => { await limparTodos(); toast.success('Resolvidos apagados'); }}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <RefreshCw className="w-3.5 h-3.5" /> Limpar resolvidos
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabela */}
@@ -344,40 +311,32 @@ export default function Diagnostico() {
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   {([
-                    { field: 'municipio'  as SortField, label: 'Município',  cls: 'pl-4'                     },
-                    { field: 'regiao'     as SortField, label: 'Região',     cls: 'hidden md:table-cell'     },
-                    { field: 'tipo'       as SortField, label: 'Tipo',       cls: 'hidden lg:table-cell'     },
-                    { field: 'origem'     as SortField, label: 'Origem',     cls: 'hidden sm:table-cell'     },
-                    { field: 'pendencias' as SortField, label: 'Pendências', cls: ''                         },
+                    { field: 'municipio'  as SortField, label: 'Município',  cls: 'pl-4'                 },
+                    { field: 'regiao'     as SortField, label: 'Região',     cls: 'hidden md:table-cell' },
+                    { field: 'tipo'       as SortField, label: 'Tipo',       cls: 'hidden lg:table-cell' },
+                    { field: 'origem'     as SortField, label: 'Origem',     cls: 'hidden sm:table-cell' },
+                    { field: 'pendencias' as SortField, label: 'Pendências', cls: ''                     },
                   ]).map(col => (
                     <th key={col.field} onClick={() => handleSort(col.field)}
                       className={cn('py-3 px-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer select-none hover:text-foreground transition-colors', col.cls)}>
                       <span className="flex items-center">
-                        {col.label}
-                        <SortIcon field={col.field} sortField={sortField} sortDir={sortDir} />
+                        {col.label}<SortIcon field={col.field} sortField={sortField} sortDir={sortDir} />
                       </span>
                     </th>
                   ))}
-                  <th className="py-3 pl-3 pr-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Resolvido
-                  </th>
                 </tr>
               </thead>
               <tbody>
                 <AnimatePresence>
-                  {pendenciasFiltradas.map((item, i) => {
-                    const k = chave(item);
-                    return (
-                      <LinhaTabela key={k} item={item} resolvido={resolvidos.has(k)}
-                        onToggle={() => setResolvidos(prev => {
-                          const next = new Set(prev);
-                          next.has(k) ? next.delete(k) : next.add(k);
-                          return next;
-                        })}
-                        delay={i * 0.015}
-                      />
-                    );
-                  })}
+                  {pendenciasFiltradas.map((item, i) => (
+                    <LinhaTabela
+                      key={`${item.municipio}|${item.tipo}|${item.origem}`}
+                      item={item} delay={i * 0.015}
+                      itemResolvido={itemTotalmenteResolvido(item)}
+                      isResolvido={(p) => isResolvido(item.municipio, item.tipo, item.origem, p)}
+                      onTogglePendencia={(p) => toggleResolvido(item.municipio, item.tipo, item.origem, p)}
+                    />
+                  ))}
                 </AnimatePresence>
               </tbody>
             </table>
@@ -385,7 +344,7 @@ export default function Diagnostico() {
           <div className="px-4 py-3 border-t border-border bg-muted/20 flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
               {pendenciasFiltradas.length} item{pendenciasFiltradas.length !== 1 ? 's' : ''}
-              {resolvidos.size > 0 && ` · ${resolvidos.size} resolvido${resolvidos.size !== 1 ? 's' : ''}`}
+              {totalResolvidos > 0 && ` · ${totalResolvidos} resolvido${totalResolvidos !== 1 ? 's' : ''}`}
             </p>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -399,9 +358,9 @@ export default function Diagnostico() {
         </div>
       )}
 
-      {resolvidos.size > 0 && (
+      {totalResolvidos > 0 && (
         <p className="text-xs text-muted-foreground/50 text-center mt-3">
-          Os itens marcados como resolvidos são apenas visuais e serão reiniciados ao recarregar a página.
+          Resolvidos persistidos no banco e visíveis para todos os usuários.
         </p>
       )}
     </AppLayout>

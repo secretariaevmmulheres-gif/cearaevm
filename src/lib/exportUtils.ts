@@ -1435,7 +1435,7 @@ export interface DiagnosticoFiltros {
   diasSemMovimento?: number; // default: 60
 }
 
-interface PendenciaMunicipio {
+export interface PendenciaMunicipio {
   municipio: string;
   regiao: string;
   tipo: string;

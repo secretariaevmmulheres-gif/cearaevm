@@ -16,7 +16,7 @@ export function useSolicitacoes() {
         .from('solicitacoes')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as Solicitacao[];
     },
@@ -27,21 +27,22 @@ export function useSolicitacoes() {
       const { data, error } = await supabase
         .from('solicitacoes')
         .insert({
-          municipio: solicitacao.municipio,
-          data_solicitacao: solicitacao.data_solicitacao,
-          tipo_equipamento: solicitacao.tipo_equipamento as TipoEquipamento,
-          status: solicitacao.status as StatusSolicitacao,
-          recebeu_patrulha: solicitacao.recebeu_patrulha,
+          municipio:                    solicitacao.municipio,
+          data_solicitacao:             solicitacao.data_solicitacao,
+          tipo_equipamento:             solicitacao.tipo_equipamento as TipoEquipamento,
+          status:                       solicitacao.status as StatusSolicitacao,
+          recebeu_patrulha:             solicitacao.recebeu_patrulha,
           guarda_municipal_estruturada: solicitacao.guarda_municipal_estruturada,
-          kit_athena_entregue: solicitacao.kit_athena_entregue,
-          capacitacao_realizada: solicitacao.capacitacao_realizada,
-          suite_implantada: solicitacao.suite_implantada,
-          observacoes: solicitacao.observacoes,
-          anexos: solicitacao.anexos,
+          kit_athena_entregue:          solicitacao.kit_athena_entregue,
+          kit_athena_previo:            solicitacao.kit_athena_previo ?? false,
+          capacitacao_realizada:        solicitacao.capacitacao_realizada,
+          nup:                          solicitacao.nup || null,   // ← era suite_implantada
+          observacoes:                  solicitacao.observacoes,
+          anexos:                       solicitacao.anexos,
         })
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -57,23 +58,24 @@ export function useSolicitacoes() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<Solicitacao> & { id: string }) => {
       const updateData: Record<string, unknown> = {};
-      if (data.municipio !== undefined) updateData.municipio = data.municipio;
-      if (data.data_solicitacao !== undefined) updateData.data_solicitacao = data.data_solicitacao;
-      if (data.tipo_equipamento !== undefined) updateData.tipo_equipamento = data.tipo_equipamento;
-      if (data.status !== undefined) updateData.status = data.status;
-      if (data.recebeu_patrulha !== undefined) updateData.recebeu_patrulha = data.recebeu_patrulha;
+      if (data.municipio                    !== undefined) updateData.municipio                    = data.municipio;
+      if (data.data_solicitacao             !== undefined) updateData.data_solicitacao             = data.data_solicitacao;
+      if (data.tipo_equipamento             !== undefined) updateData.tipo_equipamento             = data.tipo_equipamento;
+      if (data.status                       !== undefined) updateData.status                       = data.status;
+      if (data.recebeu_patrulha             !== undefined) updateData.recebeu_patrulha             = data.recebeu_patrulha;
       if (data.guarda_municipal_estruturada !== undefined) updateData.guarda_municipal_estruturada = data.guarda_municipal_estruturada;
-      if (data.kit_athena_entregue !== undefined) updateData.kit_athena_entregue = data.kit_athena_entregue;
-      if (data.capacitacao_realizada !== undefined) updateData.capacitacao_realizada = data.capacitacao_realizada;
-      if (data.suite_implantada !== undefined) updateData.suite_implantada = data.suite_implantada;
-      if (data.observacoes !== undefined) updateData.observacoes = data.observacoes;
-      if (data.anexos !== undefined) updateData.anexos = data.anexos;
+      if (data.kit_athena_entregue          !== undefined) updateData.kit_athena_entregue          = data.kit_athena_entregue;
+      if (data.kit_athena_previo            !== undefined) updateData.kit_athena_previo            = data.kit_athena_previo;
+      if (data.capacitacao_realizada        !== undefined) updateData.capacitacao_realizada        = data.capacitacao_realizada;
+      if (data.nup                          !== undefined) updateData.nup                          = data.nup || null; // ← era suite_implantada
+      if (data.observacoes                  !== undefined) updateData.observacoes                  = data.observacoes;
+      if (data.anexos                       !== undefined) updateData.anexos                       = data.anexos;
 
       const { error } = await supabase
         .from('solicitacoes')
         .update(updateData)
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -91,7 +93,7 @@ export function useSolicitacoes() {
         .from('solicitacoes')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -103,6 +105,8 @@ export function useSolicitacoes() {
     },
   });
 
+  // ── Transformar solicitação em equipamento ────────────────────────────────
+  // Herda todos os campos relevantes da solicitação para evitar retrabalho.
   const transformarEmEquipamento = useMutation({
     mutationFn: async (solicitacaoId: string) => {
       const solicitacao = solicitacoes.find((s) => s.id === solicitacaoId);
@@ -113,20 +117,28 @@ export function useSolicitacoes() {
       const { error } = await supabase
         .from('equipamentos')
         .insert({
-          municipio: solicitacao.municipio,
-          tipo: solicitacao.tipo_equipamento,
-          possui_patrulha: solicitacao.recebeu_patrulha,
-          endereco: '',
-          telefone: '',
-          responsavel: '',
-          observacoes: `Criado a partir da solicitação ${solicitacaoId}. ${solicitacao.observacoes}`,
+          municipio:             solicitacao.municipio,
+          tipo:                  solicitacao.tipo_equipamento,
+          // Campos de acompanhamento herdados da solicitação
+          possui_patrulha:       solicitacao.recebeu_patrulha,
+          kit_athena_entregue:   solicitacao.kit_athena_entregue,
+          kit_athena_previo:     solicitacao.kit_athena_previo ?? false,
+          capacitacao_realizada: solicitacao.capacitacao_realizada,
+          nup:                   solicitacao.nup || null,
+          // Campos a preencher manualmente depois
+          endereco:              '',
+          telefone:              '',
+          responsavel:           '',
+          observacoes:           solicitacao.observacoes
+            ? `[Origem: solicitação ${solicitacaoId}] ${solicitacao.observacoes}`
+            : `[Origem: solicitação ${solicitacaoId}]`,
         });
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipamentos'] });
-      toast.success('Equipamento criado com sucesso a partir da solicitação');
+      toast.success('Equipamento criado com sucesso — dados da solicitação herdados');
     },
     onError: (error) => {
       toast.error('Erro ao transformar em equipamento: ' + error.message);
@@ -136,11 +148,11 @@ export function useSolicitacoes() {
   return {
     solicitacoes,
     isLoading,
-    addSolicitacao: addMutation.mutate,
-    updateSolicitacao: updateMutation.mutate,
-    deleteSolicitacao: deleteMutation.mutate,
+    addSolicitacao:           addMutation.mutate,
+    updateSolicitacao:        updateMutation.mutate,
+    deleteSolicitacao:        deleteMutation.mutate,
     transformarEmEquipamento: transformarEmEquipamento.mutate,
-    isAdding: addMutation.isPending,
+    isAdding:   addMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
   };
