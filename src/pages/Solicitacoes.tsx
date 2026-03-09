@@ -20,6 +20,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
+import { useEquipamentos, validateNup } from '@/hooks/useEquipamentos';
 import {
   municipiosCeara, tiposEquipamento, statusSolicitacao,
   TipoEquipamento, StatusSolicitacao, regioesList, getRegiao,
@@ -30,7 +31,7 @@ import {
   Download, FileSpreadsheet, FileText as FilePdf, ChevronDown,
   ShieldCheck, Users, Package, GraduationCap, Hash,
   CheckCircle2, Circle, CalendarDays, StickyNote,
-  Eye as EyeIcon,
+  Eye as EyeIcon, AlertTriangle, CheckCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -192,6 +193,7 @@ export default function Solicitacoes() {
   const { role } = useAuthContext();
   const canEdit = role !== 'atividades_editor' && role !== 'viewer';
   const { solicitacoes, addSolicitacao, updateSolicitacao, deleteSolicitacao, transformarEmEquipamento, isAdding, isUpdating } = useSolicitacoes();
+  const { equipamentos } = useEquipamentos();
 
   const [searchTerm,   setSearchTerm]   = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -257,6 +259,8 @@ export default function Solicitacoes() {
 
   const handleSubmit = () => {
     if (!formData.municipio || !formData.tipo_equipamento) { toast.error('Preencha os campos obrigatórios'); return; }
+    const nupCheck = validateNup(formData.nup);
+    if (!nupCheck.valid) { toast.error(nupCheck.message ?? 'NUP invalido'); return; }
     if (editingSolicitacao) { updateSolicitacao({ id: editingSolicitacao.id, ...buildPayload() }); }
     else { addSolicitacao(buildPayload()); }
     setIsDialogOpen(false);
@@ -265,6 +269,8 @@ export default function Solicitacoes() {
   // Salva edição e já abre o confirm de transformação em sequência
   const handleSubmitAndTransform = () => {
     if (!formData.municipio || !formData.tipo_equipamento) { toast.error('Preencha os campos obrigatórios'); return; }
+    const nupCheck = validateNup(formData.nup);
+    if (!nupCheck.valid) { toast.error(nupCheck.message ?? 'NUP invalido'); return; }
     if (!editingSolicitacao) return;
     updateSolicitacao({ id: editingSolicitacao.id, ...buildPayload() });
     setIsDialogOpen(false);
@@ -446,6 +452,21 @@ export default function Solicitacoes() {
               </div>
             )}
 
+            {/* ── Alerta: município+tipo já tem equipamento cadastrado ── */}
+            {(() => {
+              if (!formData.municipio || !formData.tipo_equipamento) return null;
+              const equipExistente = equipamentos.find(
+                e => e.municipio === formData.municipio && e.tipo === formData.tipo_equipamento
+              );
+              if (!equipExistente) return null;
+              return (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span><strong>{formData.municipio}</strong> já possui um equipamento do tipo <strong>{formData.tipo_equipamento}</strong> cadastrado. Verifique se esta solicitação é realmente nova.</span>
+                </div>
+              );
+            })()}
+
             <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
               <Label className="text-sm font-semibold">Acompanhamento</Label>
               <div className="grid grid-cols-1 gap-3">
@@ -480,7 +501,24 @@ export default function Solicitacoes() {
                       formatted += value[i];
                     }
                     setFormData({ ...formData, nup: formatted });
-                  }} placeholder="62000.001753/2025-56" />
+                  }} placeholder="62000.001753/2025-56"
+                  className={cn(
+                    formData.nup && !validateNup(formData.nup).valid
+                      ? 'border-red-400 focus-visible:ring-red-400/30'
+                      : formData.nup && validateNup(formData.nup).valid
+                      ? 'border-emerald-400 focus-visible:ring-emerald-400/30'
+                      : ''
+                  )} />
+                  {formData.nup && !validateNup(formData.nup).valid && (
+                    <p className="text-xs text-red-600 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Formato inválido — esperado: 62000.001753/2025-56
+                    </p>
+                  )}
+                  {formData.nup && validateNup(formData.nup).valid && (
+                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> NUP válido
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

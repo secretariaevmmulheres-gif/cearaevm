@@ -6,6 +6,44 @@ import { toast } from 'sonner';
 
 type EquipamentoInsert = Omit<Equipamento, 'id' | 'created_at' | 'updated_at'>;
 
+// Formato: 62000.001753/2025-56
+const NUP_REGEX = /^\d{5}\.\d{6}\/\d{4}-\d{2}$/;
+
+export function validateNup(nup: string | null | undefined): { valid: boolean; message?: string } {
+  if (!nup || nup.trim() === '') return { valid: true };
+  if (!NUP_REGEX.test(nup.trim())) {
+    return { valid: false, message: 'NUP invalido. Formato esperado: 62000.001753/2025-56' };
+  }
+  return { valid: true };
+}
+
+// CMB, CMC e CMM sao unicos por municipio -> bloquear cadastro.
+// DDM e Salas Lilas podem ter multiplos -> apenas avisar.
+const TIPOS_UNICOS: string[] = [
+  'Casa da Mulher Brasileira',
+  'Casa da Mulher Cearense',
+  'Casa da Mulher Municipal',
+];
+
+export function checkDuplicata(
+  equipamentos: { municipio: string; tipo: string; id?: string }[],
+  municipio: string,
+  tipo: string,
+  ignorarId?: string
+): { bloquear: boolean; message: string } | null {
+  const existe = equipamentos.find(
+    e => e.municipio === municipio && e.tipo === tipo && e.id !== ignorarId
+  );
+  if (!existe) return null;
+  const bloquear = TIPOS_UNICOS.includes(tipo);
+  return {
+    bloquear,
+    message: bloquear
+      ? `Ja existe um equipamento do tipo "${tipo}" em ${municipio}. Este tipo so pode ter um por municipio.`
+      : `${municipio} ja possui um equipamento do tipo "${tipo}". Confirme se este e realmente um novo equipamento distinto.`,
+  };
+}
+
 export function useEquipamentos() {
   const queryClient = useQueryClient();
 
@@ -24,6 +62,12 @@ export function useEquipamentos() {
 
   const addMutation = useMutation({
     mutationFn: async (equipamento: EquipamentoInsert) => {
+      const nupCheck = validateNup(equipamento.nup);
+      if (!nupCheck.valid) throw new Error(nupCheck.message);
+
+      const dup = checkDuplicata(equipamentos, equipamento.municipio, equipamento.tipo as string);
+      if (dup?.bloquear) throw new Error(dup.message);
+
       const { data, error } = await supabase
         .from('equipamentos')
         .insert({
@@ -56,6 +100,19 @@ export function useEquipamentos() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<Equipamento> & { id: string }) => {
+      if (data.nup !== undefined) {
+        const nupCheck = validateNup(data.nup);
+        if (!nupCheck.valid) throw new Error(nupCheck.message);
+      }
+
+      if (data.municipio !== undefined || data.tipo !== undefined) {
+        const atual = equipamentos.find(e => e.id === id);
+        const novoMunicipio = data.municipio ?? atual?.municipio ?? '';
+        const novoTipo = data.tipo ?? atual?.tipo ?? '';
+        const dup = checkDuplicata(equipamentos, novoMunicipio, novoTipo as string, id);
+        if (dup?.bloquear) throw new Error(dup.message);
+      }
+
       const updateData: Record<string, unknown> = {};
       if (data.municipio             !== undefined) updateData.municipio             = data.municipio;
       if (data.tipo                  !== undefined) updateData.tipo                  = data.tipo;
@@ -96,7 +153,7 @@ export function useEquipamentos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipamentos'] });
-      toast.success('Equipamento excluído com sucesso');
+      toast.success('Equipamento excluido com sucesso');
     },
     onError: (error) => {
       toast.error('Erro ao excluir equipamento: ' + error.message);

@@ -33,17 +33,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useEquipamentos } from '@/hooks/useEquipamentos';
+import { useEquipamentos, validateNup, checkDuplicata } from '@/hooks/useEquipamentos';
 import { municipiosCeara, tiposEquipamento, TipoEquipamento, regioesList, getRegiao } from '@/data/municipios';
 import { Equipamento } from '@/types';
 import {
   Plus, Pencil, Trash2, Search, Building2, CheckCircle, XCircle,
   Download, FileSpreadsheet, FileText as FilePdf, ChevronDown,
   MapPin, Phone, User, FileText, AlertCircle, ShieldCheck,
-  Package, GraduationCap, Hash,
+  Package, GraduationCap, Hash, AlertTriangle,
   Eye as EyeIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { HistoricoPanel } from '@/components/HistoricoPanel';
 import { exportEquipamentosToPDF, exportEquipamentosToExcel } from '@/lib/exportUtils';
 import {
@@ -340,6 +342,7 @@ export default function Equipamentos() {
   const { role } = useAuthContext();
   const canEdit = role !== 'atividades_editor' && role !== 'viewer';
   const { equipamentos, addEquipamento, updateEquipamento, deleteEquipamento, isAdding, isUpdating } = useEquipamentos();
+  const { solicitacoes } = useSolicitacoes();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<string>('all');
   const [filterPatrulha, setFilterPatrulha] = useState<string>('all');
@@ -416,6 +419,14 @@ export default function Equipamentos() {
 
   const handleSubmit = () => {
     if (!formData.municipio || !formData.tipo) return;
+
+    // ── Validar NUP no frontend antes de enviar ──
+    const nupCheck = validateNup(formData.nup);
+    if (!nupCheck.valid) {
+      toast.error(nupCheck.message ?? 'NUP invalido');
+      return;
+    }
+
     const data = {
       municipio: formData.municipio,
       tipo: formData.tipo as TipoEquipamento,
@@ -652,6 +663,44 @@ export default function Equipamentos() {
               </div>
             </div>
 
+            {/* Alerta duplicata: usa checkDuplicata — bloqueia CMB/CMC/CMM, avisa para demais */}
+            {(() => {
+              if (!formData.municipio || !formData.tipo) return null;
+              const dup = checkDuplicata(
+                equipamentos, formData.municipio, formData.tipo,
+                editingEquipamento?.id
+              );
+              if (!dup) return null;
+              return (
+                <div className={cn(
+                  'flex items-start gap-2 p-3 rounded-lg border text-sm',
+                  dup.bloquear
+                    ? 'bg-red-500/10 border-red-500/20 text-red-700'
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-700'
+                )}>
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{dup.message}</span>
+                </div>
+              );
+            })()}
+
+            {/* ── Alerta conflito: município tem solicitação ativa E equipamento já cadastrado ── */}
+            {(() => {
+              if (!formData.municipio || !formData.tipo || editingEquipamento) return null;
+              const solAtiva = solicitacoes.find(
+                s => s.municipio === formData.municipio &&
+                     s.tipo_equipamento === formData.tipo &&
+                     s.status !== 'Cancelada' && s.status !== 'Inaugurada'
+              );
+              if (!solAtiva) return null;
+              return (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span><strong>{formData.municipio}</strong> tem uma solicitação ativa com status <strong>{solAtiva.status}</strong> para este tipo. Verifique se o equipamento já foi inaugurado antes de cadastrar.</span>
+                </div>
+              );
+            })()}
+
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
               <Label htmlFor="patrulha">Possui Patrulha Maria da Penha?</Label>
               <Switch
@@ -721,9 +770,37 @@ export default function Equipamentos() {
               <Label>NUP (Número do Processo)</Label>
               <Input
                 value={formData.nup}
-                onChange={(e) => setFormData({ ...formData, nup: e.target.value })}
-                placeholder="Ex: 00000.000000/0000-00"
+                onChange={(e) => {
+                  // Máscara automática: 62000.001753/2025-56
+                  const v = e.target.value.replace(/\D/g, '');
+                  let fmt = '';
+                  for (let i = 0; i < v.length && i < 17; i++) {
+                    if (i === 5)  fmt += '.';
+                    if (i === 11) fmt += '/';
+                    if (i === 15) fmt += '-';
+                    fmt += v[i];
+                  }
+                  setFormData({ ...formData, nup: fmt });
+                }}
+                placeholder="62000.001753/2025-56"
+                className={cn(
+                  formData.nup && !validateNup(formData.nup).valid
+                    ? 'border-red-400 focus-visible:ring-red-400/30'
+                    : formData.nup && validateNup(formData.nup).valid
+                    ? 'border-emerald-400 focus-visible:ring-emerald-400/30'
+                    : ''
+                )}
               />
+              {formData.nup && !validateNup(formData.nup).valid && (
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Formato inválido — esperado: 62000.001753/2025-56
+                </p>
+              )}
+              {formData.nup && validateNup(formData.nup).valid && (
+                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" /> NUP válido
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Observações</Label>
@@ -738,8 +815,16 @@ export default function Equipamentos() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={isAdding || isUpdating}>
-              {editingEquipamento ? 'Salvar Alterações' : 'Cadastrar'}
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                isAdding || isUpdating ||
+                (formData.nup ? !validateNup(formData.nup).valid : false) ||
+                (!!formData.municipio && !!formData.tipo &&
+                  !!checkDuplicata(equipamentos, formData.municipio, formData.tipo, editingEquipamento?.id)?.bloquear)
+              }
+            >
+              {editingEquipamento ? 'Salvar Alteracoes' : 'Cadastrar'}
             </Button>
           </DialogFooter>
         </DialogContent>

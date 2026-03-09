@@ -26,13 +26,10 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { exportMapToPDF, captureMapImage, CapturedMapImage } from '@/lib/exportUtils';
+import { exportMapToPDFDirect } from '@/lib/exportUtils';
 import { useMapaContext } from '@/contexts/MapaContext';
 import { toast } from 'sonner';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 
 const normalizarNome = (nome: string): string => {
@@ -115,46 +112,25 @@ export default function Mapa() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [exportHighRes, setExportHighRes] = useState(false);
-  const [exportEmbedLegend, setExportEmbedLegend] = useState(true);
-  const [showExportPreview, setShowExportPreview] = useState(false);
-  const [previewImageData, setPreviewImageData] = useState<CapturedMapImage | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
 
-  const handleCaptureForPreview = async () => {
-    if (!mapContainerRef.current) { toast.error('Não foi possível capturar o mapa'); return; }
-    setIsCapturing(true);
-    try {
-      leafletMapRef.current?.invalidateSize(true);
-      await new Promise((r) => setTimeout(r, 350));
-      const captured = await captureMapImage(mapContainerRef.current, exportHighRes);
-      setPreviewImageData(captured);
-      setMapaCapturado(captured); // salva no contexto global para o Relatório EVM
-      setShowExportPreview(true);
-    } catch {
-      toast.error('Erro ao capturar o mapa');
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const handleRecapture = async () => { setPreviewImageData(null); await handleCaptureForPreview(); };
-
-  const handleConfirmExport = async () => {
-    if (!mapContainerRef.current || !previewImageData) { toast.error('Erro ao exportar'); return; }
+  const handleExportPDF = async () => {
+    if (!geoJsonData) { toast.error('GeoJSON não carregado'); return; }
     setIsExporting(true);
     try {
-      await exportMapToPDF(
-        mapContainerRef.current,
+      // Monta mapa normalizedName → hexColor a partir do municipiosData atual
+      const colorMap = new Map<string, string>();
+      municipiosData.forEach((data, key) => { colorMap.set(key, data.hexColor); });
+      await exportMapToPDFDirect(
+        geoJsonData,
+        colorMap,
         { tipoEquipamento: filterTipoEquipamento, statusSolicitacao: filterStatusSolicitacao, apenasComViatura: filterApenasComViatura, regiao: filterRegiao },
         stats,
-        { highResolution: exportHighRes, embedLegend: exportEmbedLegend },
         equipmentCounts,
-        previewImageData
+        normalizarNome,
       );
       toast.success('Mapa exportado com sucesso!');
-      setShowExportPreview(false);
-      setPreviewImageData(null);
-    } catch {
+    } catch (e) {
+      console.error(e);
       toast.error('Erro ao exportar o mapa');
     } finally {
       setIsExporting(false);
@@ -424,7 +400,7 @@ export default function Mapa() {
           <motion.div initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
             <div
               ref={mapContainerRef}
-              className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden"
+              className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden relative"
               style={{ height: '600px' }}
             >
               {isLoadingGeoJson ? (
@@ -455,124 +431,45 @@ export default function Mapa() {
                   </MapContainer>
                 </ErrorBoundary>
               )}
+
+              {/* ── Legenda sobreposta (canto inferior esquerdo) ── */}
+              <div className="absolute bottom-4 left-4 z-[1000] bg-white/90 dark:bg-card/90 backdrop-blur-sm rounded-xl border border-border shadow-md p-3 max-w-[200px]">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Legenda</p>
+                <div className="space-y-1.5">
+                  {legendItems.map((item) => (
+                    <div key={item.label} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-sm shrink-0 shadow-sm" style={{ backgroundColor: item.color, border: item.color === priorityColors[8] ? '1px solid #d1d5db' : 'none' }} />
+                      <span className="text-[10px] text-foreground flex-1 leading-tight">{item.label}</span>
+                      <span className="text-[10px] font-bold text-muted-foreground shrink-0">{item.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Botão exportar (canto superior direito) ── */}
+              <div className="absolute top-3 right-3 z-[1000]">
+                <Button
+                  onClick={handleExportPDF}
+                  disabled={isExporting || isLoadingGeoJson}
+                  size="sm"
+                  className="gap-2 rounded-xl shadow-md bg-white/90 dark:bg-card/90 backdrop-blur-sm text-foreground border border-border hover:bg-muted"
+                  variant="outline"
+                >
+                  {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  {isExporting ? 'Gerando PDF...' : 'Exportar PDF'}
+                </Button>
+              </div>
+
+              {/* ── Hint clique ── */}
+              <div className="absolute bottom-4 right-4 z-[1000]">
+                <p className="text-[10px] text-muted-foreground bg-white/70 dark:bg-card/70 backdrop-blur-sm px-2 py-1 rounded-lg">
+                  Clique num município para ver detalhes
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              Clique em um município para ver detalhes
-            </p>
           </motion.div>
         </div>
       </div>
-
-      {/* ── Faixa abaixo do mapa: Legenda | Cobertura por Região | Exportar ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-
-        {/* Legenda */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="bg-card rounded-2xl p-4 border border-border shadow-sm"
-        >
-          <h3 className="font-semibold text-sm mb-3">Legenda</h3>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-            {legendItems.map((item) => (
-              <div key={item.label} className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 rounded-sm shrink-0 shadow-sm" style={{ backgroundColor: item.color, border: item.color === priorityColors[8] ? '1px solid #d1d5db' : 'none' }} />
-                <span className="text-xs text-foreground flex-1 truncate">{item.label}</span>
-                <span className="text-xs font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">{item.count}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Cobertura por Região */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-          className="bg-card rounded-2xl p-4 border border-border shadow-sm"
-        >
-          <h3 className="font-semibold text-sm mb-3">Cobertura por Região</h3>
-          <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-            {coberturaPorRegiao.map((r) => (
-              <div
-                key={r.regiao}
-                onClick={() => setFilterRegiao(filterRegiao === r.regiao ? 'all' : r.regiao)}
-                className={cn(
-                  'cursor-pointer rounded-lg px-2 py-1.5 -mx-2 transition-colors',
-                  filterRegiao === r.regiao
-                    ? 'bg-primary/10 ring-1 ring-primary/30'
-                    : 'hover:bg-muted/60'
-                )}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-foreground truncate max-w-[160px]" title={r.regiao}>{r.regiao}</span>
-                  <span className="text-xs font-semibold text-primary ml-2 shrink-0">{r.pct.toFixed(0)}%</span>
-                </div>
-                <ProgressBar
-                  value={r.comEquipamento}
-                  max={r.total}
-                  color={r.pct >= 50 ? 'hsl(160, 60%, 45%)' : r.pct >= 25 ? 'hsl(40, 85%, 55%)' : 'hsl(0, 70%, 55%)'}
-                />
-                <p className="text-[10px] text-muted-foreground mt-0.5">{r.comEquipamento}/{r.total} municípios</p>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Exportar */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-          className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col justify-between"
-        >
-          <div>
-            <h3 className="font-semibold text-sm mb-3">Exportar Mapa</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground">Alta Resolução</Label>
-                <Switch checked={exportHighRes} onCheckedChange={setExportHighRes} />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground">Legenda Embutida</Label>
-                <Switch checked={exportEmbedLegend} onCheckedChange={setExportEmbedLegend} />
-              </div>
-            </div>
-          </div>
-          <Button
-            onClick={handleCaptureForPreview}
-            disabled={isCapturing || isExporting || isLoadingGeoJson}
-            className="w-full gap-2 rounded-xl mt-4"
-            variant="outline"
-          >
-            {isCapturing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {isCapturing ? 'Capturando...' : 'Exportar PDF'}
-          </Button>
-        </motion.div>
-      </div>
-
-      {/* ── Modal de preview de exportação ── */}
-      <Dialog open={showExportPreview} onOpenChange={setShowExportPreview}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Preview da Exportação</DialogTitle>
-            <DialogDescription>Verifique se o mapa está correto antes de exportar.</DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center items-center p-2 bg-muted/30 rounded-xl min-h-[300px]">
-            {previewImageData ? (
-              <img src={previewImageData.dataUrl} alt="Preview do mapa" className="max-w-full max-h-[50vh] rounded-xl shadow-md object-contain" />
-            ) : (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Capturando imagem...</span>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={handleRecapture} disabled={isCapturing} className="gap-2 rounded-xl">
-              <RefreshCw className={cn('w-4 h-4', isCapturing && 'animate-spin')} />
-              Recapturar
-            </Button>
-            <Button variant="ghost" onClick={() => { setShowExportPreview(false); setPreviewImageData(null); }}>Cancelar</Button>
-            <Button onClick={handleConfirmExport} disabled={isExporting || !previewImageData} className="gap-2 rounded-xl">
-              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Exportar PDF
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* ── Modal de detalhes do município ── */}
       <AnimatePresence>

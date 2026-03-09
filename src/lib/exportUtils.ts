@@ -812,43 +812,299 @@ export async function captureMapImage(
   highResolution: boolean = false
 ): Promise<CapturedMapImage> {
   const html2canvasLib = (await import('html2canvas')).default;
-  const originalScrollY = window.scrollY;
-  const elementTop = mapElement.getBoundingClientRect().top + window.scrollY;
-  window.scrollTo({ top: elementTop, behavior: 'instant' });
-  await new Promise(resolve => setTimeout(resolve, 1200));
   const scale = highResolution ? 3 : 2;
-  const canvas = await html2canvasLib(mapElement, {
-    useCORS: true,
-    allowTaint: true,
-    scale: scale,
-    logging: false,
-    backgroundColor: '#f8fafc',
-    width: mapElement.offsetWidth,
-    height: mapElement.offsetHeight,
-    scrollX: 0,
-    scrollY: 0,
-    foreignObjectRendering: false,
-    removeContainer: true,
-    onclone: (_clonedDoc, clonedElement) => {
-      clonedElement.style.transform = 'none';
-      clonedElement.style.position = 'relative';
-      clonedElement.style.left = '0';
-      clonedElement.style.top = '0';
-      const paths = _clonedDoc.querySelectorAll('path');
-      paths.forEach(path => {
-        const fill = path.getAttribute('fill');
-        if (fill) path.style.fill = fill;
-        const stroke = path.getAttribute('stroke');
-        if (stroke) path.style.stroke = stroke;
-      });
-    },
+  const W = 900;
+  const H = 600;
+
+  // Cria um iframe oculto para renderizar o mapa isolado do layout principal
+  // Alternativa: copia o canvas do Leaflet diretamente
+  // O Leaflet renderiza polígonos num SVG e tiles num layer de <img> com CORS
+  // Vamos compor manualmente: fundo neutro + SVG dos polígonos
+
+  const outputCanvas = document.createElement('canvas');
+  outputCanvas.width  = W * scale;
+  outputCanvas.height = H * scale;
+  const ctx = outputCanvas.getContext('2d')!;
+  ctx.scale(scale, scale);
+
+  // Fundo cor dos tiles OSM (bege claro)
+  ctx.fillStyle = '#f0ede8';
+  ctx.fillRect(0, 0, W, H);
+
+  // Pega o bounding rect do elemento mapa para calcular offsets
+  const mapRect = mapElement.getBoundingClientRect();
+
+  // Coleta todos os SVGs do Leaflet (polígonos GeoJSON)
+  const svgs = mapElement.querySelectorAll<SVGSVGElement>('svg');
+  const promises: Promise<void>[] = [];
+
+  svgs.forEach(svg => {
+    const svgRect = svg.getBoundingClientRect();
+    const dx = svgRect.left - mapRect.left;
+    const dy = svgRect.top  - mapRect.top;
+    const sw = svgRect.width  || svg.viewBox?.baseVal?.width  || W;
+    const sh = svgRect.height || svg.viewBox?.baseVal?.height || H;
+
+    // Clona o SVG e aplica estilos inline dos paths
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width',  String(sw));
+    clone.setAttribute('height', String(sh));
+
+    const origPaths  = svg.querySelectorAll<SVGPathElement>('path');
+    const clonePaths = clone.querySelectorAll<SVGPathElement>('path');
+    origPaths.forEach((orig, i) => {
+      const cp = clonePaths[i];
+      if (!cp) return;
+      const cs = window.getComputedStyle(orig);
+      const fill   = orig.style.fill   || cs.fill   || orig.getAttribute('fill')         || 'transparent';
+      const stroke = orig.style.stroke || cs.stroke || orig.getAttribute('stroke')       || '#666';
+      const fo     = orig.style.fillOpacity || orig.getAttribute('fill-opacity') || '0.85';
+      const sw2    = orig.style.strokeWidth || orig.getAttribute('stroke-width') || '0.5';
+      cp.setAttribute('fill',         fill);
+      cp.setAttribute('stroke',       stroke);
+      cp.setAttribute('fill-opacity', fo);
+      cp.setAttribute('stroke-width', sw2);
+      // Remove classes que referenciam estilos externos
+      cp.removeAttribute('class');
+    });
+
+    const serialized = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+
+    promises.push(new Promise<void>(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, dx, dy, sw, sh);
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+      img.src = url;
+    }));
   });
-  window.scrollTo({ top: originalScrollY, behavior: 'instant' });
+
+  await Promise.all(promises);
+
   return {
-    dataUrl: canvas.toDataURL('image/png', 1.0),
-    width: canvas.width,
-    height: canvas.height,
+    dataUrl: outputCanvas.toDataURL('image/png', 1.0),
+    width:   outputCanvas.width,
+    height:  outputCanvas.height,
   };
+}
+
+
+
+/**
+ * Exporta o mapa do Ceará diretamente no jsPDF desenhando os polígonos GeoJSON —
+ * sem html2canvas, sem captura de tela, funciona independente de scroll/modal.
+ */
+export async function exportMapToPDFDirect(
+  geoJsonData: any,
+  municipioColors: Map<string, string>,  // normalizedName → hexColor
+  filters: MapExportFilters,
+  stats: MapExportStats,
+  equipmentCounts: MapEquipmentCounts,
+  normalizeFn: (nome: string) => string,
+) {
+  const doc = new jsPDF('landscape');
+  const PW = doc.internal.pageSize.getWidth();
+  const PH = doc.internal.pageSize.getHeight();
+  const totalComEquipamento = stats.brasileira + stats.cearense + stats.municipal
+    + stats.lilasMunicipal + stats.lilasEstado + stats.lilasDelegacia + stats.ddm;
+
+  // ── Página 1: cabeçalho + estatísticas ──────────────────────────────────────
+  doc.setFillColor(31, 81, 140);
+  doc.rect(0, 0, PW, 16, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12); doc.setFont(undefined, 'bold');
+  doc.text('Mapa do Ceará — EVM', 14, 10);
+  doc.setFontSize(8); doc.setFont(undefined, 'normal');
+  doc.text('Enfrentamento à Violência contra as Mulheres', 14, 14);
+  doc.setTextColor(0, 0, 0);
+
+  doc.setFontSize(9); doc.setFont(undefined, 'bold');
+  doc.text('Filtros Aplicados', 14, 26); doc.setFont(undefined, 'normal');
+  doc.setFontSize(8);
+  doc.text(`Região: ${filters.regiao && filters.regiao !== 'all' ? filters.regiao : 'Todas'}`, 14, 33);
+  doc.text(`Tipo: ${filters.tipoEquipamento === 'all' ? 'Todos' : filters.tipoEquipamento}`, 14, 38);
+  doc.text(`Status solicitação: ${filters.statusSolicitacao === 'all' ? 'Todos' : filters.statusSolicitacao}`, 14, 43);
+  doc.text(`Apenas com viatura: ${filters.apenasComViatura ? 'Sim' : 'Não'}`, 14, 48);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 53);
+
+  doc.setFontSize(9); doc.setFont(undefined, 'bold');
+  doc.text('Estatísticas de Cobertura', 14, 63); doc.setFont(undefined, 'normal');
+  const statRows = [
+    ['Casa da Mulher Brasileira', equipmentCounts.brasileira],
+    ['Casa da Mulher Cearense', equipmentCounts.cearense],
+    ['Casa da Mulher Municipal', equipmentCounts.municipal],
+    ['Sala Lilás Municipal', equipmentCounts.lilasMunicipal],
+    ['Sala Lilás Gov. Estado', equipmentCounts.lilasEstado],
+    ['Sala Lilás em Delegacia', equipmentCounts.lilasDelegacia],
+    ['DDM', equipmentCounts.ddm],
+    ['Só Viatura', stats.viaturaOnly],
+    ['Sem Cobertura', stats.semCobertura],
+  ] as [string, number][];
+  const legendColors: [number,number,number][] = [
+    [13,148,136],[124,58,237],[234,88,12],[192,38,211],[232,121,249],[240,171,252],[21,128,61],[6,182,212],[229,231,235]
+  ];
+  statRows.forEach(([label, count], i) => {
+    const y = 70 + i * 8;
+    doc.setFillColor(...legendColors[i]);
+    doc.rect(14, y - 3, 4, 4, 'F');
+    doc.setFontSize(8);
+    doc.text(`${label}:`, 21, y);
+    doc.setFont(undefined, 'bold');
+    doc.text(String(count), 80, y);
+    doc.setFont(undefined, 'normal');
+  });
+  const covY = 70 + statRows.length * 8 + 4;
+  doc.setFontSize(9); doc.setFont(undefined, 'bold');
+  doc.text(`Cobertura total: ${(totalComEquipamento/184*100).toFixed(1)}%  (${totalComEquipamento} de 184 municípios)`, 14, covY);
+
+  // ── Página 2: mapa vetorial ──────────────────────────────────────────────────
+  doc.addPage();
+
+  // Cabeçalho
+  doc.setFillColor(31, 81, 140);
+  doc.rect(0, 0, PW, 14, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10); doc.setFont(undefined, 'bold');
+  doc.text('Mapa de Cobertura — Estado do Ceará', PW / 2, 9, { align: 'center' });
+  doc.setTextColor(0, 0, 0);
+
+  // Área do mapa
+  const MAP_MARGIN = 8;
+  const LEGEND_W   = 70;
+  const mapX = MAP_MARGIN;
+  const mapY = 18;
+  const mapW = PW - MAP_MARGIN * 2 - LEGEND_W - 4;
+  const mapH = PH - mapY - 16;
+
+  // Fundo do mapa
+  doc.setFillColor(210, 230, 245);
+  doc.rect(mapX, mapY, mapW, mapH, 'F');
+  doc.setDrawColor(180, 180, 180);
+  doc.rect(mapX, mapY, mapW, mapH, 'S');
+
+  // Calcula bounding box do GeoJSON para projeção
+  let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  if (geoJsonData?.features) {
+    geoJsonData.features.forEach((f: any) => {
+      const coords = f.geometry?.type === 'MultiPolygon'
+        ? f.geometry.coordinates.flat(2)
+        : f.geometry?.coordinates?.flat?.(1) ?? [];
+      coords.forEach(([lon, lat]: number[]) => {
+        if (lon < minLon) minLon = lon;
+        if (lon > maxLon) maxLon = lon;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+      });
+    });
+  }
+
+  const lonRange = maxLon - minLon || 1;
+  const latRange = maxLat - minLat || 1;
+  // padding interno
+  const pad = 4;
+  const drawW = mapW - pad * 2;
+  const drawH = mapH - pad * 2;
+
+  // Projeção: lon/lat → mm no PDF (eixo Y invertido)
+  const project = (lon: number, lat: number): [number, number] => {
+    const x = mapX + pad + ((lon - minLon) / lonRange) * drawW;
+    const y = mapY + pad + ((maxLat - lat) / latRange) * drawH;
+    return [x, y];
+  };
+
+  // Desenha cada feature
+  if (geoJsonData?.features) {
+    geoJsonData.features.forEach((feature: any) => {
+      const name = feature.properties?.name as string;
+      const hexColor = municipioColors.get(normalizeFn(name)) ?? '#e5e7eb';
+
+      // Converte hex para RGB
+      const r = parseInt(hexColor.slice(1,3), 16);
+      const g = parseInt(hexColor.slice(3,5), 16);
+      const b = parseInt(hexColor.slice(5,7), 16);
+      doc.setFillColor(r, g, b);
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.2);
+
+      const drawPolygon = (ring: number[][]) => {
+        if (ring.length < 3) return;
+        const pts = ring.map(([lon, lat]) => project(lon, lat));
+        // jsPDF lines: move to first, line to rest
+        doc.lines(
+          pts.slice(1).map(([x2, y2], i) => {
+            const [x1, y1] = pts[i];
+            return [x2 - x1, y2 - y1] as [number, number];
+          }),
+          pts[0][0], pts[0][1],
+          [1, 1], 'FD', true
+        );
+      };
+
+      if (feature.geometry?.type === 'Polygon') {
+        feature.geometry.coordinates.forEach((ring: number[][]) => drawPolygon(ring));
+      } else if (feature.geometry?.type === 'MultiPolygon') {
+        feature.geometry.coordinates.forEach((poly: number[][][]) =>
+          poly.forEach((ring: number[][]) => drawPolygon(ring))
+        );
+      }
+    });
+  }
+
+  // ── Legenda ──────────────────────────────────────────────────────────────────
+  const lgX = mapX + mapW + 4;
+  const lgY = mapY;
+  const lgW = LEGEND_W;
+  doc.setFillColor(255, 255, 255); doc.setDrawColor(200, 200, 200);
+  doc.roundedRect(lgX, lgY, lgW, mapH, 2, 2, 'FD');
+  doc.setFontSize(7); doc.setFont(undefined, 'bold');
+  doc.text('LEGENDA', lgX + 3, lgY + 7);
+  doc.setFont(undefined, 'normal');
+  const lgItems = [
+    { color: legendColors[0], label: 'C.M. Brasileira',    count: equipmentCounts.brasileira },
+    { color: legendColors[1], label: 'C.M. Cearense',      count: equipmentCounts.cearense },
+    { color: legendColors[2], label: 'C.M. Municipal',     count: equipmentCounts.municipal },
+    { color: legendColors[3], label: 'Sala Lilás Municipal',     count: equipmentCounts.lilasMunicipal },
+    { color: legendColors[4], label: 'Sala Lilás Gov.Estado',    count: equipmentCounts.lilasEstado },
+    { color: legendColors[5], label: 'Sala Lilás em Delegacia',  count: equipmentCounts.lilasDelegacia },
+    { color: legendColors[6], label: 'DDM',                count: equipmentCounts.ddm },
+    { color: legendColors[7], label: 'Só Viatura',         count: stats.viaturaOnly },
+    { color: legendColors[8], label: 'Sem Cobertura',      count: stats.semCobertura },
+  ];
+  lgItems.forEach((item, i) => {
+    const ly = lgY + 13 + i * 9;
+    doc.setFillColor(...item.color);
+    doc.rect(lgX + 3, ly - 3, 4, 4, 'F');
+    doc.setDrawColor(180, 180, 180);
+    doc.rect(lgX + 3, ly - 3, 4, 4, 'S');
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(6.5);
+    doc.text(item.label, lgX + 9, ly);
+    doc.setFont(undefined, 'bold');
+    doc.text(String(item.count), lgX + lgW - 6, ly, { align: 'right' });
+    doc.setFont(undefined, 'normal');
+  });
+  // Cobertura total
+  const covLy = lgY + 13 + lgItems.length * 9 + 4;
+  doc.setDrawColor(200,200,200);
+  doc.line(lgX + 3, covLy - 3, lgX + lgW - 3, covLy - 3);
+  doc.setFontSize(7); doc.setFont(undefined, 'bold');
+  doc.text('Cobertura:', lgX + 3, covLy + 2);
+  doc.text(`${(totalComEquipamento/184*100).toFixed(1)}%`, lgX + 3, covLy + 8);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(6);
+  doc.text(`${totalComEquipamento}/184 municípios`, lgX + 3, covLy + 13);
+
+  // Rodapé
+  doc.setFontSize(6); doc.setTextColor(120,120,120);
+  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} — EVM Ceará`, PW/2, PH - 4, { align: 'center' });
+
+  doc.save(`mapa-ceara_${ts()}.pdf`);
 }
 
 export async function exportMapToPDF(

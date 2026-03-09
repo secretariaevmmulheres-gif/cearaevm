@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Solicitacao } from '@/types';
 import { TipoEquipamento, StatusSolicitacao } from '@/data/municipios';
 import { toast } from 'sonner';
+import { validateNup } from './useEquipamentos';
 
 type SolicitacaoInsert = Omit<Solicitacao, 'id' | 'created_at' | 'updated_at'>;
 
@@ -24,6 +25,10 @@ export function useSolicitacoes() {
 
   const addMutation = useMutation({
     mutationFn: async (solicitacao: SolicitacaoInsert) => {
+      // ── Validar NUP ──
+      const nupCheck = validateNup(solicitacao.nup);
+      if (!nupCheck.valid) throw new Error(nupCheck.message);
+
       const { data, error } = await supabase
         .from('solicitacoes')
         .insert({
@@ -57,6 +62,12 @@ export function useSolicitacoes() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<Solicitacao> & { id: string }) => {
+      // ── Validar NUP se foi alterado ──
+      if (data.nup !== undefined) {
+        const nupCheck = validateNup(data.nup);
+        if (!nupCheck.valid) throw new Error(nupCheck.message);
+      }
+
       const updateData: Record<string, unknown> = {};
       if (data.municipio                    !== undefined) updateData.municipio                    = data.municipio;
       if (data.data_solicitacao             !== undefined) updateData.data_solicitacao             = data.data_solicitacao;
