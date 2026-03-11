@@ -897,6 +897,146 @@ export async function captureMapImage(
 
 
 /**
+ * Desenha uma página de mapa vetorial no doc jsPDF existente.
+ * Reutilizável tanto no export standalone quanto no Relatório EVM.
+ */
+function drawVectorMapPage(
+  doc: jsPDF,
+  geoJsonData: any,
+  municipioColors: Map<string, string>,
+  stats: MapExportStats,
+  equipmentCounts: MapEquipmentCounts,
+  normalizeFn: (nome: string) => string,
+  totalComEquipamento: number,
+) {
+  const PW = doc.internal.pageSize.getWidth();
+  const PH = doc.internal.pageSize.getHeight();
+
+  // Cabeçalho
+  doc.setFillColor(31, 81, 140);
+  doc.rect(0, 0, PW, 14, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10); doc.setFont(undefined, 'bold');
+  doc.text('Mapa de Cobertura — Estado do Ceará', PW / 2, 9, { align: 'center' });
+  doc.setTextColor(0, 0, 0); doc.setFont(undefined, 'normal');
+
+  const MAP_MARGIN = 8;
+  const LEGEND_W   = 70;
+  const mapX = MAP_MARGIN;
+  const mapY = 18;
+  const mapW = PW - MAP_MARGIN * 2 - LEGEND_W - 4;
+  const mapH = PH - mapY - 16;
+
+  // Fundo
+  doc.setFillColor(210, 230, 245);
+  doc.rect(mapX, mapY, mapW, mapH, 'F');
+  doc.setDrawColor(180, 180, 180);
+  doc.rect(mapX, mapY, mapW, mapH, 'S');
+
+  // Bounding box do GeoJSON
+  let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  if (geoJsonData?.features) {
+    geoJsonData.features.forEach((f: any) => {
+      const coords = f.geometry?.type === 'MultiPolygon'
+        ? f.geometry.coordinates.flat(2)
+        : f.geometry?.coordinates?.flat?.(1) ?? [];
+      coords.forEach(([lon, lat]: number[]) => {
+        if (lon < minLon) minLon = lon;
+        if (lon > maxLon) maxLon = lon;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+      });
+    });
+  }
+
+  const lonRange = maxLon - minLon || 1;
+  const latRange = maxLat - minLat || 1;
+  const pad = 4;
+  const drawW = mapW - pad * 2;
+  const drawH = mapH - pad * 2;
+
+  const project = (lon: number, lat: number): [number, number] => [
+    mapX + pad + ((lon - minLon) / lonRange) * drawW,
+    mapY + pad + ((maxLat - lat) / latRange) * drawH,
+  ];
+
+  const drawPolygon = (ring: number[][]) => {
+    if (ring.length < 3) return;
+    const pts = ring.map(([lon, lat]) => project(lon, lat));
+    doc.lines(
+      pts.slice(1).map(([x2, y2], i) => {
+        const [x1, y1] = pts[i];
+        return [x2 - x1, y2 - y1] as [number, number];
+      }),
+      pts[0][0], pts[0][1],
+      [1, 1], 'FD', true
+    );
+  };
+
+  if (geoJsonData?.features) {
+    geoJsonData.features.forEach((feature: any) => {
+      const hex = municipioColors.get(normalizeFn(feature.properties?.name ?? '')) ?? '#e5e7eb';
+      doc.setFillColor(parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16));
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.2);
+      if (feature.geometry?.type === 'Polygon') {
+        feature.geometry.coordinates.forEach((ring: number[][]) => drawPolygon(ring));
+      } else if (feature.geometry?.type === 'MultiPolygon') {
+        feature.geometry.coordinates.forEach((poly: number[][][]) =>
+          poly.forEach((ring: number[][]) => drawPolygon(ring))
+        );
+      }
+    });
+  }
+
+  // Legenda
+  const legendColors: [number,number,number][] = [
+    [13,148,136],[124,58,237],[234,88,12],[192,38,211],[232,121,249],[240,171,252],[21,128,61],[6,182,212],[229,231,235]
+  ];
+  const lgX = mapX + mapW + 4;
+  const lgY = mapY;
+  const lgW = LEGEND_W;
+  doc.setFillColor(255,255,255); doc.setDrawColor(200,200,200);
+  doc.roundedRect(lgX, lgY, lgW, mapH, 2, 2, 'FD');
+  doc.setFontSize(7); doc.setFont(undefined, 'bold');
+  doc.text('LEGENDA', lgX + 3, lgY + 7);
+  doc.setFont(undefined, 'normal');
+  const lgItems = [
+    { color: legendColors[0], label: 'C.M. Brasileira',         count: equipmentCounts.brasileira },
+    { color: legendColors[1], label: 'C.M. Cearense',           count: equipmentCounts.cearense },
+    { color: legendColors[2], label: 'C.M. Municipal',          count: equipmentCounts.municipal },
+    { color: legendColors[3], label: 'Sala Lilás Municipal',    count: equipmentCounts.lilasMunicipal },
+    { color: legendColors[4], label: 'Sala Lilás Gov.Estado',   count: equipmentCounts.lilasEstado },
+    { color: legendColors[5], label: 'Sala Lilás Delegacia',    count: equipmentCounts.lilasDelegacia },
+    { color: legendColors[6], label: 'DDM',                     count: equipmentCounts.ddm },
+    { color: legendColors[7], label: 'Só Viatura',              count: stats.viaturaOnly },
+    { color: legendColors[8], label: 'Sem Cobertura',           count: stats.semCobertura },
+  ];
+  lgItems.forEach((item, i) => {
+    const ly = lgY + 13 + i * 9;
+    doc.setFillColor(...item.color); doc.rect(lgX+3, ly-3, 4, 4, 'F');
+    doc.setDrawColor(180,180,180); doc.rect(lgX+3, ly-3, 4, 4, 'S');
+    doc.setTextColor(0,0,0); doc.setFontSize(6.5);
+    doc.text(item.label, lgX+9, ly);
+    doc.setFont(undefined,'bold');
+    doc.text(String(item.count), lgX+lgW-6, ly, { align: 'right' });
+    doc.setFont(undefined,'normal');
+  });
+  const covLy = lgY + 13 + lgItems.length * 9 + 4;
+  doc.setDrawColor(200,200,200);
+  doc.line(lgX+3, covLy-3, lgX+lgW-3, covLy-3);
+  doc.setFontSize(7); doc.setFont(undefined,'bold');
+  doc.text('Cobertura:', lgX+3, covLy+2);
+  doc.text(`${(totalComEquipamento/184*100).toFixed(1)}%`, lgX+3, covLy+8);
+  doc.setFont(undefined,'normal'); doc.setFontSize(6);
+  doc.text(`${totalComEquipamento}/184 municípios`, lgX+3, covLy+13);
+
+  doc.setFontSize(6); doc.setTextColor(120,120,120);
+  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} — EVM Ceará`, PW/2, PH-4, { align: 'center' });
+  doc.setTextColor(0,0,0);
+}
+
+/**
  * Exporta o mapa do Ceará diretamente no jsPDF desenhando os polígonos GeoJSON —
  * sem html2canvas, sem captura de tela, funciona independente de scroll/modal.
  */
@@ -963,148 +1103,28 @@ export async function exportMapToPDFDirect(
   doc.setFontSize(9); doc.setFont(undefined, 'bold');
   doc.text(`Cobertura total: ${(totalComEquipamento/184*100).toFixed(1)}%  (${totalComEquipamento} de 184 municípios)`, 14, covY);
 
-  // ── Página 2: mapa vetorial ──────────────────────────────────────────────────
+  // ── Página 2: mapa vetorial (via helper reutilizável) ──────────────────────
   doc.addPage();
-
-  // Cabeçalho
-  doc.setFillColor(31, 81, 140);
-  doc.rect(0, 0, PW, 14, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(10); doc.setFont(undefined, 'bold');
-  doc.text('Mapa de Cobertura — Estado do Ceará', PW / 2, 9, { align: 'center' });
-  doc.setTextColor(0, 0, 0);
-
-  // Área do mapa
-  const MAP_MARGIN = 8;
-  const LEGEND_W   = 70;
-  const mapX = MAP_MARGIN;
-  const mapY = 18;
-  const mapW = PW - MAP_MARGIN * 2 - LEGEND_W - 4;
-  const mapH = PH - mapY - 16;
-
-  // Fundo do mapa
-  doc.setFillColor(210, 230, 245);
-  doc.rect(mapX, mapY, mapW, mapH, 'F');
-  doc.setDrawColor(180, 180, 180);
-  doc.rect(mapX, mapY, mapW, mapH, 'S');
-
-  // Calcula bounding box do GeoJSON para projeção
-  let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
-  if (geoJsonData?.features) {
-    geoJsonData.features.forEach((f: any) => {
-      const coords = f.geometry?.type === 'MultiPolygon'
-        ? f.geometry.coordinates.flat(2)
-        : f.geometry?.coordinates?.flat?.(1) ?? [];
-      coords.forEach(([lon, lat]: number[]) => {
-        if (lon < minLon) minLon = lon;
-        if (lon > maxLon) maxLon = lon;
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-      });
-    });
-  }
-
-  const lonRange = maxLon - minLon || 1;
-  const latRange = maxLat - minLat || 1;
-  // padding interno
-  const pad = 4;
-  const drawW = mapW - pad * 2;
-  const drawH = mapH - pad * 2;
-
-  // Projeção: lon/lat → mm no PDF (eixo Y invertido)
-  const project = (lon: number, lat: number): [number, number] => {
-    const x = mapX + pad + ((lon - minLon) / lonRange) * drawW;
-    const y = mapY + pad + ((maxLat - lat) / latRange) * drawH;
-    return [x, y];
-  };
-
-  // Desenha cada feature
-  if (geoJsonData?.features) {
-    geoJsonData.features.forEach((feature: any) => {
-      const name = feature.properties?.name as string;
-      const hexColor = municipioColors.get(normalizeFn(name)) ?? '#e5e7eb';
-
-      // Converte hex para RGB
-      const r = parseInt(hexColor.slice(1,3), 16);
-      const g = parseInt(hexColor.slice(3,5), 16);
-      const b = parseInt(hexColor.slice(5,7), 16);
-      doc.setFillColor(r, g, b);
-      doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.2);
-
-      const drawPolygon = (ring: number[][]) => {
-        if (ring.length < 3) return;
-        const pts = ring.map(([lon, lat]) => project(lon, lat));
-        // jsPDF lines: move to first, line to rest
-        doc.lines(
-          pts.slice(1).map(([x2, y2], i) => {
-            const [x1, y1] = pts[i];
-            return [x2 - x1, y2 - y1] as [number, number];
-          }),
-          pts[0][0], pts[0][1],
-          [1, 1], 'FD', true
-        );
-      };
-
-      if (feature.geometry?.type === 'Polygon') {
-        feature.geometry.coordinates.forEach((ring: number[][]) => drawPolygon(ring));
-      } else if (feature.geometry?.type === 'MultiPolygon') {
-        feature.geometry.coordinates.forEach((poly: number[][][]) =>
-          poly.forEach((ring: number[][]) => drawPolygon(ring))
-        );
-      }
-    });
-  }
-
-  // ── Legenda ──────────────────────────────────────────────────────────────────
-  const lgX = mapX + mapW + 4;
-  const lgY = mapY;
-  const lgW = LEGEND_W;
-  doc.setFillColor(255, 255, 255); doc.setDrawColor(200, 200, 200);
-  doc.roundedRect(lgX, lgY, lgW, mapH, 2, 2, 'FD');
-  doc.setFontSize(7); doc.setFont(undefined, 'bold');
-  doc.text('LEGENDA', lgX + 3, lgY + 7);
-  doc.setFont(undefined, 'normal');
-  const lgItems = [
-    { color: legendColors[0], label: 'C.M. Brasileira',    count: equipmentCounts.brasileira },
-    { color: legendColors[1], label: 'C.M. Cearense',      count: equipmentCounts.cearense },
-    { color: legendColors[2], label: 'C.M. Municipal',     count: equipmentCounts.municipal },
-    { color: legendColors[3], label: 'Sala Lilás Municipal',     count: equipmentCounts.lilasMunicipal },
-    { color: legendColors[4], label: 'Sala Lilás Gov.Estado',    count: equipmentCounts.lilasEstado },
-    { color: legendColors[5], label: 'Sala Lilás em Delegacia',  count: equipmentCounts.lilasDelegacia },
-    { color: legendColors[6], label: 'DDM',                count: equipmentCounts.ddm },
-    { color: legendColors[7], label: 'Só Viatura',         count: stats.viaturaOnly },
-    { color: legendColors[8], label: 'Sem Cobertura',      count: stats.semCobertura },
-  ];
-  lgItems.forEach((item, i) => {
-    const ly = lgY + 13 + i * 9;
-    doc.setFillColor(...item.color);
-    doc.rect(lgX + 3, ly - 3, 4, 4, 'F');
-    doc.setDrawColor(180, 180, 180);
-    doc.rect(lgX + 3, ly - 3, 4, 4, 'S');
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(6.5);
-    doc.text(item.label, lgX + 9, ly);
-    doc.setFont(undefined, 'bold');
-    doc.text(String(item.count), lgX + lgW - 6, ly, { align: 'right' });
-    doc.setFont(undefined, 'normal');
-  });
-  // Cobertura total
-  const covLy = lgY + 13 + lgItems.length * 9 + 4;
-  doc.setDrawColor(200,200,200);
-  doc.line(lgX + 3, covLy - 3, lgX + lgW - 3, covLy - 3);
-  doc.setFontSize(7); doc.setFont(undefined, 'bold');
-  doc.text('Cobertura:', lgX + 3, covLy + 2);
-  doc.text(`${(totalComEquipamento/184*100).toFixed(1)}%`, lgX + 3, covLy + 8);
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(6);
-  doc.text(`${totalComEquipamento}/184 municípios`, lgX + 3, covLy + 13);
-
-  // Rodapé
-  doc.setFontSize(6); doc.setTextColor(120,120,120);
-  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} — EVM Ceará`, PW/2, PH - 4, { align: 'center' });
+  drawVectorMapPage(doc, geoJsonData, municipioColors, stats, equipmentCounts, normalizeFn, totalComEquipamento);
 
   doc.save(`mapa-ceara_${ts()}.pdf`);
+}
+
+/**
+ * Versão para o Relatório EVM: adiciona a página do mapa num doc jsPDF existente.
+ * Recebe o geoJsonData e o mapa de cores — não depende de html2canvas.
+ */
+export function addVectorMapPageToDoc(
+  doc: jsPDF,
+  geoJsonData: any,
+  municipioColors: Map<string, string>,
+  stats: MapExportStats,
+  equipmentCounts: MapEquipmentCounts,
+  normalizeFn: (nome: string) => string,
+  totalComEquipamento: number,
+) {
+  doc.addPage();
+  drawVectorMapPage(doc, geoJsonData, municipioColors, stats, equipmentCounts, normalizeFn, totalComEquipamento);
 }
 
 export async function exportMapToPDF(
@@ -1280,12 +1300,19 @@ export interface CpdiReportData {
   dataReferencia?: string;
   regiaoFiltro?: string;
   secoesAtivas?: string[];
-  mapaImagem?: CapturedMapImage;
   modoResumo?: boolean;
+  // Mapa vetorial — substitui mapaImagem (sem html2canvas)
+  geoJsonData?: any;
+  municipioColors?: Map<string, string>;
+  normalizeFn?: (nome: string) => string;
+  incluirMapa?: boolean;
+  // Stats do mapa para legenda
+  mapaStats?: MapExportStats;
+  mapaEquipmentCounts?: MapEquipmentCounts;
 }
 
 export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
-  const { equipamentos: eqAll, solicitacoes: solAll, viaturas: viAll, dataReferencia, regiaoFiltro, secoesAtivas, mapaImagem, modoResumo = false } = data;
+  const { equipamentos: eqAll, solicitacoes: solAll, viaturas: viAll, dataReferencia, regiaoFiltro, secoesAtivas, modoResumo = false, geoJsonData, municipioColors, normalizeFn, incluirMapa, mapaStats, mapaEquipmentCounts } = data;
 
   const inclui = (regiao?: string | null) => !regiaoFiltro || !regiao || regiao === regiaoFiltro;
   const equipamentos  = eqAll.filter(e => inclui(getRegiao(e.municipio)));
@@ -1628,51 +1655,10 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     }
   }
 
-  if (mapaImagem) {
-    doc.addPage();
-    const PW2 = doc.internal.pageSize.getWidth();
-    const PH2 = doc.internal.pageSize.getHeight();
-    doc.setFillColor(31, 81, 140);
-    doc.rect(0, 0, PW2, 14, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont(undefined, 'bold');
-    doc.text('Mapa de Cobertura — Estado do Ceará', PW2 / 2, 9, { align: 'center' });
-    doc.setTextColor(0, 0, 0); doc.setFont(undefined, 'normal');
-    const margin2 = 10, topOffset = 18, botOffset = 14;
-    const availW2 = PW2 - margin2 * 2;
-    const availH2 = PH2 - topOffset - botOffset;
-    const aspect = mapaImagem.width / mapaImagem.height;
-    let mW = availW2, mH = mW / aspect;
-    if (mH > availH2) { mH = availH2; mW = mH * aspect; }
-    const mX = margin2 + (availW2 - mW) / 2;
-    const mY = topOffset;
-    doc.addImage(mapaImagem.dataUrl, 'PNG', mX, mY, mW, mH);
-    const lgW = 56, lgItemH = 7;
-    const legendItems2 = [
-      { color: [13, 148, 136]  as [number,number,number], label: 'C.M. Brasileira'  },
-      { color: [124, 58, 237]  as [number,number,number], label: 'C.M. Cearense'    },
-      { color: [234, 88, 12]   as [number,number,number], label: 'C.M. Municipal'   },
-      { color: [217, 70, 239]  as [number,number,number], label: 'Sala Lilás Municipal' },
-      { color: [21, 128, 61]   as [number,number,number], label: 'DDM'              },
-      { color: [74, 222, 128]  as [number,number,number], label: 'Sala Lilás em Delegacia' },
-      { color: [6, 182, 212]   as [number,number,number], label: 'Só Viatura'       },
-      { color: [229, 231, 235] as [number,number,number], label: 'Sem Cobertura'    },
-    ];
-    const lgH2 = 10 + legendItems2.length * lgItemH;
-    const lgX2 = mX + mW - lgW - 3, lgY2 = mY + mH - lgH2 - 3;
-    doc.setFillColor(255, 255, 255); doc.setDrawColor(180, 180, 180);
-    doc.roundedRect(lgX2, lgY2, lgW, lgH2, 2, 2, 'FD');
-    doc.setFontSize(6.5); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
-    doc.text('Legenda', lgX2 + 3, lgY2 + 5.5); doc.setFont(undefined, 'normal');
-    legendItems2.forEach((item, i) => {
-      const ly = lgY2 + 10 + i * lgItemH;
-      doc.setFillColor(...item.color);
-      doc.rect(lgX2 + 3, ly - 2.5, 3.5, 3.5, 'F');
-      doc.setTextColor(0, 0, 0);
-      doc.text(item.label, lgX2 + 9, ly);
-    });
-    doc.setFontSize(7); doc.setTextColor(120, 120, 120);
-    doc.text('Imagem capturada da página Mapa do sistema EVM', PW2 / 2, PH2 - 6, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
+  if (incluirMapa && geoJsonData && municipioColors && normalizeFn && mapaStats && mapaEquipmentCounts) {
+    const totalMapaCom = mapaStats.brasileira + mapaStats.cearense + mapaStats.municipal
+      + mapaStats.lilasMunicipal + mapaStats.lilasEstado + mapaStats.lilasDelegacia + mapaStats.ddm;
+    addVectorMapPageToDoc(doc, geoJsonData, municipioColors, mapaStats, mapaEquipmentCounts, normalizeFn, totalMapaCom);
   }
 
   addPdfFooters(doc);
@@ -1692,6 +1678,7 @@ export interface DiagnosticoFiltros {
 }
 
 export interface PendenciaMunicipio {
+  itemId: string;  // id do equipamento ou solicitação — garante key única no React
   municipio: string;
   regiao: string;
   tipo: string;
@@ -1720,7 +1707,7 @@ export function gerarDiagnostico(
     if (!TIPOS_SEM_KIT.has(e.tipo) && !e.kit_athena_entregue)  pendencias.push('Sem Kit Athena');
     if (!e.capacitacao_realizada)                               pendencias.push('Sem Qualificação');
     if (pendencias.length > 0) {
-      resultado.push({ municipio: e.municipio, regiao: getRegiao(e.municipio) || '—', tipo: e.tipo, pendencias, origem: 'Equipamento' });
+      resultado.push({ itemId: e.id, municipio: e.municipio, regiao: getRegiao(e.municipio) || '—', tipo: e.tipo, pendencias, origem: 'Equipamento' });
     }
   });
 
@@ -1738,7 +1725,7 @@ export function gerarDiagnostico(
       if (dias >= diasSemMovimento) pendencias.push(`Parada há ${dias} dias`);
       if (!s.nup)                   pendencias.push('Sem NUP registrado');
       if (pendencias.length > 0) {
-        resultado.push({ municipio: s.municipio, regiao: getRegiao(s.municipio) || '—', tipo: s.tipo_equipamento, pendencias, origem: 'Solicitação', status: s.status, diasSemMovimento: dias });
+        resultado.push({ itemId: s.id, municipio: s.municipio, regiao: getRegiao(s.municipio) || '—', tipo: s.tipo_equipamento, pendencias, origem: 'Solicitação', status: s.status, diasSemMovimento: dias });
       }
     });
 
@@ -1954,4 +1941,164 @@ export function exportDiagnosticoToExcel(
   XLSX.utils.book_append_sheet(wb, wsTodos, 'Todos');
 
   saveWb(wb, `diagnostico-evm_${ts()}.xlsx`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUALIFICAÇÕES — Export PDF e Excel
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface QualificacaoExport {
+  id: string;
+  nome: string;
+  ministrante: string;
+  data: string;
+  total_pessoas: number;
+  observacoes: string | null;
+  municipios: { municipio: string; quantidade_pessoas: number }[];
+}
+
+export function exportQualificacoesToPDF(qualificacoes: QualificacaoExport[]) {
+  const doc = new jsPDF();
+  let y = addPdfHeader(doc, 'Qualificações', 'Cursos e Qualificações Realizados');
+
+  const PW = doc.internal.pageSize.getWidth();
+
+  // ── Resumo geral ──────────────────────────────────────────────────────────
+  const totalPessoas = qualificacoes.reduce((s, q) => s + q.total_pessoas, 0);
+  const municipiosUnicos = new Set(qualificacoes.flatMap(q => q.municipios.map(m => m.municipio)));
+
+  doc.setFontSize(9); doc.setTextColor(100, 100, 100);
+  doc.text(
+    `Total de cursos: ${qualificacoes.length}  ·  Pessoas qualificadas: ${totalPessoas.toLocaleString('pt-BR')}  ·  Municípios alcançados: ${municipiosUnicos.size}`,
+    14, y
+  );
+  y += 8;
+
+  // ── Tabela de resumo (uma linha por curso) ─────────────────────────────────
+  doc.setTextColor(0, 0, 0);
+  autoTable(doc, {
+    startY: y,
+    head: [['Curso', 'Ministrante', 'Data', 'Pessoas', 'Municípios']],
+    body: qualificacoes.map(q => [
+      q.nome,
+      q.ministrante,
+      fmtDate(q.data),
+      q.total_pessoas.toLocaleString('pt-BR'),
+      q.municipios.length > 0 ? `${q.municipios.length} municípios` : '—',
+    ]),
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [88, 28, 135], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 243, 255] },
+    columnStyles: {
+      0: { cellWidth: 65 },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 28 },
+      3: { cellWidth: 22, halign: 'right' },
+      4: { cellWidth: 28, halign: 'center' },
+    },
+    didDrawPage: () => { addPdfFooters(doc); },
+  });
+
+  // ── Detalhe por curso ──────────────────────────────────────────────────────
+  for (const q of qualificacoes) {
+    if (q.municipios.length === 0) continue;
+
+    doc.addPage();
+    addPdfFooters(doc);
+    let dy = 20;
+
+    // Cabeçalho do curso
+    doc.setFillColor(245, 243, 255);
+    doc.roundedRect(14, dy - 4, PW - 28, 28, 3, 3, 'F');
+    doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(88, 28, 135);
+    doc.text(q.nome, 18, dy + 4);
+    doc.setFont(undefined, 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+    doc.text(`${q.ministrante}  ·  ${fmtDate(q.data)}  ·  ${q.total_pessoas.toLocaleString('pt-BR')} pessoas`, 18, dy + 12);
+    dy += 34;
+
+    // Observações
+    if (q.observacoes) {
+      doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+      const lines = doc.splitTextToSize(q.observacoes, PW - 28) as string[];
+      doc.text(lines, 14, dy);
+      dy += lines.length * 4 + 4;
+    }
+
+    // Tabela de municípios
+    const sortedMun = [...q.municipios].sort((a, b) => b.quantidade_pessoas - a.quantidade_pessoas);
+    const totalMun = sortedMun.reduce((s, m) => s + m.quantidade_pessoas, 0);
+
+    autoTable(doc, {
+      startY: dy,
+      head: [['Município', 'Pessoas Qualificadas']],
+      body: sortedMun.map(m => [m.municipio, m.quantidade_pessoas.toLocaleString('pt-BR')]),
+      foot: [['Total', totalMun.toLocaleString('pt-BR')]],
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [88, 28, 135], textColor: 255 },
+      footStyles: { fillColor: [237, 233, 254], fontStyle: 'bold', textColor: [60, 20, 100] },
+      alternateRowStyles: { fillColor: [250, 249, 255] },
+      columnStyles: {
+        0: { cellWidth: 100 },
+        1: { cellWidth: 50, halign: 'right' },
+      },
+    });
+  }
+
+  addPdfFooters(doc);
+  doc.save(`qualificacoes-evm_${ts()}.pdf`);
+}
+
+export function exportQualificacoesToExcel(qualificacoes: QualificacaoExport[]) {
+  const wb = XLSX.utils.book_new();
+
+  // ── Aba 1: Resumo ──────────────────────────────────────────────────────────
+  const resumoData = qualificacoes.map(q => ({
+    'Curso':             q.nome,
+    'Ministrante':       q.ministrante,
+    'Data':              fmtDate(q.data),
+    'Pessoas (total)':   q.total_pessoas,
+    'Qtd. Municípios':   q.municipios.length,
+    'Pessoas (municípios)': q.municipios.reduce((s, m) => s + m.quantidade_pessoas, 0),
+    'Observações':       q.observacoes ?? '',
+  }));
+  const wsResumo = XLSX.utils.json_to_sheet(resumoData);
+  styleWorksheet(wsResumo, '581C87');
+  XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo');
+
+  // ── Aba 2: Municípios (detalhe) ────────────────────────────────────────────
+  const detData: Record<string, string | number>[] = [];
+  for (const q of qualificacoes) {
+    for (const m of q.municipios) {
+      detData.push({
+        'Curso':             q.nome,
+        'Ministrante':       q.ministrante,
+        'Data':              fmtDate(q.data),
+        'Município':         m.municipio,
+        'Pessoas':           m.quantidade_pessoas,
+      });
+    }
+  }
+  if (detData.length > 0) {
+    const wsDet = XLSX.utils.json_to_sheet(detData);
+    styleWorksheet(wsDet, '7C3AED');
+    XLSX.utils.book_append_sheet(wb, wsDet, 'Por Município');
+  }
+
+  // ── Aba 3: Municípios únicos alcançados ────────────────────────────────────
+  const alcanceMap = new Map<string, number>();
+  for (const q of qualificacoes) {
+    for (const m of q.municipios) {
+      alcanceMap.set(m.municipio, (alcanceMap.get(m.municipio) ?? 0) + m.quantidade_pessoas);
+    }
+  }
+  const alcanceData = Array.from(alcanceMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([municipio, pessoas]) => ({ 'Município': municipio, 'Total Pessoas': pessoas }));
+  if (alcanceData.length > 0) {
+    const wsAlcance = XLSX.utils.json_to_sheet(alcanceData);
+    styleWorksheet(wsAlcance, 'A855F7');
+    XLSX.utils.book_append_sheet(wb, wsAlcance, 'Alcance por Município');
+  }
+
+  saveWb(wb, `qualificacoes-evm_${ts()}.xlsx`);
 }

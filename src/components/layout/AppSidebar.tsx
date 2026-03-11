@@ -16,6 +16,7 @@ import {
   CalendarDays,
   ClipboardList,
   History,
+  GraduationCap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -27,10 +28,10 @@ const menuItems = [
   { path: '/equipamentos',        label: 'Equipamentos', icon: Building2       },
   { path: '/viaturas',            label: 'Viaturas',     icon: Truck           },
   { path: '/solicitacoes',        label: 'Solicitações', icon: FileText        },
-  { path: '/atividades',          label: 'Atividades',   icon: CalendarDays    },
+  { path: '/atividades',          label: 'Atividades',     icon: CalendarDays    },
+  { path: '/qualificacoes',       label: 'Qualificações',  icon: GraduationCap   },
   { path: '/mapa',                label: 'Mapa',         icon: Map             },
   { path: '/relatorio-cpdi',      label: 'Rel. EVM',     icon: ClipboardList   },
-  { path: '/diagnostico',      label: 'Diagnóstico',     icon: Shield   },
   { path: '/historico',           label: 'Histórico',    icon: History         },
 ];
 

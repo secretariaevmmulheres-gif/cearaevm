@@ -9,6 +9,7 @@ import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useAtividades } from '@/hooks/useAtividades';
+import { useEvolucaoTemporal } from '@/hooks/useEvolucaoTemporal';
 import { Button } from '@/components/ui/button';
 import {
   Building2,
@@ -23,6 +24,9 @@ import {
   Image,
   ShieldCheck,
   CalendarDays,
+  TrendingUp,
+  PackageCheck,
+  BarChart2,
 } from 'lucide-react';
 import {
   BarChart,
@@ -38,6 +42,9 @@ import {
   Legend,
   LineChart,
   Line,
+  AreaChart,
+  Area,
+  ComposedChart,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -109,6 +116,7 @@ export default function Dashboard() {
   const { viaturas } = useViaturas();
   const { solicitacoes } = useSolicitacoes();
   const { atividades } = useAtividades();
+  const { data: evolucao, isLoading: evolucaoLoading } = useEvolucaoTemporal();
 
   const equipamentoChartData = Object.entries(stats.equipamentosPorTipo).map(([name, value]) => ({
     name: name === 'Casa da Mulher Brasileira' ? 'CMB'
@@ -307,10 +315,13 @@ export default function Dashboard() {
   })).filter(s => s.total > 0);
 
   // Próximas atividades agendadas (ordenadas por data)
+  // Mostra: de 7 dias atrás até o futuro (atividades recentes ainda relevantes + futuras)
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const limitePassado = new Date(hoje); limitePassado.setDate(hoje.getDate() - 7);
   const proximasAtividades = atividades
-    .filter(a => a.status === 'Agendado')
+    .filter(a => a.status === 'Agendado' && new Date(a.data + 'T00:00:00') >= limitePassado)
     .sort((a, b) => new Date(a.data + 'T00:00:00').getTime() - new Date(b.data + 'T00:00:00').getTime())
-    .slice(0, 6);
+    .slice(0, 10);
 
   const handleExportWithCharts = async () => {
     if (!chartsRef.current) return;
@@ -878,8 +889,6 @@ export default function Dashboard() {
             <div className="divide-y divide-border/50">
               {proximasAtividades.map((a, i) => {
                 const dataAtiv = new Date(a.data + 'T00:00:00');
-                const hoje = new Date();
-                hoje.setHours(0, 0, 0, 0);
                 const diffDias = Math.round((dataAtiv.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
                 const urgente = diffDias <= 7;
                 const passado = diffDias < 0;
@@ -925,6 +934,276 @@ export default function Dashboard() {
             </div>
           </ChartCard>
         )}
+
+        {/* ════════════════════════════════════════════════════════════════
+            SEÇÃO: EVOLUÇÃO TEMPORAL — dados do historico_alteracoes
+            ════════════════════════════════════════════════════════════════ */}
+
+        {/* ── Divisor com título ── */}
+        <div className="col-span-1 md:col-span-2 lg:col-span-4 mt-2">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold">Evolução Temporal</h2>
+              <p className="text-xs text-muted-foreground">Histórico de alterações · desde o início</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Gráfico 1: Inaugurações por mês (barras) ── */}
+        <ChartCard title="Inaugurações por Mês" dotColor="bg-blue-500" delay={20} colSpan={2}>
+          <div className="h-64">
+            {evolucaoLoading ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground/50">
+                <div className="text-center space-y-2">
+                  <BarChart2 className="w-8 h-8 mx-auto animate-pulse" />
+                  <p className="text-sm">Carregando...</p>
+                </div>
+              </div>
+            ) : evolucao.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={evolucao} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} barSize={18}>
+                  <defs>
+                    <linearGradient id="inaugGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(215, 70%, 55%)" />
+                      <stop offset="100%" stopColor="hsl(215, 70%, 40%)" stopOpacity={0.7} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} dy={8} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} dx={-4} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="bg-card border border-border rounded-xl shadow-lg px-4 py-3 text-sm">
+                          <p className="font-semibold mb-1">{label}</p>
+                          <p className="text-blue-500 font-bold">{payload[0].value} inauguraç{Number(payload[0].value) === 1 ? 'ão' : 'ões'}</p>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar dataKey="inauguracoes" name="Inaugurações" fill="url(#inaugGrad)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground/40 text-sm">
+                Sem dados de inauguração no histórico
+              </div>
+            )}
+          </div>
+          {/* Mini-resumo */}
+          {!evolucaoLoading && evolucao.length > 0 && (() => {
+            const total = evolucao.reduce((s, p) => s + p.inauguracoes, 0);
+            const ultimo = [...evolucao].reverse().find(p => p.inauguracoes > 0);
+            return (
+              <div className="mt-3 flex items-center gap-4 pt-3 border-t border-border">
+                <div className="text-center flex-1">
+                  <p className="text-xl font-bold text-blue-500">{total}</p>
+                  <p className="text-xs text-muted-foreground">total registrado</p>
+                </div>
+                {ultimo && (
+                  <div className="text-center flex-1">
+                    <p className="text-xl font-bold">{ultimo.inauguracoes}</p>
+                    <p className="text-xs text-muted-foreground">em {ultimo.month}</p>
+                  </div>
+                )}
+                <div className="text-center flex-1">
+                  <p className="text-xl font-bold">{evolucao.filter(p => p.inauguracoes > 0).length}</p>
+                  <p className="text-xs text-muted-foreground">meses com atividade</p>
+                </div>
+              </div>
+            );
+          })()}
+        </ChartCard>
+
+        {/* ── Gráfico 2: Cobertura Kit Athena acumulada ── */}
+        <ChartCard title="Cobertura Kit Athena (acumulado)" dotColor="bg-emerald-500" delay={21} colSpan={2}>
+          <div className="h-64">
+            {evolucaoLoading ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground/50">
+                <div className="text-center space-y-2">
+                  <PackageCheck className="w-8 h-8 mx-auto animate-pulse" />
+                  <p className="text-sm">Carregando...</p>
+                </div>
+              </div>
+            ) : evolucao.some(p => p.kitAthena > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={evolucao} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="kitGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(160, 55%, 50%)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="hsl(160, 55%, 50%)" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} dy={8} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} dx={-4} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const pt = payload[0].payload;
+                      return (
+                        <div className="bg-card border border-border rounded-xl shadow-lg px-4 py-3 text-sm">
+                          <p className="font-semibold mb-1">{label}</p>
+                          <p className="text-emerald-500 font-bold">{pt.kitAthena} kits acumulados</p>
+                          {pt.kitAthenaMes > 0 && (
+                            <p className="text-muted-foreground text-xs mt-1">+{pt.kitAthenaMes} neste mês</p>
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="kitAthena"
+                    name="Kit Athena"
+                    stroke="hsl(160, 55%, 45%)"
+                    strokeWidth={3}
+                    fill="url(#kitGrad)"
+                    dot={false}
+                    activeDot={{ r: 6, fill: 'hsl(160, 55%, 45%)', stroke: 'white', strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground/40 text-sm">
+                Nenhuma entrega de Kit Athena registrada no histórico
+              </div>
+            )}
+          </div>
+          {!evolucaoLoading && evolucao.length > 0 && (() => {
+            const totalKit = evolucao[evolucao.length - 1]?.kitAthena ?? 0;
+            const mesesComKit = evolucao.filter(p => p.kitAthenaMes > 0).length;
+            const pico = evolucao.reduce((mx, p) => p.kitAthenaMes > mx.kitAthenaMes ? p : mx, evolucao[0]);
+            return (
+              <div className="mt-3 flex items-center gap-4 pt-3 border-t border-border">
+                <div className="text-center flex-1">
+                  <p className="text-xl font-bold text-emerald-500">{totalKit}</p>
+                  <p className="text-xs text-muted-foreground">kits entregues</p>
+                </div>
+                <div className="text-center flex-1">
+                  <p className="text-xl font-bold">{mesesComKit}</p>
+                  <p className="text-xs text-muted-foreground">meses com entrega</p>
+                </div>
+                {pico?.kitAthenaMes > 0 && (
+                  <div className="text-center flex-1">
+                    <p className="text-xl font-bold">{pico.kitAthenaMes}</p>
+                    <p className="text-xs text-muted-foreground">pico em {pico.month}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </ChartCard>
+
+        {/* ── Gráfico 3: Solicitações abertas vs. resolvidas (barras empilhadas) ── */}
+        <ChartCard title="Solicitações por Mês" dotColor="bg-violet-500" delay={22} colSpan={2}>
+          <div className="h-64">
+            {evolucaoLoading ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground/50">
+                <div className="text-center space-y-2">
+                  <BarChart2 className="w-8 h-8 mx-auto animate-pulse" />
+                  <p className="text-sm">Carregando...</p>
+                </div>
+              </div>
+            ) : evolucao.some(p => p.solicAbertasMes > 0 || p.solicResolvMes > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={evolucao} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} barSize={14}>
+                  <defs>
+                    <linearGradient id="solicAbertaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(270, 60%, 60%)" />
+                      <stop offset="100%" stopColor="hsl(270, 60%, 45%)" stopOpacity={0.8} />
+                    </linearGradient>
+                    <linearGradient id="solicResolvGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(142, 55%, 50%)" />
+                      <stop offset="100%" stopColor="hsl(142, 55%, 35%)" stopOpacity={0.8} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} dy={8} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} dx={-4} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const pt = payload[0]?.payload;
+                      return (
+                        <div className="bg-card border border-border rounded-xl shadow-lg px-4 py-3 text-sm min-w-[160px]">
+                          <p className="font-semibold mb-2">{label}</p>
+                          <div className="space-y-1">
+                            <div className="flex justify-between gap-6">
+                              <span className="text-violet-500">Abertas</span>
+                              <span className="font-bold">{pt?.solicAbertasMes ?? 0}</span>
+                            </div>
+                            <div className="flex justify-between gap-6">
+                              <span className="text-emerald-500">Inauguradas</span>
+                              <span className="font-bold">{pt?.solicResolvMes ?? 0}</span>
+                            </div>
+                            {pt?.solicAbertas !== undefined && (
+                              <div className="flex justify-between gap-6 pt-1 border-t border-border mt-1">
+                                <span className="text-muted-foreground text-xs">Backlog</span>
+                                <span className="font-bold text-xs">{pt.solicAbertas}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="top" height={32}
+                    formatter={(value) => <span className="text-xs font-medium text-foreground">{value}</span>}
+                  />
+                  <Bar dataKey="solicAbertasMes" name="Abertas" fill="url(#solicAbertaGrad)" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="solicResolvMes"  name="Inauguradas" fill="url(#solicResolvGrad)" radius={[3, 3, 0, 0]} />
+                  {/* Linha de backlog acumulado */}
+                  <Line
+                    type="monotone"
+                    dataKey="solicAbertas"
+                    name="Backlog"
+                    stroke="hsl(30, 80%, 55%)"
+                    strokeWidth={2}
+                    strokeDasharray="5 3"
+                    dot={false}
+                    activeDot={{ r: 5, fill: 'hsl(30, 80%, 55%)', stroke: 'white', strokeWidth: 2 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground/40 text-sm">
+                Sem dados de solicitações no histórico
+              </div>
+            )}
+          </div>
+          {!evolucaoLoading && evolucao.length > 0 && (() => {
+            const totalAbertas = evolucao.reduce((s, p) => s + p.solicAbertasMes, 0);
+            const totalResolv  = evolucao.reduce((s, p) => s + p.solicResolvMes, 0);
+            const backlog      = evolucao[evolucao.length - 1]?.solicAbertas ?? 0;
+            const taxaResolv   = totalAbertas > 0 ? Math.round((totalResolv / totalAbertas) * 100) : 0;
+            return (
+              <div className="mt-3 flex items-center gap-3 pt-3 border-t border-border">
+                <div className="text-center flex-1">
+                  <p className="text-xl font-bold text-violet-500">{totalAbertas}</p>
+                  <p className="text-xs text-muted-foreground">solicitações</p>
+                </div>
+                <div className="text-center flex-1">
+                  <p className="text-xl font-bold text-emerald-500">{totalResolv}</p>
+                  <p className="text-xs text-muted-foreground">inauguradas</p>
+                </div>
+                <div className="text-center flex-1">
+                  <p className="text-xl font-bold text-amber-500">{taxaResolv}%</p>
+                  <p className="text-xs text-muted-foreground">taxa resolução</p>
+                </div>
+                <div className="text-center flex-1">
+                  <p className="text-xl font-bold">{backlog}</p>
+                  <p className="text-xs text-muted-foreground">backlog atual</p>
+                </div>
+              </div>
+            );
+          })()}
+        </ChartCard>
 
       </div>
     </AppLayout>

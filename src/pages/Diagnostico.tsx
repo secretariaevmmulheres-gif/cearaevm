@@ -634,7 +634,7 @@ export default function Diagnostico() {
                 <AnimatePresence>
                   {pendenciasFiltradas.map((item, i) => (
                     <LinhaTabela
-                      key={`${item.municipio}|${item.tipo}|${item.origem}`}
+                      key={item.itemId}
                       item={item} delay={i * 0.015}
                       itemResolvido={itemTotalmenteResolvido(item)}
                       isResolvido={p => isResolvido(item.municipio, item.tipo, item.origem, p)}

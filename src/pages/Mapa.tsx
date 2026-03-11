@@ -97,7 +97,13 @@ export default function Mapa() {
   const { equipamentos } = useEquipamentos();
   const { viaturas } = useViaturas();
   const { solicitacoes } = useSolicitacoes();
-  const { setMapaCapturado } = useMapaContext();
+  const {
+    setMapaCapturado,
+    setGeoJsonData: setGeoJsonDataCtx,
+    setMunicipioColors,
+    setMapaStats,
+    setMapaEquipmentCounts,
+  } = useMapaContext();
   const [selectedMunicipio, setSelectedMunicipio] = useState<MunicipioData | null>(null);
   const [geoJsonData, setGeoJsonData] = useState<FeatureCollection | null>(null);
   const [isLoadingGeoJson, setIsLoadingGeoJson] = useState(true);
@@ -140,7 +146,11 @@ export default function Mapa() {
   useEffect(() => {
     fetch(CEARA_GEOJSON_URL)
       .then(r => r.json())
-      .then((data: FeatureCollection) => { setGeoJsonData(data); setIsLoadingGeoJson(false); })
+      .then((data: FeatureCollection) => {
+        setGeoJsonData(data);
+        setGeoJsonDataCtx(data);   // ← salva no contexto global
+        setIsLoadingGeoJson(false);
+      })
       .catch(() => setIsLoadingGeoJson(false));
   }, []);
 
@@ -207,6 +217,17 @@ export default function Mapa() {
     return counts;
   }, [municipiosData]);
 
+  // Sincroniza cores, stats e counts no contexto sempre que os dados mudarem
+  // (o RelatorioEVM os lê diretamente daqui, sem recalcular)
+  useEffect(() => {
+    if (!municipiosData.size) return;
+    const colors: Record<string, string> = {};
+    municipiosData.forEach((data, key) => { colors[key] = data.hexColor; });
+    setMunicipioColors(colors);
+  }, [municipiosData]);
+  useEffect(() => { setMapaStats(stats); },                    [stats]);
+  useEffect(() => { setMapaEquipmentCounts(equipmentCounts); }, [equipmentCounts]);
+
   // Cobertura por região para barras de progresso
   const coberturaPorRegiao = useMemo(() => {
     return regioesList.map((regiao) => {
@@ -261,14 +282,13 @@ export default function Mapa() {
   const legendItems = [
     { color: priorityColors[1], label: 'Casa da Mulher Brasileira', count: equipmentCounts.brasileira },
     { color: priorityColors[2], label: 'Casa da Mulher Cearense',   count: equipmentCounts.cearense },
-    { color: priorityColors[3], label: 'Casa da Mulher Municipal', count: equipmentCounts.municipal },
-    { color: priorityColors[4], label: 'Sala Lilás Municipal',    count: equipmentCounts.lilasMunicipal },
-    { color: priorityColors[5], label: 'Sala Lilás Gov. Estado',  count: equipmentCounts.lilasEstado },
-    { color: priorityColors[6], label: 'Sala Lilás em Delegacia', count: equipmentCounts.lilasDelegacia },
-    { color: priorityColors[5], label: 'DDM', count: equipmentCounts.ddm },
-    { color: priorityColors[6], label: 'Sala Lilás em Delegacia', count: equipmentCounts.lilasDelegacia },
-    { color: priorityColors[8], label: 'Só Viatura', count: stats.viaturaOnly },
-    { color: priorityColors[9], label: 'Sem Cobertura', count: stats.semCobertura },
+    { color: priorityColors[3], label: 'Casa da Mulher Municipal',  count: equipmentCounts.municipal },
+    { color: priorityColors[4], label: 'Sala Lilás Municipal',      count: equipmentCounts.lilasMunicipal },
+    { color: priorityColors[5], label: 'Sala Lilás Gov. Estado',    count: equipmentCounts.lilasEstado },
+    { color: priorityColors[6], label: 'Sala Lilás em Delegacia',   count: equipmentCounts.lilasDelegacia },
+    { color: priorityColors[7], label: 'DDM',                       count: equipmentCounts.ddm },
+    { color: priorityColors[8], label: 'Só Viatura',                count: stats.viaturaOnly },
+    { color: priorityColors[9], label: 'Sem Cobertura',             count: stats.semCobertura },
   ];
 
   return (

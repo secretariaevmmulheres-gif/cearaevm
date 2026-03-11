@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -11,13 +11,15 @@ import {
   exportCpdiToPDF,
   exportDiagnosticoToPDF,
   exportDiagnosticoToExcel,
+  MapExportStats,
+  MapEquipmentCounts,
 } from '@/lib/exportUtils';
-import { useMapaContext, MapaCapturada } from '@/contexts/MapaContext';
+import { useMapaContext } from '@/contexts/MapaContext';
 import { cn } from '@/lib/utils';
 import {
   Download, ShieldCheck, Loader2,
   CheckCircle2, Clock, AlertCircle, LayoutList,
-  Filter, X, Settings2, Map, ImageOff,
+  Filter, X, Settings2, Map as MapIcon,
   FileSpreadsheet, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -66,11 +68,9 @@ function ConfiguracaoPDF({
   dataRef, setDataRef,
   onExportar, exporting,
   contagens,
-  mapaCapturado, dataCapturaMap,
   incluirMapa, setIncluirMapa,
-  // Item 5 — threshold configurável
+  geoJsonData,
   diasSemMovimento, setDiasSemMovimento,
-  // Item 8 — diagnóstico dentro do painel
   onDiagnosticoPDF, onDiagnosticoExcel, exportingDiag,
 }: {
   secoesAtivas: Set<SecaoId>;
@@ -82,10 +82,9 @@ function ConfiguracaoPDF({
   onExportar: (resumo?: boolean) => void;
   exporting: boolean;
   contagens: Record<SecaoId, number>;
-  mapaCapturado: MapaCapturada | null;
-  dataCapturaMap: Date | null;
   incluirMapa: boolean;
   setIncluirMapa: (v: boolean) => void;
+  geoJsonData: any;
   diasSemMovimento: number;
   setDiasSemMovimento: (d: number) => void;
   onDiagnosticoPDF: () => void;
@@ -231,27 +230,18 @@ function ConfiguracaoPDF({
           </div>
           <div className={cn(
             'flex items-center gap-3 p-3 rounded-xl border transition-all',
-            mapaCapturado && incluirMapa
+            incluirMapa && geoJsonData
               ? 'border-primary/30 bg-primary/5'
               : 'border-border bg-muted/30'
           )}>
-            {mapaCapturado ? (
+            {geoJsonData ? (
               <>
-                <img
-                  src={mapaCapturado.dataUrl}
-                  alt="Preview mapa"
-                  className="w-20 h-14 object-cover rounded-lg border border-border shrink-0"
-                />
+                <div className="w-20 h-14 rounded-lg border border-border bg-gradient-to-br from-blue-100 to-teal-100 flex items-center justify-center shrink-0">
+                  <MapIcon className="w-6 h-6 text-primary/60" />
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Imagem capturada</p>
-                  {dataCapturaMap && (
-                    <p className="text-xs text-muted-foreground">
-                      {dataCapturaMap.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} — {dataCapturaMap.toLocaleDateString('pt-BR')}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground/60">
-                    {mapaCapturado.width}×{mapaCapturado.height}px
-                  </p>
+                  <p className="text-sm font-medium">Mapa vetorial disponível</p>
+                  <p className="text-xs text-muted-foreground">184 municípios · polígonos GeoJSON</p>
                 </div>
                 <button
                   onClick={() => setIncluirMapa(!incluirMapa)}
@@ -265,17 +255,8 @@ function ConfiguracaoPDF({
               </>
             ) : (
               <div className="flex items-center gap-3 text-muted-foreground/60 py-1">
-                <ImageOff className="w-5 h-5 shrink-0" />
-                <div>
-                  <p className="text-sm">Nenhuma captura disponível</p>
-                  <p className="text-xs">
-                    Acesse a página{' '}
-                    <a href="/mapa" className="text-primary hover:underline font-medium">
-                      Mapa <Map className="w-3 h-3 inline" />
-                    </a>
-                    {' '}e clique em "Exportar PDF" para capturar automaticamente.
-                  </p>
-                </div>
+                <MapIcon className="w-5 h-5 shrink-0" />
+                <p className="text-sm">Visite a página <strong>Mapa</strong> primeiro para habilitar esta seção</p>
               </div>
             )}
           </div>
@@ -514,7 +495,14 @@ export default function RelatorioEVM() {
   const { equipamentos } = useEquipamentos();
   const { solicitacoes } = useSolicitacoes();
   const { viaturas }     = useViaturas();
-  const { mapaCapturado, dataCapturaMap } = useMapaContext();
+
+  // ── Dados do mapa — lidos do contexto (populado pelo Mapa.tsx) ────────────
+  const {
+    geoJsonData,
+    municipioColors: municipioColorsCtx,
+    mapaStats,
+    mapaEquipmentCounts,
+  } = useMapaContext();
 
   const [incluirMapa,        setIncluirMapa]        = useState(true);
   const [exporting,          setExporting]           = useState(false);
@@ -595,6 +583,12 @@ export default function RelatorioEVM() {
     diasSemMovimento,
   };
 
+  // Normalização — usada para lookup no mapa vetorial
+  const normalizarNomeRef = (nome: string) => {
+    const m: Record<string,string> = {'itapagé':'itapajé','itapaje':'itapajé'};
+    const k = nome.toLowerCase().trim(); return m[k] || k;
+  };
+
   const handleExport = async (resumo = false) => {
     setExporting(true);
     try {
@@ -604,8 +598,14 @@ export default function RelatorioEVM() {
         dataReferencia: dataRef,
         regiaoFiltro:   regiaoFiltro === 'all' ? undefined : regiaoFiltro,
         secoesAtivas:   Array.from(secoesAtivas),
-        mapaImagem:     incluirMapa && mapaCapturado ? mapaCapturado : undefined,
         modoResumo:     resumo,
+        incluirMapa:    incluirMapa && !!geoJsonData && !!mapaStats && !!mapaEquipmentCounts,
+        geoJsonData:    geoJsonData,
+        // Converte Record → Map aqui, longe dos imports do lucide que sombreiam o global Map
+        municipioColors: new globalThis.Map(Object.entries(municipioColorsCtx)),
+        normalizeFn:    normalizarNomeRef,
+        mapaStats:      mapaStats ?? undefined,
+        mapaEquipmentCounts: mapaEquipmentCounts ?? undefined,
       });
       toast.success(resumo ? 'Resumo EVM exportado!' : 'Relatório EVM exportado com sucesso!');
     } catch {
@@ -658,7 +658,7 @@ export default function RelatorioEVM() {
         dataRef={dataRef}                 setDataRef={setDataRef}
         onExportar={handleExport}         exporting={exporting}
         contagens={contagens}
-        mapaCapturado={mapaCapturado}     dataCapturaMap={dataCapturaMap}
+        geoJsonData={geoJsonData}
         incluirMapa={incluirMapa}         setIncluirMapa={setIncluirMapa}
         diasSemMovimento={diasSemMovimento} setDiasSemMovimento={setDiasSemMovimento}
         onDiagnosticoPDF={handleDiagnosticoPDF}
