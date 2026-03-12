@@ -6,11 +6,14 @@ import { Button } from '@/components/ui/button';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useViaturas } from '@/hooks/useViaturas';
+import { useQualificacoes } from '@/hooks/useQualificacoes';
 import { getRegiao, regioesList } from '@/data/municipios';
 import {
   exportCpdiToPDF,
   exportDiagnosticoToPDF,
   exportDiagnosticoToExcel,
+  exportQualificacoesToPDF,
+  exportQualificacoesToExcel,
   MapExportStats,
   MapEquipmentCounts,
 } from '@/lib/exportUtils';
@@ -20,7 +23,7 @@ import {
   Download, ShieldCheck, Loader2,
   CheckCircle2, Clock, AlertCircle, LayoutList,
   Filter, X, Settings2, Map as MapIcon,
-  FileSpreadsheet, AlertTriangle,
+  FileSpreadsheet, AlertTriangle, GraduationCap, MapPin, Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -495,6 +498,7 @@ export default function RelatorioEVM() {
   const { equipamentos } = useEquipamentos();
   const { solicitacoes } = useSolicitacoes();
   const { viaturas }     = useViaturas();
+  const { qualificacoes } = useQualificacoes();
 
   // ── Dados do mapa — lidos do contexto (populado pelo Mapa.tsx) ────────────
   const {
@@ -595,6 +599,7 @@ export default function RelatorioEVM() {
       await new Promise(r => setTimeout(r, 50));
       await exportCpdiToPDF({
         equipamentos, solicitacoes, viaturas,
+        qualificacoes,
         dataReferencia: dataRef,
         regiaoFiltro:   regiaoFiltro === 'all' ? undefined : regiaoFiltro,
         secoesAtivas:   Array.from(secoesAtivas),
@@ -608,7 +613,8 @@ export default function RelatorioEVM() {
         mapaEquipmentCounts: mapaEquipmentCounts ?? undefined,
       });
       toast.success(resumo ? 'Resumo EVM exportado!' : 'Relatório EVM exportado com sucesso!');
-    } catch {
+    } catch (err) {
+      console.error('Erro ao exportar relatório EVM:', err);
       toast.error('Erro ao exportar o relatório');
     } finally {
       setExporting(false);
@@ -825,6 +831,85 @@ export default function RelatorioEVM() {
             </>
           ) : <EmptyState msg="Nenhuma viatura PMCE cadastrada." />}
         </SectionCard>
+
+        {/* ── Seção 10: Qualificações ── */}
+        {qualificacoes.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                  <GraduationCap className="w-5 h-5 text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Qualificações Realizadas</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {qualificacoes.length} curso{qualificacoes.length !== 1 ? 's' : ''} · {qualificacoes.reduce((s, q) => s + q.total_pessoas, 0).toLocaleString('pt-BR')} pessoas qualificadas
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => exportQualificacoesToPDF(qualificacoes)}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> PDF
+                </button>
+                <button
+                  onClick={() => exportQualificacoesToExcel(qualificacoes)}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-violet-500/5 border-b border-border">
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Curso</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Ministrante</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Data</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">Pessoas</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">Municípios</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {qualificacoes.map((q, i) => (
+                    <tr key={q.id} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? '' : 'bg-muted/20')}>
+                      <td className="px-4 py-3 font-medium">{q.nome}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{q.ministrante}</td>
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                        {new Date(q.data + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                        {q.total_pessoas.toLocaleString('pt-BR')}
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">
+                        {q.municipios.length > 0 ? (
+                          <span className="flex items-center justify-end gap-1">
+                            <MapPin className="w-3 h-3" />{q.municipios.length}
+                          </span>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-violet-500/5 border-t border-border">
+                    <td colSpan={3} className="px-4 py-3 font-semibold">Total</td>
+                    <td className="px-4 py-3 text-right font-bold tabular-nums">
+                      {qualificacoes.reduce((s, q) => s + q.total_pessoas, 0).toLocaleString('pt-BR')}
+                    </td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">
+                      {new Set(qualificacoes.flatMap(q => q.municipios.map(m => m.municipio))).size} únicos
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

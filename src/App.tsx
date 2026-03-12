@@ -14,8 +14,10 @@ import Viaturas from "./pages/Viaturas";
 import Solicitacoes from "./pages/Solicitacoes";
 import Atividades from "./pages/Atividades";
 import Qualificacoes from "./pages/Qualificacoes";
+import MunicipioPage from "./pages/MunicipioPage";
 import Mapa from "./pages/Mapa";
 import RelatorioEVM from "./pages/RelatorioEVM";
+import Diagnostico from "./pages/Diagnostico";
 import Historico from "./pages/Historico";
 import Usuarios from "./pages/Usuarios";
 import Perfil from "./pages/Perfil";
@@ -113,6 +115,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/diagnostico"
+        element={
+          <ProtectedRoute>
+            <Diagnostico />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/historico"
         element={
           <ProtectedRoute>
@@ -133,6 +143,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Perfil />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/municipio/:nome"
+        element={
+          <ProtectedRoute>
+            <MunicipioPage />
           </ProtectedRoute>
         }
       />

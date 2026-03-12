@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -515,9 +516,17 @@ export default function Mapa() {
                   <div className="w-4 h-4 rounded-sm shadow-sm" style={{ backgroundColor: selectedMunicipio.hexColor }} />
                   <h2 className="font-bold text-lg">{selectedMunicipio.nome}</h2>
                 </div>
-                <button onClick={() => setSelectedMunicipio(null)} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    to={`/municipio/${encodeURIComponent(selectedMunicipio.nome)}`}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
+                  >
+                    Ver ficha completa →
+                  </Link>
+                  <button onClick={() => setSelectedMunicipio(null)} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="p-5 space-y-5">

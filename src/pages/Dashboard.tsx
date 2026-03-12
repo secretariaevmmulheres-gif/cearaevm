@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -11,6 +11,9 @@ import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useAtividades } from '@/hooks/useAtividades';
 import { useEvolucaoTemporal } from '@/hooks/useEvolucaoTemporal';
 import { Button } from '@/components/ui/button';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import {
   Building2,
   Truck,
@@ -27,6 +30,9 @@ import {
   TrendingUp,
   PackageCheck,
   BarChart2,
+  ChevronDown,
+  Filter,
+  List,
 } from 'lucide-react';
 import {
   BarChart,
@@ -57,6 +63,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { exportAllToPDF, exportAllToExcel, exportDashboardWithChartsToPDF, exportCpdiToPDF } from '@/lib/exportUtils';
+import { municipiosCeara, abreviarTipo } from '@/data/municipios';
 import { toast } from 'sonner';
 
 const COLORS = [
@@ -116,18 +123,23 @@ export default function Dashboard() {
   const { viaturas } = useViaturas();
   const { solicitacoes } = useSolicitacoes();
   const { atividades } = useAtividades();
-  const { data: evolucao, isLoading: evolucaoLoading } = useEvolucaoTemporal();
+
+  // ── Filtro de ano para gráficos de evolução temporal ──────────────────────
+  const anoAtual = new Date().getFullYear();
+  const [anoFiltro, setAnoFiltro] = useState<string>('todos');
+  const { data: evolucao, isLoading: evolucaoLoading } = useEvolucaoTemporal(
+    anoFiltro === 'todos' ? undefined : Number(anoFiltro)
+  );
+
+  // ── Municípios sem cobertura — lista expandível ───────────────────────────
+  const [semCoberturaExpandido, setSemCoberturaExpandido] = useState(false);
+  const municipiosSemCoberturaLista = useMemo(() => {
+    const comEquip = new Set(equipamentos.map(e => e.municipio));
+    return municipiosCeara.filter(m => !comEquip.has(m)).sort();
+  }, [equipamentos]);
 
   const equipamentoChartData = Object.entries(stats.equipamentosPorTipo).map(([name, value]) => ({
-    name: name === 'Casa da Mulher Brasileira' ? 'CMB'
-        : name === 'Casa da Mulher Cearense' ? 'CMC'
-        : name === 'Casa da Mulher Municipal' ? 'CMM'
-        : name === 'Sala Lilás Municipal' ? 'S.L. Municipal'
-        : name === 'Sala Lilás Governo do Estado' ? 'S.L. Estado'
-        : name === 'Sala Lilás em Delegacia' ? 'S.L. Delegacia'
-        : name === 'DDM' ? 'DDM'
-        : name === 'Sala Lilás em Delegacia' ? 'Sala Deleg.'
-        : name,
+    name: abreviarTipo(name),
     fullName: name,
     value,
   }));
@@ -208,15 +220,7 @@ export default function Dashboard() {
 
     return Array.from(map.entries())
       .map(([name, value]) => ({
-        name: name === 'Casa da Mulher Brasileira' ? 'CMB'
-        : name === 'Casa da Mulher Cearense' ? 'CMC'
-        : name === 'Casa da Mulher Municipal' ? 'CMM'
-        : name === 'Sala Lilás Municipal' ? 'S.L. Municipal'
-        : name === 'Sala Lilás Governo do Estado' ? 'S.L. Estado'
-        : name === 'Sala Lilás em Delegacia' ? 'S.L. Delegacia'
-        : name === 'DDM' ? 'DDM'
-        : name === 'Sala Lilás em Delegacia' ? 'Sala Deleg.'
-        : name,
+        name: abreviarTipo(name),
         fullName: name,
         value,
       }))
@@ -723,8 +727,36 @@ export default function Dashboard() {
                 </div>
                 <span className="text-sm font-medium">Sem Cobertura</span>
               </div>
-              <span className="text-2xl font-display font-bold text-muted-foreground">{stats.municipiosSemEquipamento}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-display font-bold text-muted-foreground">{stats.municipiosSemEquipamento}</span>
+                <button
+                  onClick={() => setSemCoberturaExpandido(v => !v)}
+                  className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  title={semCoberturaExpandido ? 'Recolher lista' : 'Ver lista'}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+
+            {/* Lista expansível de municípios sem cobertura */}
+            {semCoberturaExpandido && municipiosSemCoberturaLista.length > 0 && (
+              <div className="mt-3 rounded-xl border border-border bg-muted/20 max-h-48 overflow-y-auto">
+                <div className="sticky top-0 bg-muted/60 backdrop-blur-sm px-3 py-2 border-b border-border">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {municipiosSemCoberturaLista.length} municípios sem equipamento
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-x-2 p-2">
+                  {municipiosSemCoberturaLista.map(m => (
+                    <div key={m} className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-accent/50 transition-colors">
+                      <MapPin className="w-3 h-3 text-muted-foreground/50 shrink-0" />
+                      <span className="text-xs truncate">{m}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="relative mt-4">
               <div className="relative w-full h-5 bg-muted/50 rounded-full overflow-hidden shadow-inner">
                 <div
@@ -941,13 +973,32 @@ export default function Dashboard() {
 
         {/* ── Divisor com título ── */}
         <div className="col-span-1 md:col-span-2 lg:col-span-4 mt-2">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-primary" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold">Evolução Temporal</h2>
+                <p className="text-xs text-muted-foreground">
+                  {anoFiltro === 'todos' ? 'Todo o período registrado' : `Ano ${anoFiltro}`}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-semibold">Evolução Temporal</h2>
-              <p className="text-xs text-muted-foreground">Histórico de alterações · desde o início</p>
+            {/* Seletor de ano */}
+            <div className="flex items-center gap-2">
+              <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+              <Select value={anoFiltro} onValueChange={setAnoFiltro}>
+                <SelectTrigger className="h-8 w-28 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {[anoAtual - 2, anoAtual - 1, anoAtual].map(ano => (
+                    <SelectItem key={ano} value={String(ano)}>{ano}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>

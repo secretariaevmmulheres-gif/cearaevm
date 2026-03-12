@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -46,6 +47,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
+import { useQualificacoes } from '@/hooks/useQualificacoes';
 import { HistoricoPanel } from '@/components/HistoricoPanel';
 import { exportEquipamentosToPDF, exportEquipamentosToExcel } from '@/lib/exportUtils';
 import {
@@ -186,7 +188,13 @@ function EquipamentoRow({
               className={cn('w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200', expanded && 'rotate-180')}
             />
             <div>
-              <p className="font-medium">{equipamento.municipio}</p>
+              <Link
+                to={`/municipio/${encodeURIComponent(equipamento.municipio)}`}
+                className="font-medium hover:text-primary hover:underline underline-offset-2 transition-colors"
+                onClick={e => e.stopPropagation()}
+              >
+                {equipamento.municipio}
+              </Link>
               {regiao && <p className="text-[11px] text-muted-foreground">{regiao}</p>}
             </div>
           </div>
@@ -343,6 +351,7 @@ export default function Equipamentos() {
   const canEdit = role !== 'atividades_editor' && role !== 'viewer';
   const { equipamentos, addEquipamento, updateEquipamento, deleteEquipamento, isAdding, isUpdating } = useEquipamentos();
   const { solicitacoes } = useSolicitacoes();
+  const { qualificacoes } = useQualificacoes();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<string>('all');
   const [filterPatrulha, setFilterPatrulha] = useState<string>('all');
@@ -363,6 +372,7 @@ export default function Equipamentos() {
     kit_athena_entregue: false,
     kit_athena_previo: false,
     capacitacao_realizada: false,
+    qualificacao_id: '' as string,
     nup: '',
   });
 
@@ -395,7 +405,7 @@ export default function Equipamentos() {
 
   const openCreateDialog = () => {
     setEditingEquipamento(null);
-    setFormData({ municipio: '', tipo: '', possui_patrulha: false, endereco: '', telefone: '', responsavel: '', observacoes: '', kit_athena_entregue: false, kit_athena_previo: false, capacitacao_realizada: false, nup: '' });
+    setFormData({ municipio: '', tipo: '', possui_patrulha: false, endereco: '', telefone: '', responsavel: '', observacoes: '', kit_athena_entregue: false, kit_athena_previo: false, capacitacao_realizada: false, qualificacao_id: '', nup: '' });
     setIsDialogOpen(true);
   };
 
@@ -412,6 +422,7 @@ export default function Equipamentos() {
       kit_athena_entregue: equipamento.kit_athena_entregue ?? false,
       kit_athena_previo:     equipamento.kit_athena_previo    ?? false,
       capacitacao_realizada: equipamento.capacitacao_realizada ?? false,
+      qualificacao_id: (equipamento as any).qualificacao_id || '',
       nup: equipamento.nup || '',
     });
     setIsDialogOpen(true);
@@ -734,9 +745,34 @@ export default function Equipamentos() {
               <Switch
                 id="capacitacao"
                 checked={formData.capacitacao_realizada}
-                onCheckedChange={(v) => setFormData({ ...formData, capacitacao_realizada: v })}
+                onCheckedChange={(v) => setFormData({ ...formData, capacitacao_realizada: v, qualificacao_id: v ? formData.qualificacao_id : '' })}
               />
             </div>
+
+            {formData.capacitacao_realizada && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Vincular a uma qualificação (opcional)</Label>
+                <Select
+                  value={formData.qualificacao_id || 'none'}
+                  onValueChange={v => setFormData({ ...formData, qualificacao_id: v === 'none' ? '' : v })}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Selecionar qualificação..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Não vincular</SelectItem>
+                    {qualificacoes
+                      .filter(q => !formData.municipio || q.municipios.some(m => m.municipio === formData.municipio))
+                      .map(q => (
+                        <SelectItem key={q.id} value={q.id}>
+                          {q.nome} ({new Date(q.data + 'T00:00:00').toLocaleDateString('pt-BR')})
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Endereço</Label>

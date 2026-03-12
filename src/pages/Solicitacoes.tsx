@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useEquipamentos, validateNup } from '@/hooks/useEquipamentos';
+import { useQualificacoes } from '@/hooks/useQualificacoes';
 import {
   municipiosCeara, tiposEquipamento, statusSolicitacao,
   TipoEquipamento, StatusSolicitacao, regioesList, getRegiao,
@@ -105,7 +107,13 @@ function SolicitacaoRow({ solicitacao, onEdit, onDelete, onTransform, canEdit }:
           <div className="flex items-center gap-2">
             <ChevronDown className={cn('w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200', expanded && 'rotate-180')} />
             <div>
-              <p className="font-medium">{solicitacao.municipio}</p>
+              <Link
+                to={`/municipio/${encodeURIComponent(solicitacao.municipio)}`}
+                className="font-medium hover:text-primary hover:underline underline-offset-2 transition-colors"
+                onClick={e => e.stopPropagation()}
+              >
+                {solicitacao.municipio}
+              </Link>
               {regiao && <p className="text-[11px] text-muted-foreground">{regiao}</p>}
             </div>
           </div>
@@ -194,6 +202,7 @@ export default function Solicitacoes() {
   const canEdit = role !== 'atividades_editor' && role !== 'viewer';
   const { solicitacoes, addSolicitacao, updateSolicitacao, deleteSolicitacao, transformarEmEquipamento, isAdding, isUpdating } = useSolicitacoes();
   const { equipamentos } = useEquipamentos();
+  const { qualificacoes } = useQualificacoes();
 
   const [searchTerm,   setSearchTerm]   = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -213,6 +222,7 @@ export default function Solicitacoes() {
     status: 'Recebida' as StatusSolicitacao,
     recebeu_patrulha: false, guarda_municipal_estruturada: false,
     kit_athena_entregue: false, kit_athena_previo: false, capacitacao_realizada: false,
+    qualificacao_id: '' as string,
     nup: '', observacoes: '', anexos: [] as string[],
   });
 
@@ -233,7 +243,7 @@ export default function Solicitacoes() {
     setEditingSolicitacao(null);
     setFormData({ municipio: '', data_solicitacao: format(new Date(), 'yyyy-MM-dd'), tipo_equipamento: '', status: 'Recebida',
       recebeu_patrulha: false, guarda_municipal_estruturada: false, kit_athena_entregue: false, kit_athena_previo: false,
-      capacitacao_realizada: false, nup: '', observacoes: '', anexos: [] });
+      capacitacao_realizada: false, qualificacao_id: '', nup: '', observacoes: '', anexos: [] });
     setIsDialogOpen(true);
   };
 
@@ -243,6 +253,7 @@ export default function Solicitacoes() {
       tipo_equipamento: s.tipo_equipamento, status: s.status, recebeu_patrulha: s.recebeu_patrulha,
       guarda_municipal_estruturada: s.guarda_municipal_estruturada, kit_athena_entregue: s.kit_athena_entregue,
       kit_athena_previo: s.kit_athena_previo ?? false, capacitacao_realizada: s.capacitacao_realizada,
+      qualificacao_id: (s as any).qualificacao_id || '',
       nup: s.nup || '', observacoes: s.observacoes || '', anexos: s.anexos || [] });
     setIsDialogOpen(true);
   };
@@ -474,7 +485,6 @@ export default function Solicitacoes() {
                   { id: 'patrulha', label: 'Recebeu Patrulha Maria da Penha', key: 'recebeu_patrulha'             },
                   { id: 'guarda',   label: 'Guarda Municipal estruturada',    key: 'guarda_municipal_estruturada' },
                   { id: 'kit',      label: 'Kit Athena entregue',             key: 'kit_athena_entregue'          },
-                  { id: 'qualif',   label: 'Qualificação realizada',          key: 'capacitacao_realizada'        },
                 ].map(item => (
                   <div key={item.id} className="flex items-center justify-between">
                     <Label htmlFor={item.id} className="text-sm font-normal">{item.label}</Label>
@@ -482,6 +492,36 @@ export default function Solicitacoes() {
                       onCheckedChange={(v) => setFormData({ ...formData, [item.key]: v })} />
                   </div>
                 ))}
+                {/* Switch de Qualificação com Select de vínculo */}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="qualif" className="text-sm font-normal">Qualificação realizada</Label>
+                  <Switch id="qualif" checked={formData.capacitacao_realizada}
+                    onCheckedChange={(v) => setFormData({ ...formData, capacitacao_realizada: v, qualificacao_id: v ? formData.qualificacao_id : '' })} />
+                </div>
+                {formData.capacitacao_realizada && (
+                  <div className="space-y-1.5 pl-4 border-l-2 border-emerald-400">
+                    <Label className="text-xs text-muted-foreground">Vincular a uma qualificação (opcional)</Label>
+                    <Select
+                      value={formData.qualificacao_id || 'none'}
+                      onValueChange={v => setFormData({ ...formData, qualificacao_id: v === 'none' ? '' : v })}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Selecionar qualificação..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Não vincular</SelectItem>
+                        {qualificacoes
+                          .filter(q => !formData.municipio || q.municipios.some(m => m.municipio === formData.municipio))
+                          .map(q => (
+                            <SelectItem key={q.id} value={q.id}>
+                              {q.nome} ({new Date(q.data + 'T00:00:00').toLocaleDateString('pt-BR')})
+                            </SelectItem>
+                          ))
+                        }
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {formData.kit_athena_entregue && (
                   <div className="flex items-center justify-between pl-4 border-l-2 border-amber-400">
                     <Label htmlFor="kit_previo" className="text-sm font-normal text-amber-700">

@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
@@ -17,10 +17,14 @@ import {
   ClipboardList,
   History,
   GraduationCap,
+  SearchX,
+  Search,
+  MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { municipiosCeara } from '@/data/municipios';
 
 const menuItems = [
   { path: '/dashboard',           label: 'Dashboard',    icon: LayoutDashboard },
@@ -32,6 +36,7 @@ const menuItems = [
   { path: '/qualificacoes',       label: 'Qualificações',  icon: GraduationCap   },
   { path: '/mapa',                label: 'Mapa',         icon: Map             },
   { path: '/relatorio-cpdi',      label: 'Rel. EVM',     icon: ClipboardList   },
+  { path: '/diagnostico',         label: 'Diagnóstico',  icon: SearchX         },
   { path: '/historico',           label: 'Histórico',    icon: History         },
 ];
 
@@ -41,8 +46,39 @@ const adminMenuItems = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate  = useNavigate();
   const { signOut, hasRole, user, role } = useAuthContext();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // ── Busca global por município ─────────────────────────────────────────────
+  const [buscaMunicipio, setBuscaMunicipio] = useState('');
+  const [buscaAberta,    setBuscaAberta]    = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const buscaRef = useRef<HTMLDivElement>(null);
+
+  const resultados = buscaMunicipio.length >= 2
+    ? municipiosCeara
+        .filter(m => m.toLowerCase().includes(buscaMunicipio.toLowerCase()))
+        .slice(0, 8)
+    : [];
+
+  const irParaMunicipio = (nome: string) => {
+    navigate(`/municipio/${encodeURIComponent(nome)}`);
+    setBuscaMunicipio('');
+    setBuscaAberta(false);
+    setIsMobileOpen(false);
+  };
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (buscaRef.current && !buscaRef.current.contains(e.target as Node)) {
+        setBuscaAberta(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handleLogout = async () => {
     await signOut();
@@ -92,8 +128,46 @@ export function AppSidebar() {
             </div>
           </div>
 
+          {/* Busca global por município */}
+          <div className="px-4 pb-2 pt-1" ref={buscaRef}>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder="Buscar município..."
+                value={buscaMunicipio}
+                onChange={e => { setBuscaMunicipio(e.target.value); setBuscaAberta(true); }}
+                onFocus={() => setBuscaAberta(true)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-border bg-muted/40 focus:outline-none focus:ring-1 focus:ring-primary/40 placeholder:text-muted-foreground/60"
+              />
+              {buscaMunicipio && (
+                <button
+                  onClick={() => { setBuscaMunicipio(''); setBuscaAberta(false); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            {buscaAberta && resultados.length > 0 && (
+              <div className="absolute z-50 mt-1 w-48 bg-popover border border-border rounded-xl shadow-xl overflow-hidden">
+                {resultados.map(m => (
+                  <button
+                    key={m}
+                    onClick={() => irParaMunicipio(m)}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-xs text-left hover:bg-accent transition-colors"
+                  >
+                    <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
             {menuItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
@@ -102,13 +176,13 @@ export function AppSidebar() {
                   to={item.path}
                   onClick={() => setIsMobileOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
+                    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                     isActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground"
                       : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                 >
-                  <item.icon className="w-5 h-5" />
+                  <item.icon className="w-4 h-4 shrink-0" />
                   {item.label}
                 </NavLink>
               );
@@ -116,8 +190,8 @@ export function AppSidebar() {
 
             {isAdmin && (
               <>
-                <div className="pt-4 pb-2">
-                  <span className="text-xs text-sidebar-foreground/50 px-4">Administração</span>
+                <div className="pt-3 pb-1">
+                  <span className="text-xs text-sidebar-foreground/50 px-3">Administração</span>
                 </div>
                 {adminMenuItems.map((item) => {
                   const isActive = location.pathname === item.path;
@@ -127,13 +201,13 @@ export function AppSidebar() {
                       to={item.path}
                       onClick={() => setIsMobileOpen(false)}
                       className={cn(
-                        "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
+                        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                         isActive
                           ? "bg-sidebar-primary text-sidebar-primary-foreground"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                       )}
                     >
-                      <item.icon className="w-5 h-5" />
+                      <item.icon className="w-4 h-4 shrink-0" />
                       {item.label}
                     </NavLink>
                   );
@@ -171,7 +245,7 @@ export function AppSidebar() {
               className="w-full justify-start gap-3 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               onClick={handleLogout}
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4 shrink-0" />
               Sair do Sistema
             </Button>
           </div>

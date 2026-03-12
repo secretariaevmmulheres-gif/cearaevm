@@ -237,6 +237,58 @@ export type TipoEquipamento = typeof tiposEquipamento[number];
 export type StatusSolicitacao = typeof statusSolicitacao[number];
 export type OrgaoResponsavel = typeof orgaosResponsaveis[number];
 
+// ── Normalização de nomes ──────────────────────────────────────────────────────
+// Remove acentos, lowercase e espaços duplos — usado ao cruzar dados GeoJSON com o banco
+export function normalizarNome(nome: string): string {
+  return nome
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ── Abreviações canônicas de tipo de equipamento ──────────────────────────────
+export const TIPO_ABREVIACAO: Record<string, string> = {
+  'Casa da Mulher Brasileira':      'CMB',
+  'Casa da Mulher Cearense':        'CMC',
+  'Casa da Mulher Municipal':       'CMM',
+  'Sala Lilás Municipal':           'S.L. Municipal',
+  'Sala Lilás Governo do Estado':   'S.L. Estado',
+  'Sala Lilás em Delegacia':        'S.L. Delegacia',
+  'DDM':                            'DDM',
+};
+
+export function abreviarTipo(tipo: string): string {
+  return TIPO_ABREVIACAO[tipo] ?? tipo;
+}
+
+// ── Cores canônicas por tipo de equipamento ───────────────────────────────────
+// Usadas no Mapa, exportUtils e RelatorioEVM — fonte única de verdade
+export const TIPO_PRIORIDADE: Record<string, number> = {
+  'Casa da Mulher Brasileira':    1,
+  'Casa da Mulher Cearense':      2,
+  'Casa da Mulher Municipal':     3,
+  'Sala Lilás Municipal':         4,
+  'Sala Lilás Governo do Estado': 5,
+  'Sala Lilás em Delegacia':      6,
+  'DDM':                          7,
+  // 8 = só viatura, 9 = sem cobertura, 0 = filtrado fora
+};
+
+export const TIPO_COR_HEX: Record<number, string> = {
+  0: '#e5e7eb',  // filtrado fora
+  1: '#0d9488',  // CMB — teal
+  2: '#7c3aed',  // CMC — violet
+  3: '#ea580c',  // CMM — orange
+  4: '#d946ef',  // Sala Lilás Municipal — fuchsia
+  5: '#f472b6',  // Sala Lilás Gov.Estado — pink
+  6: '#c084fc',  // Sala Lilás Delegacia — purple
+  7: '#16a34a',  // DDM — green
+  8: '#06b6d4',  // Só viatura — cyan
+  9: '#d1d5db',  // Sem cobertura — gray
+};
+
 // Função helper para obter a região de um município
 export function getRegiao(municipio: string): RegiaoPlanejamento | undefined {
   return regioesPlanejamento[municipio as keyof typeof regioesPlanejamento];

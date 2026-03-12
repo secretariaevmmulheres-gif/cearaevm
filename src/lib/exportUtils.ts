@@ -952,12 +952,28 @@ function drawVectorMapPage(
   const lonRange = maxLon - minLon || 1;
   const latRange = maxLat - minLat || 1;
   const pad = 4;
-  const drawW = mapW - pad * 2;
-  const drawH = mapH - pad * 2;
+
+  // Preserva o aspect ratio geográfico — não estica o mapa para preencher a área
+  // O Ceará tem proporção estreita/alta (~lon:lat ≈ 1:2.2), então limitamos pelo eixo mais restritivo
+  const availW = mapW - pad * 2;
+  const availH = mapH - pad * 2;
+  const geoAspect = lonRange / latRange;   // largura / altura em graus
+  let drawW: number, drawH: number;
+  if (availW / availH > geoAspect) {
+    // Limitado pela altura — centraliza horizontalmente
+    drawH = availH;
+    drawW = drawH * geoAspect;
+  } else {
+    // Limitado pela largura — centraliza verticalmente
+    drawW = availW;
+    drawH = drawW / geoAspect;
+  }
+  const offsetX = (availW - drawW) / 2;
+  const offsetY = (availH - drawH) / 2;
 
   const project = (lon: number, lat: number): [number, number] => [
-    mapX + pad + ((lon - minLon) / lonRange) * drawW,
-    mapY + pad + ((maxLat - lat) / latRange) * drawH,
+    mapX + pad + offsetX + ((lon - minLon) / lonRange) * drawW,
+    mapY + pad + offsetY + ((maxLat - lat) / latRange) * drawH,
   ];
 
   const drawPolygon = (ring: number[][]) => {
@@ -1297,6 +1313,7 @@ export interface CpdiReportData {
   equipamentos: Equipamento[];
   solicitacoes: Solicitacao[];
   viaturas: Viatura[];
+  qualificacoes?: QualificacaoExport[];
   dataReferencia?: string;
   regiaoFiltro?: string;
   secoesAtivas?: string[];
@@ -1312,7 +1329,7 @@ export interface CpdiReportData {
 }
 
 export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
-  const { equipamentos: eqAll, solicitacoes: solAll, viaturas: viAll, dataReferencia, regiaoFiltro, secoesAtivas, modoResumo = false, geoJsonData, municipioColors, normalizeFn, incluirMapa, mapaStats, mapaEquipmentCounts } = data;
+  const { equipamentos: eqAll, solicitacoes: solAll, viaturas: viAll, qualificacoes, dataReferencia, regiaoFiltro, secoesAtivas, modoResumo = false, geoJsonData, municipioColors, normalizeFn, incluirMapa, mapaStats, mapaEquipmentCounts } = data;
 
   const inclui = (regiao?: string | null) => !regiaoFiltro || !regiao || regiao === regiaoFiltro;
   const equipamentos  = eqAll.filter(e => inclui(getRegiao(e.municipio)));
@@ -1321,7 +1338,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
 
   const temSecao = (id: string) => !secoesAtivas || secoesAtivas.includes(id);
   const refDate = dataReferencia ? new Date(dataReferencia + 'T00:00:00') : new Date();
-  const doc = new jsPDF();
+  const doc = new jsPDF('landscape');
   const PW = doc.internal.pageSize.getWidth();
 
   // ── Capa ──────────────────────────────────────────────────────────────────
@@ -1467,7 +1484,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
         doc.text('Nenhuma unidade em funcionamento.', 18, yPos);
         doc.setTextColor(0, 0, 0); return yPos + 8;
       }
-      if (yPos > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
+      if (yPos > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
       autoTable(doc, {
         head: [['Município','Região','Endereço']],
         body: items.map(e => [e.municipio, getRegiao(e.municipio) || '—', e.endereco || '—']),
@@ -1475,7 +1492,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
         styles: { fontSize: 7, cellPadding: 2.5 },
         headStyles: { fillColor: hColor, textColor: [255,255,255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248,250,252] },
-        columnStyles: { 0:{cellWidth:50},1:{cellWidth:42},2:{cellWidth:90} },
+        columnStyles: {},
         margin: { left: 14, right: 14, top: 32 },
         didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
       });
@@ -1491,10 +1508,10 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
 
     const colEquip =
       semPatrulha && semKitAthena
-        ? { 0:{cellWidth:40},1:{cellWidth:28},2:{cellWidth:72},3:{cellWidth:42} }
+        ? {}
         : semPatrulha
-        ? { 0:{cellWidth:34},1:{cellWidth:24},2:{cellWidth:56},3:{cellWidth:30},4:{cellWidth:19,halign:'center' as const},5:{cellWidth:19,halign:'center' as const} }
-        : { 0:{cellWidth:30},1:{cellWidth:22},2:{cellWidth:44},3:{cellWidth:28},4:{cellWidth:19,halign:'center' as const},5:{cellWidth:20,halign:'center' as const},6:{cellWidth:19,halign:'center' as const} };
+        ? { 4:{halign:'center' as const},5:{halign:'center' as const} }
+        : { 4:{halign:'center' as const},5:{halign:'center' as const},6:{halign:'center' as const} };
 
     const bodyEquip = (e: Equipamento) => {
       const base = [e.municipio, getRegiao(e.municipio) || '—', e.endereco || '—', e.responsavel || '—'];
@@ -1504,7 +1521,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     };
 
     if (items.length > 0) {
-      if (yPos > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
+      if (yPos > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
       doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
       doc.text('Em funcionamento (' + items.length + ')', 14, yPos);
       doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
@@ -1528,7 +1545,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     }
 
     if (!modoResumo && solics && solics.length > 0) {
-      if (yPos > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
+      if (yPos > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); yPos = 30; }
       doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
       doc.text('Em andamento / Previstas (' + solics.length + ')', 14, yPos);
       doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
@@ -1540,7 +1557,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
         styles: { fontSize: 6.5, cellPadding: 2 },
         headStyles: { fillColor: [Math.round(hColor[0]*0.6), Math.round(hColor[1]*0.6), Math.round(hColor[2]*0.6)] as [number,number,number], textColor:[255,255,255], fontStyle:'bold' },
         alternateRowStyles: { fillColor: [252,252,248] },
-        columnStyles: { 0:{cellWidth:35},1:{cellWidth:26},2:{cellWidth:22},3:{cellWidth:20},4:{cellWidth:22},5:{cellWidth:14,halign:'center' as const},6:{cellWidth:14,halign:'center' as const},7:{cellWidth:16,halign:'center' as const} },
+        columnStyles: { 5:{halign:'center' as const},6:{halign:'center' as const},7:{halign:'center' as const} },
         margin: { left: 14, right: 14, top: 32 },
         didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
       });
@@ -1551,46 +1568,46 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
 
   // ── Seções ────────────────────────────────────────────────────────────────
   if (temSecao('cmb')) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('1. Casa da Mulher Brasileira (CMB)', [13,148,136], y);
     y = tableEquip(cmb, y, [13,148,136], solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Brasileira' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'), { semPatrulha: true, semKitAthena: true });
   }
   if (temSecao('cmc')) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('2. Casa da Mulher Cearense (CMC)', [124,58,237], y);
     y = tableEquip(cmc, y, [124,58,237], solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Cearense' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'), { semPatrulha: true, semKitAthena: true });
   }
   if (temSecao('cmm')) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('3. Casa da Mulher Municipal (CMM)', [234,88,12], y);
     y = tableEquip(cmm, y, [234,88,12], solicitacoes.filter(s => s.tipo_equipamento === 'Casa da Mulher Municipal' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'));
   }
   if (temSecao('lilasMunicipal')) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('4. Salas Lilás Municipal', [192,38,211], y);
     y = tableEquip(lilasMunicipal, y, [192,38,211], solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás Municipal' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'), { semPatrulha: true });
   }
   if (temSecao('lilasEstado')) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('5. Salas Lilás Governo do Estado', [232,121,249], y);
     y = tableEquip(lilasEstado, y, [232,121,249], solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás Governo do Estado' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'), { semPatrulha: true });
   }
   if (temSecao('lilasDelegacia')) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('6. Salas Lilás em Delegacia', [240,171,252], y);
     y = tableEquip(lilasDelegacia, y, [240,171,252], solicitacoes.filter(s => s.tipo_equipamento === 'Sala Lilás em Delegacia' && s.status !== 'Cancelada' && s.status !== 'Inaugurada'), { semPatrulha: true });
   }
   if (temSecao('ddm')) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('7. Delegacias de Defesa da Mulher (DDM)', [21,128,61], y);
     y = addNote('As DDMs são gerenciadas pela Polícia Civil do Ceará e não passam pelo fluxo de solicitações desta Secretaria.', y);
     y = tableEquip(ddm, y, [21,128,61], undefined, { semPatrulha: true, semKitAthena: true });
   }
   if (temSecao('patrulha')) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('8. Patrulhas Maria da Penha', [6,182,212], y);
     if (equipsComPatrulha.length > 0) {
-      if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+      if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
       doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
       doc.text('Vinculadas a equipamentos (' + equipsComPatrulha.length + ')', 14, y);
       doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0); y += 3;
@@ -1601,14 +1618,14 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
         styles: { fontSize: 7, cellPadding: 2.5 },
         headStyles: { fillColor: [6,182,212], textColor:[255,255,255], fontStyle:'bold' },
         alternateRowStyles: { fillColor: [240,253,254] },
-        columnStyles: { 0:{cellWidth:38},1:{cellWidth:30},2:{cellWidth:45},3:{cellWidth:45},4:{cellWidth:25} },
+        columnStyles: {},
         margin: { left: 14, right: 14, top: 32 },
         didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
       });
       y = lastY(doc) + 6;
     }
     if (solicsComPatrulha.length > 0) {
-      if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+      if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
       doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 60, 60);
       doc.text('Aguardando equipamento — já com patrulha (' + solicsComPatrulha.length + ')', 14, y);
       doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0); y += 3;
@@ -1619,7 +1636,7 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
         styles: { fontSize: 7, cellPadding: 2.5 },
         headStyles: { fillColor: [8,145,178], textColor:[255,255,255], fontStyle:'bold' },
         alternateRowStyles: { fillColor: [240,253,254] },
-        columnStyles: { 0:{cellWidth:38},1:{cellWidth:30},2:{cellWidth:42},3:{cellWidth:32},4:{cellWidth:20,halign:'center' as const},5:{cellWidth:20,halign:'center' as const} },
+        columnStyles: { 4:{halign:'center' as const},5:{halign:'center' as const} },
         margin: { left: 14, right: 14, top: 32 },
         didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
       });
@@ -1632,17 +1649,17 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     }
   }
   if (temSecao('viaturas')) {
-    if (y > 240) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
+    if (y > 165) { doc.addPage(); addPdfHeader(doc, 'Relatório EVM'); y = 30; }
     y = addSecHeader('9. Viaturas PMCE', [99,102,241], y);
     if (viaturas.length > 0) {
       autoTable(doc, {
         head: [['Município','Região','Tipo de Patrulha','Órgão','Qtd.','Vinc. Equipamento','Data Implantação']],
         body: viaturas.map(v => [v.municipio, getRegiao(v.municipio)||'—', v.tipo_patrulha, v.orgao_responsavel, String(v.quantidade), v.vinculada_equipamento ? '✓ Sim' : 'Não', fmtDate(v.data_implantacao)]),
         startY: y,
-        styles: { fontSize: 7, cellPadding: 2.5 },
+        styles: { fontSize: 8, cellPadding: 2.5 },
         headStyles: { fillColor: [99,102,241], textColor:[255,255,255], fontStyle:'bold' },
         alternateRowStyles: { fillColor: [245,245,255] },
-        columnStyles: { 0:{cellWidth:35},1:{cellWidth:28},2:{cellWidth:35},3:{cellWidth:22},4:{cellWidth:10,halign:'center' as const},5:{cellWidth:22,halign:'center' as const},6:{cellWidth:24} },
+        columnStyles: { 4:{halign:'center' as const},5:{halign:'center' as const} },
         margin: { left: 14, right: 14, top: 32 },
         didDrawPage: (d) => { if (d.pageNumber > 1) addPdfHeader(doc, 'Relatório EVM'); },
         foot: [['Total','','','',String(totalViaturasPMCE),'','']],
@@ -1659,6 +1676,48 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     const totalMapaCom = mapaStats.brasileira + mapaStats.cearense + mapaStats.municipal
       + mapaStats.lilasMunicipal + mapaStats.lilasEstado + mapaStats.lilasDelegacia + mapaStats.ddm;
     addVectorMapPageToDoc(doc, geoJsonData, municipioColors, mapaStats, mapaEquipmentCounts, normalizeFn, totalMapaCom);
+  }
+
+  // ── Seção de Qualificações ─────────────────────────────────────────────────
+  if (qualificacoes && qualificacoes.length > 0 && !modoResumo) {
+    doc.addPage();
+    let qY = addPdfHeader(doc, 'Qualificações Realizadas');
+    const qPW = doc.internal.pageSize.getWidth();
+    const checkQY = (needed = 10) => {
+      if (qY + needed > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        qY = addPdfHeader(doc, 'Qualificações Realizadas');
+      }
+    };
+
+    const totalPessoas = qualificacoes.reduce((s, q) => s + q.total_pessoas, 0);
+    const municUnicos = new Set(qualificacoes.flatMap(q => q.municipios.map(m => m.municipio))).size;
+
+    // Resumo
+    doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(80, 80, 80);
+    doc.text(`${qualificacoes.length} curso${qualificacoes.length !== 1 ? 's' : ''}  ·  ${totalPessoas.toLocaleString('pt-BR')} pessoas qualificadas  ·  ${municUnicos} municípios alcançados`, qPW / 2, qY, { align: 'center' });
+    qY += 8;
+
+    // Tabela de cursos
+    autoTable(doc, {
+      startY: qY,
+      head: [['Curso', 'Ministrante', 'Data', 'Pessoas', 'Municípios']],
+      body: qualificacoes.map(q => [
+        q.nome,
+        q.ministrante,
+        new Date(q.data + 'T00:00:00').toLocaleDateString('pt-BR'),
+        q.total_pessoas.toLocaleString('pt-BR'),
+        String(q.municipios.length),
+      ]),
+      foot: [['Total', '', '', totalPessoas.toLocaleString('pt-BR'), String(municUnicos) + ' únicos']],
+      headStyles:    { fillColor: [109, 40, 217], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      footStyles:    { fillColor: [237, 233, 254], textColor: [60, 20, 120], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles:    { fontSize: 8 },
+      alternateRowStyles: { fillColor: [250, 248, 255] },
+      columnStyles:  { 3: { halign: 'right' as const }, 4: { halign: 'right' as const } },
+      margin:        { left: 14, right: 14 },
+      didDrawPage:   () => { addPdfFooters(doc); },
+    });
   }
 
   addPdfFooters(doc);

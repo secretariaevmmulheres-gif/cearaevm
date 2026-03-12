@@ -44,7 +44,7 @@ export interface EvolucaoTemporalResult {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useEvolucaoTemporal(): EvolucaoTemporalResult {
+export function useEvolucaoTemporal(anoFiltro?: number): EvolucaoTemporalResult {
   const [data,      setData]      = useState<PontoMensal[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error,     setError]     = useState<string | null>(null);
@@ -139,13 +139,18 @@ export function useEvolucaoTemporal(): EvolucaoTemporalResult {
         };
       });
 
-      setData(points);
+      // ── Aplica filtro de ano se especificado ──────────────────────────────
+      const pointsFiltrados = anoFiltro
+        ? points.filter(p => p.monthKey.startsWith(String(anoFiltro)))
+        : points;
+
+      setData(pointsFiltrados);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar evolução temporal');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [anoFiltro]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

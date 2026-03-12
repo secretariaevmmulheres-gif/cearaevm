@@ -140,9 +140,11 @@ function EventoLinha({ item, delay }: { item: HistoricoAlteracao; delay: number 
 
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function Historico() {
-  const [filtroTabela, setFiltroTabela] = useState<string>('');
-  const [filtroAcao,   setFiltroAcao]   = useState<string>('');
-  const [busca,        setBusca]        = useState('');
+  const [filtroTabela,  setFiltroTabela]  = useState<string>('');
+  const [filtroAcao,    setFiltroAcao]    = useState<string>('');
+  const [filtroCampo,   setFiltroCampo]   = useState<string>('');
+  const [filtroUsuario, setFiltroUsuario] = useState<string>('');
+  const [busca,         setBusca]         = useState('');
 
   // Item 11 — paginação cursor-based
   const {
@@ -171,7 +173,9 @@ export default function Historico() {
   // Filtros locais (ação + busca — sem re-fetch, só filtram o que já veio)
   const filtrado = useMemo(() => {
     let list = historico;
-    if (filtroAcao) list = list.filter(h => h.acao === filtroAcao);
+    if (filtroAcao)    list = list.filter(h => h.acao === filtroAcao);
+    if (filtroCampo)   list = list.filter(h => h.campo === filtroCampo);
+    if (filtroUsuario) list = list.filter(h => (h.usuario_email ?? '').toLowerCase().includes(filtroUsuario.toLowerCase()));
     if (busca) {
       const q = busca.toLowerCase();
       list = list.filter(h =>
@@ -183,7 +187,7 @@ export default function Historico() {
       );
     }
     return list;
-  }, [historico, filtroAcao, busca]);
+  }, [historico, filtroAcao, filtroCampo, filtroUsuario, busca]);
 
   // Contadores por ação (sobre o total já carregado)
   const contadores = useMemo(() => ({
@@ -192,7 +196,17 @@ export default function Historico() {
     DELETE: historico.filter(h => h.acao === 'DELETE').length,
   }), [historico]);
 
-  const temFiltro = filtroAcao || filtroTabela || busca;
+  // Listas únicas para os selects de filtro
+  const camposUnicos = useMemo(() =>
+    Array.from(new Set(historico.map(h => h.campo).filter(Boolean))).sort() as string[],
+    [historico]
+  );
+  const usuariosUnicos = useMemo(() =>
+    Array.from(new Set(historico.map(h => h.usuario_email).filter(Boolean))).sort() as string[],
+    [historico]
+  );
+
+  const temFiltro = filtroAcao || filtroTabela || filtroCampo || filtroUsuario || busca;
 
   return (
     <AppLayout>
@@ -232,8 +246,8 @@ export default function Historico() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6 flex-wrap">
+        <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por município, usuário, campo..."
@@ -252,10 +266,30 @@ export default function Historico() {
           <option value="solicitacoes">Solicitações</option>
           <option value="atividades">Atividades</option>
         </select>
+        <select
+          value={filtroCampo}
+          onChange={e => setFiltroCampo(e.target.value)}
+          className="text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+        >
+          <option value="">Todos os campos</option>
+          {camposUnicos.map(c => (
+            <option key={c} value={c}>{getCampoLabel(c)}</option>
+          ))}
+        </select>
+        <select
+          value={filtroUsuario}
+          onChange={e => setFiltroUsuario(e.target.value)}
+          className="text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 max-w-48"
+        >
+          <option value="">Todos os usuários</option>
+          {usuariosUnicos.map(u => (
+            <option key={u} value={u}>{u}</option>
+          ))}
+        </select>
         {temFiltro && (
           <Button
             variant="ghost" size="sm"
-            onClick={() => { setFiltroAcao(''); setFiltroTabela(''); setBusca(''); }}
+            onClick={() => { setFiltroAcao(''); setFiltroTabela(''); setFiltroCampo(''); setFiltroUsuario(''); setBusca(''); }}
             className="gap-1.5 text-muted-foreground shrink-0"
           >
             <Filter className="w-3.5 h-3.5" />

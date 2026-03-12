@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -175,7 +176,7 @@ function LinhaTabela({
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(delay, 0.2) }}>
             <div className="flex items-center gap-2">
               <div className={cn('w-1.5 h-1.5 rounded-full shrink-0', origemCor.dot)} />
-              <span className={cn('text-sm font-semibold', itemResolvido && 'line-through text-muted-foreground')}>{item.municipio}</span>
+              <Link to={`/municipio/${encodeURIComponent(item.municipio)}`} className={cn('text-sm font-semibold hover:text-primary hover:underline underline-offset-2 transition-colors', itemResolvido && 'line-through text-muted-foreground')}>{item.municipio}</Link>
             </div>
           </motion.div>
         </td>
@@ -215,18 +216,27 @@ function LinhaTabela({
                 <div className="px-6 py-4 border-t border-border/50">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Detalhes do item</p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 gap-1.5 text-xs"
-                      onClick={e => {
-                        e.stopPropagation();
-                        if (item.origem === 'Equipamento' && equipamento) onEditEquipamento(equipamento);
-                        if (item.origem === 'Solicitação' && solicitacao) onEditSolicitacao(solicitacao);
-                      }}
-                    >
-                      <Pencil className="w-3 h-3" /> Editar
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to={`/municipio/${encodeURIComponent(item.municipio)}`}
+                        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        Ver ficha →
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1.5 text-xs"
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (item.origem === 'Equipamento' && equipamento) onEditEquipamento(equipamento);
+                          if (item.origem === 'Solicitação' && solicitacao) onEditSolicitacao(solicitacao);
+                        }}
+                      >
+                        <Pencil className="w-3 h-3" /> Editar
+                      </Button>
+                    </div>
                   </div>
                   {detalhes ?? <p className="text-xs text-muted-foreground/60 italic">Dados não encontrados.</p>}
                 </div>

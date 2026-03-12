@@ -641,7 +641,7 @@ export default function Qualificacoes() {
             {filtered.length} {filtered.length === 1 ? 'registro' : 'registros'}
             {search && ` para "${search}"`}
           </p>
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence>
             {filtered.map(q => (
               <QualificacaoCard
                 key={q.id}
