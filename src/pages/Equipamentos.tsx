@@ -411,19 +411,20 @@ export default function Equipamentos() {
 
   const openEditDialog = (equipamento: Equipamento) => {
     setEditingEquipamento(equipamento);
+    const eq = equipamento as Equipamento & { qualificacao_id?: string | null };
     setFormData({
-      municipio: equipamento.municipio,
-      tipo: equipamento.tipo,
-      possui_patrulha: equipamento.possui_patrulha,
-      endereco: equipamento.endereco || '',
-      telefone: equipamento.telefone || '',
-      responsavel: equipamento.responsavel || '',
-      observacoes: equipamento.observacoes || '',
-      kit_athena_entregue: equipamento.kit_athena_entregue ?? false,
-      kit_athena_previo:     equipamento.kit_athena_previo    ?? false,
-      capacitacao_realizada: equipamento.capacitacao_realizada ?? false,
-      qualificacao_id: (equipamento as any).qualificacao_id || '',
-      nup: equipamento.nup || '',
+      municipio: eq.municipio,
+      tipo: eq.tipo,
+      possui_patrulha: eq.possui_patrulha,
+      endereco: eq.endereco || '',
+      telefone: eq.telefone || '',
+      responsavel: eq.responsavel || '',
+      observacoes: eq.observacoes || '',
+      kit_athena_entregue: eq.kit_athena_entregue ?? false,
+      kit_athena_previo:     eq.kit_athena_previo    ?? false,
+      capacitacao_realizada: eq.capacitacao_realizada ?? false,
+      qualificacao_id: eq.qualificacao_id || '',
+      nup: eq.nup || '',
     });
     setIsDialogOpen(true);
   };
@@ -491,7 +492,7 @@ export default function Equipamentos() {
                 <FilePdf className="w-4 h-4 mr-2" />
                 Exportar PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportEquipamentosToExcel(sortedEquipamentos)}>
+              <DropdownMenuItem onClick={() => exportEquipamentosToExcel(sortedEquipamentos, qualificacoes)}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
                 Exportar Excel
               </DropdownMenuItem>

@@ -550,8 +550,24 @@ export function exportEquipamentosToPDF(equipamentos: Equipamento[], filterRegia
   doc.save(`equipamentos_${ts()}.pdf`);
 }
 
-export function exportEquipamentosToExcel(equipamentos: Equipamento[]) {
-  const data = equipamentos.map(e => ({ 'Município': e.municipio, 'Região': getRegiao(e.municipio) || '', 'Tipo': e.tipo, 'Patrulha M.P.': e.possui_patrulha ? 'Sim' : 'Não', 'Endereço': e.endereco || '', 'Responsável': e.responsavel || '', 'Telefone': e.telefone || '', 'Observações': e.observacoes || '', 'Data de Criação': fmtDate(e.created_at) }));
+export function exportEquipamentosToExcel(equipamentos: Equipamento[], qualificacoes?: QualificacaoExport[]) {
+  const qualMap = new Map(qualificacoes?.map(q => [q.id, q.nome]) ?? []);
+  const data = equipamentos.map(e => ({
+    'Município':          e.municipio,
+    'Região':             getRegiao(e.municipio) || '',
+    'Tipo':               e.tipo,
+    'Patrulha M.P.':      e.possui_patrulha ? 'Sim' : 'Não',
+    'Kit Athena':         e.kit_athena_entregue ? 'Sim' : 'Não',
+    'Kit Athena (Prévio)':e.kit_athena_previo  ? 'Sim' : 'Não',
+    'Capacitação':        e.capacitacao_realizada ? 'Sim' : 'Não',
+    'Curso Vinculado':    e.qualificacao_id ? (qualMap.get(e.qualificacao_id) ?? e.qualificacao_id) : '',
+    'NUP':                e.nup || '',
+    'Endereço':           e.endereco || '',
+    'Responsável':        e.responsavel || '',
+    'Telefone':           e.telefone || '',
+    'Observações':        e.observacoes || '',
+    'Data de Criação':    fmtDate(e.created_at),
+  }));
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
   styleWorksheet(ws, '1F518C');
@@ -604,8 +620,23 @@ export function exportSolicitacoesToPDF(solicitacoes: Solicitacao[], filterRegia
   doc.save(`solicitacoes_${ts()}.pdf`);
 }
 
-export function exportSolicitacoesToExcel(solicitacoes: Solicitacao[]) {
-  const data = solicitacoes.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Status': s.status, 'Data da Solicitação': fmtDate(s.data_solicitacao), 'NUP': s.nup || '', 'Guarda Municipal Estruturada': s.guarda_municipal_estruturada ? 'Sim' : 'Não', 'Recebeu Patrulha': s.recebeu_patrulha ? 'Sim' : 'Não', 'Kit Athena Entregue': s.kit_athena_entregue ? 'Sim' : 'Não', 'Qualificação Realizada': s.capacitacao_realizada ? 'Sim' : 'Não', 'Observações': s.observacoes || '' }));
+export function exportSolicitacoesToExcel(solicitacoes: Solicitacao[], qualificacoes?: QualificacaoExport[]) {
+  const qualMap = new Map(qualificacoes?.map(q => [q.id, q.nome]) ?? []);
+  const data = solicitacoes.map(s => ({
+    'Município':                    s.municipio,
+    'Região':                       getRegiao(s.municipio) || '',
+    'Tipo de Equipamento':          s.tipo_equipamento,
+    'Status':                       s.status,
+    'Data da Solicitação':          fmtDate(s.data_solicitacao),
+    'NUP':                          s.nup || '',
+    'Guarda Municipal Estruturada': s.guarda_municipal_estruturada ? 'Sim' : 'Não',
+    'Recebeu Patrulha':             s.recebeu_patrulha ? 'Sim' : 'Não',
+    'Kit Athena Entregue':          s.kit_athena_entregue ? 'Sim' : 'Não',
+    'Kit Athena (Prévio)':          s.kit_athena_previo  ? 'Sim' : 'Não',
+    'Capacitação Realizada':        s.capacitacao_realizada ? 'Sim' : 'Não',
+    'Curso Vinculado':              s.qualificacao_id ? (qualMap.get(s.qualificacao_id) ?? s.qualificacao_id) : '',
+    'Observações':                  s.observacoes || '',
+  }));
   const wb = XLSX.utils.book_new();
   const sWs2 = XLSX.utils.json_to_sheet(data);
   styleWorksheet(sWs2, 'EA580C');
@@ -1691,17 +1722,22 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
     };
 
     const totalPessoas = qualificacoes.reduce((s, q) => s + q.total_pessoas, 0);
-    const municUnicos = new Set(qualificacoes.flatMap(q => q.municipios.map(m => m.municipio))).size;
+    const municUnicosSet = new Set(qualificacoes.flatMap(q => q.municipios.map(m => m.municipio)));
+    const municUnicos = municUnicosSet.size;
 
     // Resumo
     doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(80, 80, 80);
-    doc.text(`${qualificacoes.length} curso${qualificacoes.length !== 1 ? 's' : ''}  ·  ${totalPessoas.toLocaleString('pt-BR')} pessoas qualificadas  ·  ${municUnicos} municípios alcançados`, qPW / 2, qY, { align: 'center' });
+    doc.text(
+      `${qualificacoes.length} curso${qualificacoes.length !== 1 ? 's' : ''}  ·  ${totalPessoas.toLocaleString('pt-BR')} pessoas qualificadas  ·  ${municUnicos} municípios únicos alcançados`,
+      qPW / 2, qY, { align: 'center' }
+    );
     qY += 8;
 
-    // Tabela de cursos
+    // Tabela de cursos — "Munic. do Curso" = municípios cadastrados naquele curso
+    // O footer mostra municípios ÚNICOS no total (sem repetição entre cursos)
     autoTable(doc, {
       startY: qY,
-      head: [['Curso', 'Ministrante', 'Data', 'Pessoas', 'Municípios']],
+      head: [['Curso', 'Ministrante', 'Data', 'Pessoas', 'Munic. do Curso']],
       body: qualificacoes.map(q => [
         q.nome,
         q.ministrante,
@@ -1709,12 +1745,67 @@ export async function exportCpdiToPDF(data: CpdiReportData): Promise<void> {
         q.total_pessoas.toLocaleString('pt-BR'),
         String(q.municipios.length),
       ]),
-      foot: [['Total', '', '', totalPessoas.toLocaleString('pt-BR'), String(municUnicos) + ' únicos']],
+      foot: [['Total', '', '', totalPessoas.toLocaleString('pt-BR'), municUnicos + ' únicos']],
       headStyles:    { fillColor: [109, 40, 217], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
       footStyles:    { fillColor: [237, 233, 254], textColor: [60, 20, 120], fontStyle: 'bold', fontSize: 9 },
       bodyStyles:    { fontSize: 8 },
       alternateRowStyles: { fillColor: [250, 248, 255] },
       columnStyles:  { 3: { halign: 'right' as const }, 4: { halign: 'right' as const } },
+      margin:        { left: 14, right: 14 },
+      didDrawPage:   () => { addPdfFooters(doc); },
+    });
+
+    // ── Tabela de cobertura por região ──────────────────────────────────────
+    const qRegioesList = [
+      'Cariri', 'Centro Sul', 'Grande Fortaleza', 'Litoral Leste', 'Litoral Norte',
+      'Litoral Oeste', 'Maciço de Baturité', 'Serra de Ibiapaba', 'Sertão Central',
+      'Sertão de Canindé', 'Sertão de Sobral', 'Sertão do Inhamuns',
+      'Sertão dos Crateús', 'Vale do Jaguaribe',
+    ] as const;
+
+    const statsRegiao = qRegioesList.map(regiao => {
+      const municipiosUnicos = new Set<string>();
+      const qualIds = new Set<string>();
+      let pessoasRegiao = 0;
+      qualificacoes.forEach(q => {
+        q.municipios.forEach(m => {
+          if (getRegiao(m.municipio) === regiao) {
+            municipiosUnicos.add(m.municipio);
+            qualIds.add(q.id);
+            pessoasRegiao += m.quantidade_pessoas;
+          }
+        });
+      });
+      return { regiao, numQual: qualIds.size, numMunic: municipiosUnicos.size, pessoas: pessoasRegiao };
+    }).sort((a, b) => b.numQual - a.numQual || b.numMunic - a.numMunic);
+
+    qY = (doc as any).lastAutoTable?.finalY ?? qY;
+    qY += 10;
+    checkQY(60);
+
+    doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(60, 20, 120);
+    doc.text('Cobertura por Região de Planejamento', 14, qY); qY += 6;
+
+    autoTable(doc, {
+      startY: qY,
+      head: [['Região de Planejamento', 'Qualificações', 'Municípios Únicos', 'Pessoas']],
+      body: statsRegiao.map(r => [
+        r.regiao,
+        r.numQual > 0 ? String(r.numQual) : '—',
+        r.numMunic > 0 ? String(r.numMunic) : '—',
+        r.pessoas > 0 ? r.pessoas.toLocaleString('pt-BR') : '—',
+      ]),
+      foot: [[
+        `${statsRegiao.filter(r => r.numQual > 0).length} de 14 regiões alcançadas`,
+        String(qualificacoes.length),
+        String(municUnicos),
+        totalPessoas.toLocaleString('pt-BR'),
+      ]],
+      headStyles:    { fillColor: [109, 40, 217], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      footStyles:    { fillColor: [237, 233, 254], textColor: [60, 20, 120], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles:    { fontSize: 8 },
+      alternateRowStyles: { fillColor: [250, 248, 255] },
+      columnStyles:  { 1: { halign: 'right' as const }, 2: { halign: 'right' as const }, 3: { halign: 'right' as const } },
       margin:        { left: 14, right: 14 },
       didDrawPage:   () => { addPdfFooters(doc); },
     });
@@ -2024,36 +2115,97 @@ export function exportQualificacoesToPDF(qualificacoes: QualificacaoExport[]) {
 
   // ── Resumo geral ──────────────────────────────────────────────────────────
   const totalPessoas = qualificacoes.reduce((s, q) => s + q.total_pessoas, 0);
-  const municipiosUnicos = new Set(qualificacoes.flatMap(q => q.municipios.map(m => m.municipio)));
+  const municipiosUnicosSet = new Set(qualificacoes.flatMap(q => q.municipios.map(m => m.municipio)));
+  const municUnicos = municipiosUnicosSet.size;
 
   doc.setFontSize(9); doc.setTextColor(100, 100, 100);
   doc.text(
-    `Total de cursos: ${qualificacoes.length}  ·  Pessoas qualificadas: ${totalPessoas.toLocaleString('pt-BR')}  ·  Municípios alcançados: ${municipiosUnicos.size}`,
+    `Total de cursos: ${qualificacoes.length}  ·  Pessoas qualificadas: ${totalPessoas.toLocaleString('pt-BR')}  ·  Municípios únicos alcançados: ${municUnicos}`,
     14, y
   );
   y += 8;
 
   // ── Tabela de resumo (uma linha por curso) ─────────────────────────────────
+  // "Munic. do Curso" = municípios cadastrados naquele curso específico
   doc.setTextColor(0, 0, 0);
   autoTable(doc, {
     startY: y,
-    head: [['Curso', 'Ministrante', 'Data', 'Pessoas', 'Municípios']],
+    head: [['Curso', 'Ministrante', 'Data', 'Pessoas', 'Munic. do Curso']],
     body: qualificacoes.map(q => [
       q.nome,
       q.ministrante,
       fmtDate(q.data),
       q.total_pessoas.toLocaleString('pt-BR'),
-      q.municipios.length > 0 ? `${q.municipios.length} municípios` : '—',
+      q.municipios.length > 0 ? String(q.municipios.length) : '—',
     ]),
+    foot: [['Total', '', '', totalPessoas.toLocaleString('pt-BR'), municUnicos + ' únicos']],
     styles: { fontSize: 9, cellPadding: 3 },
-    headStyles: { fillColor: [88, 28, 135], textColor: 255, fontStyle: 'bold' },
+    headStyles: { fillColor: [88, 28, 135], textColor: [255, 255, 255], fontStyle: 'bold' },
+    footStyles: { fillColor: [237, 233, 254], fontStyle: 'bold', textColor: [60, 20, 100] },
     alternateRowStyles: { fillColor: [245, 243, 255] },
     columnStyles: {
-      0: { cellWidth: 65 },
-      1: { cellWidth: 40 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 22, halign: 'right' },
-      4: { cellWidth: 28, halign: 'center' },
+      3: { halign: 'right' as const },
+      4: { halign: 'right' as const },
+    },
+    didDrawPage: () => { addPdfFooters(doc); },
+  });
+
+  // ── Tabela de cobertura por região ────────────────────────────────────────
+  const regioesPDF = [
+    'Cariri', 'Centro Sul', 'Grande Fortaleza', 'Litoral Leste', 'Litoral Norte',
+    'Litoral Oeste', 'Maciço de Baturité', 'Serra de Ibiapaba', 'Sertão Central',
+    'Sertão de Canindé', 'Sertão de Sobral', 'Sertão do Inhamuns',
+    'Sertão dos Crateús', 'Vale do Jaguaribe',
+  ] as const;
+
+  const statsRegiao = regioesPDF.map(regiao => {
+    const municipiosUnicos = new Set<string>();
+    const qualIds = new Set<string>();
+    let pessoasRegiao = 0;
+    qualificacoes.forEach(q => {
+      q.municipios.forEach(m => {
+        if (getRegiao(m.municipio) === regiao) {
+          municipiosUnicos.add(m.municipio);
+          qualIds.add(q.id);
+          pessoasRegiao += m.quantidade_pessoas;
+        }
+      });
+    });
+    return { regiao, numQual: qualIds.size, numMunic: municipiosUnicos.size, pessoas: pessoasRegiao };
+  }).sort((a, b) => b.numQual - a.numQual || b.numMunic - a.numMunic);
+
+  const regioesCom = statsRegiao.filter(r => r.numQual > 0).length;
+
+  y = (doc as any).lastAutoTable?.finalY ?? y;
+  y += 10;
+  if (y > doc.internal.pageSize.getHeight() - 80) { doc.addPage(); y = 20; addPdfFooters(doc); }
+
+  doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(88, 28, 135);
+  doc.text('Cobertura por Região de Planejamento', 14, y); y += 6;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Região de Planejamento', 'Qualificações', 'Municípios Únicos', 'Pessoas']],
+    body: statsRegiao.map(r => [
+      r.regiao,
+      r.numQual > 0 ? String(r.numQual) : '—',
+      r.numMunic > 0 ? String(r.numMunic) : '—',
+      r.pessoas > 0 ? r.pessoas.toLocaleString('pt-BR') : '—',
+    ]),
+    foot: [[
+      `${regioesCom} de 14 regiões alcançadas`,
+      String(qualificacoes.length),
+      String(municUnicos),
+      totalPessoas.toLocaleString('pt-BR'),
+    ]],
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [88, 28, 135], textColor: [255, 255, 255], fontStyle: 'bold' },
+    footStyles: { fillColor: [237, 233, 254], fontStyle: 'bold', textColor: [60, 20, 100] },
+    alternateRowStyles: { fillColor: [245, 243, 255] },
+    columnStyles: {
+      1: { halign: 'right' as const },
+      2: { halign: 'right' as const },
+      3: { halign: 'right' as const },
     },
     didDrawPage: () => { addPdfFooters(doc); },
   });
@@ -2083,23 +2235,27 @@ export function exportQualificacoesToPDF(qualificacoes: QualificacaoExport[]) {
       dy += lines.length * 4 + 4;
     }
 
-    // Tabela de municípios
+    // Tabela de municípios — com região
     const sortedMun = [...q.municipios].sort((a, b) => b.quantidade_pessoas - a.quantidade_pessoas);
     const totalMun = sortedMun.reduce((s, m) => s + m.quantidade_pessoas, 0);
 
     autoTable(doc, {
       startY: dy,
-      head: [['Município', 'Pessoas Qualificadas']],
-      body: sortedMun.map(m => [m.municipio, m.quantidade_pessoas.toLocaleString('pt-BR')]),
-      foot: [['Total', totalMun.toLocaleString('pt-BR')]],
+      head: [['Município', 'Região', 'Pessoas Qualificadas']],
+      body: sortedMun.map(m => [
+        m.municipio,
+        getRegiao(m.municipio) ?? '—',
+        m.quantidade_pessoas.toLocaleString('pt-BR'),
+      ]),
+      foot: [['Total', '', totalMun.toLocaleString('pt-BR')]],
       styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [88, 28, 135], textColor: 255 },
+      headStyles: { fillColor: [88, 28, 135], textColor: [255, 255, 255] },
       footStyles: { fillColor: [237, 233, 254], fontStyle: 'bold', textColor: [60, 20, 100] },
       alternateRowStyles: { fillColor: [250, 249, 255] },
       columnStyles: {
-        0: { cellWidth: 100 },
-        1: { cellWidth: 50, halign: 'right' },
+        2: { halign: 'right' as const },
       },
+      didDrawPage: () => { addPdfFooters(doc); },
     });
   }
 
@@ -2124,7 +2280,41 @@ export function exportQualificacoesToExcel(qualificacoes: QualificacaoExport[]) 
   styleWorksheet(wsResumo, '581C87');
   XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo');
 
-  // ── Aba 2: Municípios (detalhe) ────────────────────────────────────────────
+  // ── Aba 2: Cobertura por Região ────────────────────────────────────────────
+  const regioesList = [
+    'Cariri', 'Centro Sul', 'Grande Fortaleza', 'Litoral Leste', 'Litoral Norte',
+    'Litoral Oeste', 'Maciço de Baturité', 'Serra de Ibiapaba', 'Sertão Central',
+    'Sertão de Canindé', 'Sertão de Sobral', 'Sertão do Inhamuns',
+    'Sertão dos Crateús', 'Vale do Jaguaribe',
+  ] as const;
+
+  const statsRegiao = regioesList.map(regiao => {
+    const municipiosUnicos = new Set<string>();
+    const qualIds = new Set<string>();
+    let pessoasRegiao = 0;
+    qualificacoes.forEach(q => {
+      q.municipios.forEach(m => {
+        if (getRegiao(m.municipio) === regiao) {
+          municipiosUnicos.add(m.municipio);
+          qualIds.add(q.id);
+          pessoasRegiao += m.quantidade_pessoas;
+        }
+      });
+    });
+    return {
+      'Região de Planejamento': regiao,
+      'Qualificações':          qualIds.size,
+      'Municípios Únicos':      municipiosUnicos.size,
+      'Pessoas Qualificadas':   pessoasRegiao,
+      'Municípios':             Array.from(municipiosUnicos).sort().join(', '),
+    };
+  }).sort((a, b) => b['Qualificações'] - a['Qualificações'] || b['Municípios Únicos'] - a['Municípios Únicos']);
+
+  const wsRegioes = XLSX.utils.json_to_sheet(statsRegiao);
+  styleWorksheet(wsRegioes, '6D28D9');
+  XLSX.utils.book_append_sheet(wb, wsRegioes, 'Por Região');
+
+  // ── Aba 3: Municípios (detalhe) ────────────────────────────────────────────
   const detData: Record<string, string | number>[] = [];
   for (const q of qualificacoes) {
     for (const m of q.municipios) {
@@ -2133,6 +2323,7 @@ export function exportQualificacoesToExcel(qualificacoes: QualificacaoExport[]) 
         'Ministrante':       q.ministrante,
         'Data':              fmtDate(q.data),
         'Município':         m.municipio,
+        'Região':            getRegiao(m.municipio) ?? '—',
         'Pessoas':           m.quantidade_pessoas,
       });
     }
@@ -2143,16 +2334,24 @@ export function exportQualificacoesToExcel(qualificacoes: QualificacaoExport[]) 
     XLSX.utils.book_append_sheet(wb, wsDet, 'Por Município');
   }
 
-  // ── Aba 3: Municípios únicos alcançados ────────────────────────────────────
-  const alcanceMap = new Map<string, number>();
+  // ── Aba 4: Municípios únicos alcançados ────────────────────────────────────
+  const alcanceMap = new Map<string, { pessoas: number; cursos: number }>();
   for (const q of qualificacoes) {
     for (const m of q.municipios) {
-      alcanceMap.set(m.municipio, (alcanceMap.get(m.municipio) ?? 0) + m.quantidade_pessoas);
+      const entry = alcanceMap.get(m.municipio) ?? { pessoas: 0, cursos: 0 };
+      entry.pessoas += m.quantidade_pessoas;
+      entry.cursos  += 1;
+      alcanceMap.set(m.municipio, entry);
     }
   }
   const alcanceData = Array.from(alcanceMap.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([municipio, pessoas]) => ({ 'Município': municipio, 'Total Pessoas': pessoas }));
+    .sort((a, b) => b[1].pessoas - a[1].pessoas)
+    .map(([municipio, v]) => ({
+      'Município':           municipio,
+      'Região':              getRegiao(municipio) ?? '—',
+      'Total Pessoas':       v.pessoas,
+      'Aparece em N Cursos': v.cursos,
+    }));
   if (alcanceData.length > 0) {
     const wsAlcance = XLSX.utils.json_to_sheet(alcanceData);
     styleWorksheet(wsAlcance, 'A855F7');

@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 export interface HistoricoAlteracao {
   id: string;
-  tabela: 'equipamentos' | 'solicitacoes' | 'atividades';
+  tabela: 'equipamentos' | 'solicitacoes' | 'atividades' | 'qualificacoes';
   registro_id: string;
   acao: 'INSERT' | 'UPDATE' | 'DELETE';
   campo: string | null;
@@ -42,6 +42,12 @@ const CAMPO_LABELS: Record<string, string> = {
   nome_evento:                  'Nome do Evento',
   nup:                          'NUP',
   quantidade_equipe:            'Qtd. Equipe',
+  // Qualificações
+  nome:                         'Nome do Curso',
+  ministrante:                  'Ministrante / Órgão',
+  total_pessoas:                'Total de Pessoas',
+  municipios:                   'Municípios do Curso',
+  municipio_pessoas:            'Pessoas por Município',
 };
 
 export function getCampoLabel(campo: string | null): string {

@@ -27,17 +27,17 @@ import { useState, useRef, useEffect } from 'react';
 import { municipiosCeara } from '@/data/municipios';
 
 const menuItems = [
-  { path: '/dashboard',           label: 'Dashboard',    icon: LayoutDashboard },
-  { path: '/dashboard-regional',  label: 'Por Região',   icon: PieChart        },
-  { path: '/equipamentos',        label: 'Equipamentos', icon: Building2       },
-  { path: '/viaturas',            label: 'Viaturas',     icon: Truck           },
-  { path: '/solicitacoes',        label: 'Solicitações', icon: FileText        },
-  { path: '/atividades',          label: 'Atividades',     icon: CalendarDays    },
-  { path: '/qualificacoes',       label: 'Qualificações',  icon: GraduationCap   },
-  { path: '/mapa',                label: 'Mapa',         icon: Map             },
-  { path: '/relatorio-cpdi',      label: 'Rel. EVM',     icon: ClipboardList   },
-  { path: '/diagnostico',         label: 'Diagnóstico',  icon: SearchX         },
-  { path: '/historico',           label: 'Histórico',    icon: History         },
+  { path: '/dashboard',           label: 'Dashboard',    icon: LayoutDashboard, roles: null },
+  { path: '/dashboard-regional',  label: 'Por Região',   icon: PieChart,        roles: null },
+  { path: '/equipamentos',        label: 'Equipamentos', icon: Building2,       roles: ['admin', 'editor', 'viewer'] },
+  { path: '/viaturas',            label: 'Viaturas',     icon: Truck,           roles: ['admin', 'editor', 'viewer'] },
+  { path: '/solicitacoes',        label: 'Solicitações', icon: FileText,        roles: ['admin', 'editor', 'viewer'] },
+  { path: '/atividades',          label: 'Atividades',     icon: CalendarDays,  roles: null },
+  { path: '/qualificacoes',       label: 'Qualificações',  icon: GraduationCap, roles: ['admin', 'editor', 'viewer'] },
+  { path: '/mapa',                label: 'Mapa',         icon: Map,             roles: null },
+  { path: '/relatorio-cpdi',      label: 'Rel. EVM',     icon: ClipboardList,  roles: ['admin', 'editor', 'viewer'] },
+  { path: '/diagnostico',         label: 'Diagnóstico',  icon: SearchX,        roles: ['admin', 'editor', 'viewer'] },
+  { path: '/historico',           label: 'Histórico',    icon: History,        roles: ['admin', 'editor', 'viewer'] },
 ];
 
 const adminMenuItems = [
@@ -169,8 +169,21 @@ export function AppSidebar() {
           {/* Navigation */}
           <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
-              return (
+              const isActive  = location.pathname === item.path;
+              const bloqueado = item.roles !== null && !item.roles.includes(role ?? '');
+              return bloqueado ? (
+                <div
+                  key={item.path}
+                  title="Seu perfil não tem acesso a este módulo"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/30 cursor-not-allowed select-none"
+                >
+                  <item.icon className="w-4 h-4 shrink-0 opacity-40" />
+                  {item.label}
+                  <span className="ml-auto text-[10px] bg-sidebar-foreground/10 text-sidebar-foreground/40 px-1.5 py-0.5 rounded">
+                    sem acesso
+                  </span>
+                </div>
+              ) : (
                 <NavLink
                   key={item.path}
                   to={item.path}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { User, Lock, Mail, Shield } from 'lucide-react';
+import { User, Lock, Mail, Shield, Clock, CalendarDays } from 'lucide-react';
 
 export default function Perfil() {
   const { user, role } = useAuthContext();
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [lastSignIn, setLastSignIn] = useState<string | null>(null);
+  const [createdAt, setCreatedAt]   = useState<string | null>(null);
 
   const [profileData, setProfileData] = useState({
     fullName: user?.user_metadata?.full_name || '',
@@ -25,23 +27,35 @@ export default function Perfil() {
     confirmPassword: '',
   });
 
+  // Carrega metadados do auth (last_sign_in_at, created_at)
+  useEffect(() => {
+    if (!user) return;
+    const u = user as any;
+    setLastSignIn(u.last_sign_in_at ?? null);
+    setCreatedAt(u.created_at ?? null);
+  }, [user]);
+
+  const fmtDateTime = (iso: string | null) => {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUpdatingProfile(true);
-
     try {
       const { error: authError } = await supabase.auth.updateUser({
         data: { full_name: profileData.fullName }
       });
-
       if (authError) throw authError;
 
-      // Update profiles table
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ full_name: profileData.fullName })
         .eq('id', user?.id);
-
       if (profileError) throw profileError;
 
       toast.success('Perfil atualizado com sucesso!');
@@ -55,32 +69,22 @@ export default function Perfil() {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast.error('As senhas não coincidem');
       return;
     }
-
     if (passwordData.newPassword.length < 8) {
       toast.error('A senha deve ter pelo menos 8 caracteres');
       return;
     }
-
     setIsUpdatingPassword(true);
-
     try {
       const { error } = await supabase.auth.updateUser({
         password: passwordData.newPassword
       });
-
       if (error) throw error;
-
       toast.success('Senha alterada com sucesso!');
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      });
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (error) {
       console.error('Error updating password:', error);
       toast.error('Erro ao alterar senha');
@@ -90,9 +94,10 @@ export default function Perfil() {
   };
 
   const roleLabels: Record<string, string> = {
-    admin: 'Administrador',
-    editor: 'Editor',
-    viewer: 'Visualizador',
+    admin:             'Administrador',
+    editor:            'Editor',
+    viewer:            'Visualizador',
+    atividades_editor: 'Editor de Atividades',
   };
 
   return (
@@ -128,9 +133,7 @@ export default function Perfil() {
                   disabled
                   className="bg-muted"
                 />
-                <p className="text-xs text-muted-foreground">
-                  O email não pode ser alterado
-                </p>
+                <p className="text-xs text-muted-foreground">O email não pode ser alterado</p>
               </div>
 
               <div className="space-y-2">
@@ -202,6 +205,37 @@ export default function Perfil() {
                 {isUpdatingPassword ? 'Alterando...' : 'Alterar Senha'}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Informações da Conta — last_sign_in_at */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              <CardTitle>Informações da Conta</CardTitle>
+            </div>
+            <CardDescription>Histórico de acesso e dados da sua conta</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Conta criada em</p>
+                  <p className="text-sm font-medium tabular-nums">{fmtDateTime(createdAt)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Último acesso</p>
+                  <p className="text-sm font-semibold tabular-nums">
+                    {fmtDateTime(lastSignIn)}
+                  </p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -5,7 +5,23 @@ import { TipoEquipamento, StatusSolicitacao } from '@/data/municipios';
 import { toast } from 'sonner';
 import { validateNup } from './useEquipamentos';
 
-type SolicitacaoInsert = Omit<Solicitacao, 'id' | 'created_at' | 'updated_at'>;
+// Payload explícito — desacoplado do tipo gerado pelo Supabase CLI
+// para não depender do supabase_types.ts estar atualizado.
+type SolicitacaoInsert = {
+  municipio: string;
+  data_solicitacao: string;
+  tipo_equipamento: TipoEquipamento;
+  status: StatusSolicitacao;
+  recebeu_patrulha: boolean;
+  guarda_municipal_estruturada: boolean;
+  kit_athena_entregue: boolean;
+  kit_athena_previo?: boolean;
+  capacitacao_realizada: boolean;
+  nup?: string | null;
+  observacoes?: string | null;
+  anexos?: string[];
+  qualificacao_id?: string | null;
+};
 
 export function useSolicitacoes() {
   const queryClient = useQueryClient();
@@ -19,13 +35,13 @@ export function useSolicitacoes() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Solicitacao[];
+      // cast via unknown para contornar tipos gerados desatualizados
+      return (data ?? []) as unknown as Solicitacao[];
     },
   });
 
   const addMutation = useMutation({
     mutationFn: async (solicitacao: SolicitacaoInsert) => {
-      // ── Validar NUP ──
       const nupCheck = validateNup(solicitacao.nup);
       if (!nupCheck.valid) throw new Error(nupCheck.message);
 
@@ -41,10 +57,11 @@ export function useSolicitacoes() {
           kit_athena_entregue:          solicitacao.kit_athena_entregue,
           kit_athena_previo:            solicitacao.kit_athena_previo ?? false,
           capacitacao_realizada:        solicitacao.capacitacao_realizada,
-          nup:                          solicitacao.nup || null,   // ← era suite_implantada
+          nup:                          solicitacao.nup || null,
           observacoes:                  solicitacao.observacoes,
           anexos:                       solicitacao.anexos,
-        })
+          qualificacao_id:              solicitacao.qualificacao_id ?? null,
+        } as any)
         .select()
         .single();
 
@@ -61,8 +78,7 @@ export function useSolicitacoes() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...data }: Partial<Solicitacao> & { id: string }) => {
-      // ── Validar NUP se foi alterado ──
+    mutationFn: async ({ id, ...data }: Partial<SolicitacaoInsert> & { id: string }) => {
       if (data.nup !== undefined) {
         const nupCheck = validateNup(data.nup);
         if (!nupCheck.valid) throw new Error(nupCheck.message);
@@ -78,13 +94,14 @@ export function useSolicitacoes() {
       if (data.kit_athena_entregue          !== undefined) updateData.kit_athena_entregue          = data.kit_athena_entregue;
       if (data.kit_athena_previo            !== undefined) updateData.kit_athena_previo            = data.kit_athena_previo;
       if (data.capacitacao_realizada        !== undefined) updateData.capacitacao_realizada        = data.capacitacao_realizada;
-      if (data.nup                          !== undefined) updateData.nup                          = data.nup || null; // ← era suite_implantada
+      if (data.nup                          !== undefined) updateData.nup                          = data.nup || null;
       if (data.observacoes                  !== undefined) updateData.observacoes                  = data.observacoes;
       if (data.anexos                       !== undefined) updateData.anexos                       = data.anexos;
+      if (data.qualificacao_id              !== undefined) updateData.qualificacao_id              = data.qualificacao_id ?? null;
 
       const { error } = await supabase
         .from('solicitacoes')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id);
 
       if (error) throw error;
@@ -117,7 +134,6 @@ export function useSolicitacoes() {
   });
 
   // ── Transformar solicitação em equipamento ────────────────────────────────
-  // Herda todos os campos relevantes da solicitação para evitar retrabalho.
   const transformarEmEquipamento = useMutation({
     mutationFn: async (solicitacaoId: string) => {
       const solicitacao = solicitacoes.find((s) => s.id === solicitacaoId);
@@ -130,20 +146,18 @@ export function useSolicitacoes() {
         .insert({
           municipio:             solicitacao.municipio,
           tipo:                  solicitacao.tipo_equipamento,
-          // Campos de acompanhamento herdados da solicitação
           possui_patrulha:       solicitacao.recebeu_patrulha,
           kit_athena_entregue:   solicitacao.kit_athena_entregue,
           kit_athena_previo:     solicitacao.kit_athena_previo ?? false,
           capacitacao_realizada: solicitacao.capacitacao_realizada,
           nup:                   solicitacao.nup || null,
-          // Campos a preencher manualmente depois
           endereco:              '',
           telefone:              '',
           responsavel:           '',
           observacoes:           solicitacao.observacoes
             ? `[Origem: solicitação ${solicitacaoId}] ${solicitacao.observacoes}`
             : `[Origem: solicitação ${solicitacaoId}]`,
-        });
+        } as any);
 
       if (error) throw error;
     },

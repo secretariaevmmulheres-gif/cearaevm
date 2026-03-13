@@ -18,17 +18,22 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   GraduationCap, Plus, Pencil, Trash2, Search, Download,
   FileSpreadsheet, FileText as FilePdf, ChevronDown, Users,
-  MapPin, CalendarDays, Building2, X, ChevronRight,
+  MapPin, CalendarDays, Building2, X, ChevronRight, BarChart2,
+  AlertCircle, ArrowUpDown, Filter,
 } from 'lucide-react';
 import { useQualificacoes, Qualificacao, QualificacaoPayload } from '@/hooks/useQualificacoes';
-import { municipiosCeara } from '@/data/municipios';
+import { municipiosCeara, regioesList, getRegiao } from '@/data/municipios';
 import { exportQualificacoesToPDF, exportQualificacoesToExcel } from '@/lib/exportUtils';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { HistoricoPanel } from '@/components/HistoricoPanel';
 
 // ── Tipos internos do form ────────────────────────────────────────────────────
 
@@ -356,6 +361,43 @@ function QualificacaoDialog({
   );
 }
 
+// ── Completude do cadastro ────────────────────────────────────────────────────
+
+function getCompletude(q: Qualificacao): { pct: number; faltando: string[] } {
+  const campos = [
+    { label: 'Ministrante / Órgão', ok: !!q.ministrante?.trim() },
+    { label: 'Data',                ok: !!q.data },
+    { label: 'Municípios',          ok: q.municipios.length > 0 },
+    { label: 'Observações',         ok: !!q.observacoes?.trim() },
+  ];
+  const ok = campos.filter(c => c.ok).length;
+  return { pct: Math.round((ok / campos.length) * 100), faltando: campos.filter(c => !c.ok).map(c => c.label) };
+}
+
+function CompletudeBar({ q }: { q: Qualificacao }) {
+  const { pct, faltando } = getCompletude(q);
+  const color = pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+  return (
+    <div className="flex items-center gap-2 min-w-[90px]">
+      <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+        <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={cn('text-[10px] font-medium shrink-0',
+        pct === 100 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-rose-600'
+      )}>{pct}%</span>
+      {pct < 100 && (
+        <div className="group relative">
+          <AlertCircle className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 bg-popover border border-border rounded-lg shadow-lg p-2 text-xs w-40">
+            <p className="font-medium mb-1 text-foreground">Faltando:</p>
+            {faltando.map(f => <p key={f} className="text-muted-foreground">• {f}</p>)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Card de qualificação ──────────────────────────────────────────────────────
 
 function QualificacaoCard({
@@ -412,7 +454,9 @@ function QualificacaoCard({
           </div>
 
           {/* Ações + expand */}
-          <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+            <CompletudeBar q={q} />
+            <div className="w-px h-5 bg-border" />
             <button
               onClick={onEdit}
               className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -425,7 +469,7 @@ function QualificacaoCard({
             >
               <Trash2 className="w-4 h-4" />
             </button>
-            <div className="w-px h-5 bg-border mx-1" />
+            <div className="w-px h-5 bg-border" />
             <button
               onClick={() => setExpanded(e => !e)}
               className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -501,6 +545,9 @@ function QualificacaoCard({
 
               {/* Data completa */}
               <p className="text-xs text-muted-foreground">{fmtDate(q.data)}</p>
+
+              {/* Histórico de alterações */}
+              <HistoricoPanel registroId={q.id} tabela="qualificacoes" />
             </div>
           </motion.div>
         )}
@@ -514,29 +561,93 @@ function QualificacaoCard({
 export default function Qualificacoes() {
   const { qualificacoes, isLoading, addQualificacao, isAdding, editQualificacao, isUpdating, removeQualificacao } = useQualificacoes();
 
-  const [search, setSearch]         = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing]       = useState<Qualificacao | null>(null);
-  const [deleting, setDeleting]     = useState<Qualificacao | null>(null);
+  const [search, setSearch]             = useState('');
+  const [filterRegiao, setFilterRegiao] = useState('all');
+  const [filterAno, setFilterAno]       = useState('all');
+  const [sortBy, setSortBy]             = useState<'data' | 'nome' | 'pessoas'>('data');
+  const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('desc');
+  const [dialogOpen, setDialogOpen]     = useState(false);
+  const [editing, setEditing]           = useState<Qualificacao | null>(null);
+  const [deleting, setDeleting]         = useState<Qualificacao | null>(null);
 
-  // Filtro de busca
+  // Anos disponíveis para filtro
+  const anosDisponiveis = useMemo(() => {
+    const anos = new Set(qualificacoes.map(q => q.data.substring(0, 4)));
+    return Array.from(anos).sort().reverse();
+  }, [qualificacoes]);
+
+  // Filtro + ordenação
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    if (!q) return qualificacoes;
-    return qualificacoes.filter(qc =>
-      qc.nome.toLowerCase().includes(q) ||
-      qc.ministrante.toLowerCase().includes(q) ||
-      qc.municipios.some(m => m.municipio.toLowerCase().includes(q))
-    );
-  }, [qualificacoes, search]);
+    let list = qualificacoes.filter(qc => {
+      const matchSearch = !q ||
+        qc.nome.toLowerCase().includes(q) ||
+        qc.ministrante.toLowerCase().includes(q) ||
+        qc.municipios.some(m => m.municipio.toLowerCase().includes(q));
+      const matchRegiao = filterRegiao === 'all' ||
+        qc.municipios.some(m => getRegiao(m.municipio) === filterRegiao);
+      const matchAno = filterAno === 'all' ||
+        qc.data.startsWith(filterAno);
+      return matchSearch && matchRegiao && matchAno;
+    });
+    list = [...list].sort((a, b) => {
+      let va: string | number = 0, vb: string | number = 0;
+      if (sortBy === 'data')    { va = a.data;          vb = b.data; }
+      if (sortBy === 'nome')    { va = a.nome;           vb = b.nome; }
+      if (sortBy === 'pessoas') { va = a.total_pessoas;  vb = b.total_pessoas; }
+      if (sortDir === 'asc') return va < vb ? -1 : va > vb ? 1 : 0;
+      return va > vb ? -1 : va < vb ? 1 : 0;
+    });
+    return list;
+  }, [qualificacoes, search, filterRegiao, filterAno, sortBy, sortDir]);
 
-  // Totais
-  const totalPessoas   = qualificacoes.reduce((s, q) => s + q.total_pessoas, 0);
+  const toggleSort = (campo: typeof sortBy) => {
+    if (sortBy === campo) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(campo); setSortDir('desc'); }
+  };
+
+  const temFiltro = filterRegiao !== 'all' || filterAno !== 'all' || !!search;
+
+  // Totais globais
+  const totalPessoas = qualificacoes.reduce((s, q) => s + q.total_pessoas, 0);
   const totalMunicipiosUnicos = useMemo(() => {
     const s = new Set<string>();
     qualificacoes.forEach(q => q.municipios.forEach(m => s.add(m.municipio)));
     return s.size;
   }, [qualificacoes]);
+
+  // Stats por região: quantas qualificações distintas atingiram cada região
+  // e quantos municípios únicos de cada região participaram
+  const statsRegiao = useMemo(() => {
+    return regioesList.map(regiao => {
+      // Municípios únicos desta região que aparecem em qualquer qualificação
+      const municipiosUnicos = new Set<string>();
+      // Qualificações que tocaram esta região (ao menos 1 município da região)
+      const qualificacoesIds = new Set<string>();
+      // Total de pessoas de municípios desta região
+      let totalPessoasRegiao = 0;
+
+      qualificacoes.forEach(q => {
+        q.municipios.forEach(m => {
+          if (getRegiao(m.municipio) === regiao) {
+            municipiosUnicos.add(m.municipio);
+            qualificacoesIds.add(q.id);
+            totalPessoasRegiao += m.quantidade_pessoas;
+          }
+        });
+      });
+
+      return {
+        regiao,
+        numQualificacoes: qualificacoesIds.size,
+        numMunicipios: municipiosUnicos.size,
+        totalPessoas: totalPessoasRegiao,
+        municipios: Array.from(municipiosUnicos).sort(),
+      };
+    }).sort((a, b) => b.numQualificacoes - a.numQualificacoes || b.numMunicipios - a.numMunicipios);
+  }, [qualificacoes]);
+
+  const [showRegioes, setShowRegioes] = useState(false);
 
   const handleSave = (payload: QualificacaoPayload) => {
     if (editing) {
@@ -581,43 +692,200 @@ export default function Qualificacoes() {
         ))}
       </div>
 
-      {/* ── Barra de ações ── */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, ministrante ou município..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      {/* ── Painel de Regiões ── */}
+      {qualificacoes.length > 0 && (
+        <div className="mb-5">
+          <button
+            onClick={() => setShowRegioes(r => !r)}
+            className="w-full flex items-center justify-between px-5 py-3.5 bg-card border border-border rounded-2xl hover:bg-accent/30 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <BarChart2 className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Cobertura por Região de Planejamento</span>
+              <span className="text-xs text-muted-foreground">
+                — {statsRegiao.filter(r => r.numQualificacoes > 0).length} de 14 regiões alcançadas
+              </span>
+            </div>
+            <ChevronRight className={cn('w-4 h-4 text-muted-foreground transition-transform', showRegioes && 'rotate-90')} />
+          </button>
+
+          <AnimatePresence>
+            {showRegioes && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-2 bg-card border border-border rounded-2xl overflow-hidden">
+                  {/* Cabeçalho */}
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2.5 bg-muted/40 border-b border-border text-xs font-medium text-muted-foreground">
+                    <span>Região</span>
+                    <span className="text-right w-24">Qualificações</span>
+                    <span className="text-right w-24">Municípios</span>
+                    <span className="text-right w-20">Pessoas</span>
+                  </div>
+
+                  {statsRegiao.map((r, i) => {
+                    const maxQ = statsRegiao[0].numQualificacoes || 1;
+                    const pct = Math.round((r.numQualificacoes / maxQ) * 100);
+                    const hasData = r.numQualificacoes > 0;
+                    return (
+                      <div
+                        key={r.regiao}
+                        className={cn(
+                          'grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-3 border-b border-border/50 last:border-0 items-center',
+                          i % 2 === 0 ? 'bg-card' : 'bg-muted/10',
+                          !hasData && 'opacity-40'
+                        )}
+                      >
+                        {/* Nome + barra */}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{r.regiao}</p>
+                          {hasData && (
+                            <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden w-full max-w-[200px]">
+                              <div
+                                className="h-full rounded-full bg-primary/70 transition-all"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Qualificações */}
+                        <span className={cn('text-right w-24 text-sm tabular-nums font-bold', hasData ? 'text-primary' : 'text-muted-foreground')}>
+                          {hasData ? r.numQualificacoes : '—'}
+                          {hasData && <span className="text-xs font-normal text-muted-foreground ml-1">curso{r.numQualificacoes !== 1 ? 's' : ''}</span>}
+                        </span>
+
+                        {/* Municípios */}
+                        <span className={cn('text-right w-24 text-sm tabular-nums', hasData ? 'text-blue-600 font-semibold' : 'text-muted-foreground')}>
+                          {hasData ? r.numMunicipios : '—'}
+                          {hasData && <span className="text-xs font-normal text-muted-foreground ml-1">munic.</span>}
+                        </span>
+
+                        {/* Pessoas */}
+                        <span className={cn('text-right w-20 text-sm tabular-nums', hasData ? 'text-emerald-600 font-semibold' : 'text-muted-foreground')}>
+                          {hasData ? r.totalPessoas.toLocaleString('pt-BR') : '—'}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Footer */}
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-3 bg-muted/40 border-t border-border text-xs font-semibold">
+                    <span className="text-muted-foreground">{statsRegiao.filter(r => r.numQualificacoes > 0).length} regiões alcançadas</span>
+                    <span className="text-right w-24 text-primary">{qualificacoes.length} cursos</span>
+                    <span className="text-right w-24 text-blue-600">{totalMunicipiosUnicos} munic.</span>
+                    <span className="text-right w-20 text-emerald-600">{totalPessoas.toLocaleString('pt-BR')}</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* ── Filtros ── */}
+      <div className="bg-card border border-border rounded-2xl p-4 mb-5 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Busca */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, ministrante ou município..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Região */}
+          <Select value={filterRegiao} onValueChange={setFilterRegiao}>
+            <SelectTrigger className="w-full sm:w-52">
+              <SelectValue placeholder="Todas as regiões" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as regiões</SelectItem>
+              {regioesList.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {/* Ano */}
+          <Select value={filterAno} onValueChange={setFilterAno}>
+            <SelectTrigger className="w-full sm:w-32">
+              <SelectValue placeholder="Ano" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os anos</SelectItem>
+              {anosDisponiveis.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Export */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Download className="w-4 h-4" />
-              Exportar
-              <ChevronDown className="w-3 h-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => exportQualificacoesToPDF(filtered)}>
-              <FilePdf className="w-4 h-4 mr-2 text-rose-500" />
-              PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportQualificacoesToExcel(filtered)}>
-              <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-600" />
-              Excel
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Linha de ordenação + export + novo */}
+        <div className="flex flex-wrap items-center gap-2 justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Ordenar:</span>
+            {(['data', 'nome', 'pessoas'] as const).map(campo => (
+              <button
+                key={campo}
+                onClick={() => toggleSort(campo)}
+                className={cn(
+                  'flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border transition-colors',
+                  sortBy === campo
+                    ? 'bg-primary/10 border-primary/30 text-primary font-medium'
+                    : 'border-border text-muted-foreground hover:bg-accent'
+                )}
+              >
+                {campo === 'data' ? 'Data' : campo === 'nome' ? 'Nome' : 'Pessoas'}
+                {sortBy === campo && (
+                  <ArrowUpDown className="w-3 h-3" />
+                )}
+              </button>
+            ))}
+            {temFiltro && (
+              <button
+                onClick={() => { setSearch(''); setFilterRegiao('all'); setFilterAno('all'); }}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent border border-border transition-colors"
+              >
+                <X className="w-3 h-3" /> Limpar
+              </button>
+            )}
+            <span className="text-xs text-muted-foreground ml-2">
+              {filtered.length} {filtered.length === 1 ? 'registro' : 'registros'}
+            </span>
+          </div>
 
-        <Button onClick={handleNew} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nova Qualificação
-        </Button>
+          <div className="flex items-center gap-2">
+            {/* Export */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Download className="w-4 h-4" />
+                  Exportar
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportQualificacoesToPDF(filtered)}>
+                  <FilePdf className="w-4 h-4 mr-2 text-rose-500" />
+                  PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportQualificacoesToExcel(filtered)}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-600" />
+                  Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button onClick={handleNew} size="sm" className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nova Qualificação
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* ── Lista ── */}
@@ -637,10 +905,6 @@ export default function Qualificacoes() {
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {filtered.length} {filtered.length === 1 ? 'registro' : 'registros'}
-            {search && ` para "${search}"`}
-          </p>
           <AnimatePresence>
             {filtered.map(q => (
               <QualificacaoCard

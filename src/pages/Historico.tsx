@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import {
   History, Plus, Pencil, Trash2, Loader2, AlertCircle,
   Search, Filter, Building2, CalendarDays, FileText, RefreshCw,
-  ChevronDown,
+  ChevronDown, GraduationCap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,9 +22,10 @@ const ACAO_CONFIG = {
 };
 
 const TABELA_CONFIG = {
-  equipamentos: { label: 'Equipamento', icon: Building2,    bg: 'bg-teal-500/10',   text: 'text-teal-700'   },
-  solicitacoes: { label: 'Solicitação', icon: FileText,     bg: 'bg-violet-500/10', text: 'text-violet-700' },
-  atividades:   { label: 'Atividade',   icon: CalendarDays, bg: 'bg-orange-500/10', text: 'text-orange-700' },
+  equipamentos: { label: 'Equipamento',  icon: Building2,    bg: 'bg-teal-500/10',    text: 'text-teal-700'    },
+  solicitacoes: { label: 'Solicitação',  icon: FileText,     bg: 'bg-violet-500/10',  text: 'text-violet-700'  },
+  atividades:   { label: 'Atividade',    icon: CalendarDays, bg: 'bg-orange-500/10',  text: 'text-orange-700'  },
+  qualificacoes:{ label: 'Qualificação', icon: GraduationCap, bg: 'bg-emerald-500/10', text: 'text-emerald-700' },
 };
 
 // ── Formatação de valor ───────────────────────────────────────────────────────
@@ -265,6 +266,7 @@ export default function Historico() {
           <option value="equipamentos">Equipamentos</option>
           <option value="solicitacoes">Solicitações</option>
           <option value="atividades">Atividades</option>
+          <option value="qualificacoes">Qualificações</option>
         </select>
         <select
           value={filtroCampo}

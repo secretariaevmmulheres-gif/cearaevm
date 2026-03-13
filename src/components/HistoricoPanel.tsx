@@ -109,7 +109,7 @@ export function HistoricoPanel({
   className,
 }: {
   registroId: string;
-  tabela: 'equipamentos' | 'solicitacoes' | 'atividades';
+  tabela: 'equipamentos' | 'solicitacoes' | 'atividades' | 'qualificacoes';
   className?: string;
 }) {
   const [open, setOpen] = useState(false);

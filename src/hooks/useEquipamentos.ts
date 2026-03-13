@@ -4,7 +4,21 @@ import { Equipamento } from '@/types';
 import { TipoEquipamento } from '@/data/municipios';
 import { toast } from 'sonner';
 
-type EquipamentoInsert = Omit<Equipamento, 'id' | 'created_at' | 'updated_at'>;
+// Payload completo para insert/update — desacoplado do tipo gerado pelo Supabase
+type EquipamentoInsert = {
+  municipio: string;
+  tipo: TipoEquipamento;
+  possui_patrulha: boolean;
+  endereco?: string | null;
+  telefone?: string | null;
+  responsavel?: string | null;
+  observacoes?: string | null;
+  kit_athena_entregue?: boolean;
+  kit_athena_previo?: boolean;
+  capacitacao_realizada?: boolean;
+  nup?: string | null;
+  qualificacao_id?: string | null;
+};
 
 // Formato: 62000.001753/2025-56
 const NUP_REGEX = /^\d{5}\.\d{6}\/\d{4}-\d{2}$/;
@@ -56,7 +70,7 @@ export function useEquipamentos() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Equipamento[];
+      return (data ?? []) as unknown as Equipamento[];
     },
   });
 
@@ -82,7 +96,8 @@ export function useEquipamentos() {
           kit_athena_previo:     equipamento.kit_athena_previo     ?? false,
           capacitacao_realizada: equipamento.capacitacao_realizada ?? false,
           nup:                   equipamento.nup ?? null,
-        })
+          qualificacao_id:       equipamento.qualificacao_id || null,
+        } as any)
         .select()
         .single();
 
@@ -99,7 +114,7 @@ export function useEquipamentos() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...data }: Partial<Equipamento> & { id: string }) => {
+    mutationFn: async ({ id, ...data }: Partial<EquipamentoInsert> & { id: string }) => {
       if (data.nup !== undefined) {
         const nupCheck = validateNup(data.nup);
         if (!nupCheck.valid) throw new Error(nupCheck.message);
@@ -125,10 +140,11 @@ export function useEquipamentos() {
       if (data.kit_athena_previo     !== undefined) updateData.kit_athena_previo     = data.kit_athena_previo;
       if (data.capacitacao_realizada !== undefined) updateData.capacitacao_realizada = data.capacitacao_realizada;
       if (data.nup                   !== undefined) updateData.nup                   = data.nup ?? null;
+      if (data.qualificacao_id          !== undefined) updateData.qualificacao_id          = data.qualificacao_id ?? null;
 
       const { error } = await supabase
         .from('equipamentos')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id);
 
       if (error) throw error;

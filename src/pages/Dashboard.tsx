@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -22,6 +23,7 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  TriangleAlert,
   Users,
   Download,
   Image,
@@ -327,6 +329,25 @@ export default function Dashboard() {
     .sort((a, b) => new Date(a.data + 'T00:00:00').getTime() - new Date(b.data + 'T00:00:00').getTime())
     .slice(0, 10);
 
+  // ── Alertas operacionais: solicitações ativas sem atualização ──
+  const STATUSES_ATIVOS = ['Recebida', 'Em análise', 'Aprovada', 'Em implantação'];
+  const LIMITE_ALERTA_DIAS = 30;   // amarelo
+  const LIMITE_CRITICO_DIAS = 60;  // vermelho
+
+  const solicitacoesParadas = useMemo(() => {
+    return solicitacoes
+      .filter(s => STATUSES_ATIVOS.includes(s.status))
+      .map(s => {
+        const ref = new Date(s.updated_at ?? s.created_at);
+        const dias = Math.floor((hoje.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24));
+        return { ...s, diasSemAtualizacao: dias };
+      })
+      .filter(s => s.diasSemAtualizacao >= LIMITE_ALERTA_DIAS)
+      .sort((a, b) => b.diasSemAtualizacao - a.diasSemAtualizacao)
+      .slice(0, 8);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [solicitacoes]);
+
   const handleExportWithCharts = async () => {
     if (!chartsRef.current) return;
     toast.loading('Gerando PDF com gráficos...', { id: 'export-charts' });
@@ -428,6 +449,71 @@ export default function Dashboard() {
         <MotionStatCard title="Realizadas" value={atividadesRealizadas} icon={CheckCircle2} variant="success" description="Atividades concluídas" index={10} />
         <MotionStatCard title="Pessoas Atendidas" value={totalAtendimentosAtividades} icon={Users} variant="accent" description="Total de atendimentos" index={11} />
       </div>
+
+      {/* ── Alertas Operacionais ── */}
+      {solicitacoesParadas.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-8"
+        >
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+                <TriangleAlert className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                  Atenção: Solicitações sem atualização
+                </h2>
+                <p className="text-xs text-amber-600/80 dark:text-amber-500/80">
+                  {solicitacoesParadas.length} solicitação{solicitacoesParadas.length !== 1 ? 'ões' : ''} ativa{solicitacoesParadas.length !== 1 ? 's' : ''} sem movimentação há mais de {LIMITE_ALERTA_DIAS} dias
+                </p>
+              </div>
+              <Link to="/solicitacoes" className="text-xs font-medium text-amber-700 hover:underline underline-offset-2 shrink-0">
+                Ver todas →
+              </Link>
+            </div>
+            {/* Lista */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {solicitacoesParadas.map(s => {
+                const critico = s.diasSemAtualizacao >= LIMITE_CRITICO_DIAS;
+                return (
+                  <Link
+                    key={s.id}
+                    to={`/municipio/${encodeURIComponent(s.municipio)}`}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors hover:bg-white/60 dark:hover:bg-white/5',
+                      critico
+                        ? 'border-rose-400/40 bg-rose-500/5'
+                        : 'border-amber-400/30 bg-white/40 dark:bg-white/5'
+                    )}
+                  >
+                    <div className={cn(
+                      'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
+                      critico ? 'bg-rose-500/15' : 'bg-amber-500/15'
+                    )}>
+                      <AlertCircle className={cn('w-3.5 h-3.5', critico ? 'text-rose-600' : 'text-amber-600')} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold truncate">{s.municipio}</p>
+                      <p className="text-xs text-muted-foreground truncate">{s.tipo_equipamento} · {s.status}</p>
+                    </div>
+                    <span className={cn(
+                      'text-xs font-bold shrink-0 px-2 py-0.5 rounded-full',
+                      critico ? 'bg-rose-500/15 text-rose-700' : 'bg-amber-500/15 text-amber-700'
+                    )}>
+                      {s.diasSemAtualizacao}d
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Charts */}
       <div ref={chartsRef} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -749,10 +835,14 @@ export default function Dashboard() {
                 </div>
                 <div className="grid grid-cols-2 gap-x-2 p-2">
                   {municipiosSemCoberturaLista.map(m => (
-                    <div key={m} className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-accent/50 transition-colors">
+                    <Link
+                      key={m}
+                      to={`/municipio/${encodeURIComponent(m)}`}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-accent/50 hover:text-primary transition-colors"
+                    >
                       <MapPin className="w-3 h-3 text-muted-foreground/50 shrink-0" />
                       <span className="text-xs truncate">{m}</span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>
@@ -944,7 +1034,13 @@ export default function Dashboard() {
                     </div>
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{a.municipio}</p>
+                      <Link
+                        to={`/municipio/${encodeURIComponent(a.municipio)}`}
+                        className="font-semibold text-sm truncate block hover:text-primary hover:underline underline-offset-2 transition-colors"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {a.municipio}
+                      </Link>
                       <p className="text-xs text-muted-foreground truncate">{a.tipo} · {a.recurso} · {a.municipio_sede}</p>
                     </div>
                     {/* Badge dias */}

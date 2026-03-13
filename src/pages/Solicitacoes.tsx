@@ -249,12 +249,13 @@ export default function Solicitacoes() {
 
   const openEditDialog = (s: Solicitacao) => {
     setEditingSolicitacao(s);
-    setFormData({ municipio: s.municipio, data_solicitacao: format(new Date(s.data_solicitacao + 'T00:00:00'), 'yyyy-MM-dd'),
-      tipo_equipamento: s.tipo_equipamento, status: s.status, recebeu_patrulha: s.recebeu_patrulha,
-      guarda_municipal_estruturada: s.guarda_municipal_estruturada, kit_athena_entregue: s.kit_athena_entregue,
-      kit_athena_previo: s.kit_athena_previo ?? false, capacitacao_realizada: s.capacitacao_realizada,
-      qualificacao_id: (s as any).qualificacao_id || '',
-      nup: s.nup || '', observacoes: s.observacoes || '', anexos: s.anexos || [] });
+    const sol = s as Solicitacao & { qualificacao_id?: string | null };
+    setFormData({ municipio: sol.municipio, data_solicitacao: format(new Date(sol.data_solicitacao + 'T00:00:00'), 'yyyy-MM-dd'),
+      tipo_equipamento: sol.tipo_equipamento, status: sol.status, recebeu_patrulha: sol.recebeu_patrulha,
+      guarda_municipal_estruturada: sol.guarda_municipal_estruturada, kit_athena_entregue: sol.kit_athena_entregue,
+      kit_athena_previo: sol.kit_athena_previo ?? false, capacitacao_realizada: sol.capacitacao_realizada,
+      qualificacao_id: sol.qualificacao_id || '',
+      nup: sol.nup || '', observacoes: sol.observacoes || '', anexos: sol.anexos || [] });
     setIsDialogOpen(true);
   };
 
@@ -316,7 +317,7 @@ export default function Solicitacoes() {
               <DropdownMenuItem onClick={() => exportSolicitacoesToPDF(filteredSolicitacoes, filterRegiao)}>
                 <FilePdf className="w-4 h-4 mr-2" />Exportar PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportSolicitacoesToExcel(filteredSolicitacoes)}>
+              <DropdownMenuItem onClick={() => exportSolicitacoesToExcel(filteredSolicitacoes, qualificacoes)}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />Exportar Excel
               </DropdownMenuItem>
             </DropdownMenuContent>

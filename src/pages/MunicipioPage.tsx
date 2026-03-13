@@ -8,6 +8,7 @@ import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useAtividades } from '@/hooks/useAtividades';
 import { useQualificacoes } from '@/hooks/useQualificacoes';
+import { useHistoricoRecente, getCampoLabel } from '@/hooks/useHistorico';
 import { getRegiao, municipiosCeara } from '@/data/municipios';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -15,7 +16,8 @@ import { cn } from '@/lib/utils';
 import {
   ArrowLeft, Building2, Truck, FileText, CalendarDays,
   GraduationCap, CheckCircle, XCircle, MapPin, ChevronRight,
-  PackageCheck, Shield, AlertCircle, Search,
+  PackageCheck, Shield, AlertCircle, Search, History,
+  Plus, Pencil, Trash2,
 } from 'lucide-react';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -97,6 +99,7 @@ export default function MunicipioPage() {
   const { viaturas: todasViat }         = useViaturas();
   const { atividades: todasAtiv }       = useAtividades();
   const { qualificacoes: todasQual }    = useQualificacoes();
+  const { historico: todoHist }         = useHistoricoRecente(200);
 
   const eqs   = useMemo(() => todosEq.filter(e => e.municipio === municipio), [todosEq, municipio]);
   const solics = useMemo(() => todasSolic.filter(s => s.municipio === municipio), [todasSolic, municipio]);
@@ -105,6 +108,10 @@ export default function MunicipioPage() {
   const quals  = useMemo(() =>
     todasQual.filter(q => q.municipios.some(m => m.municipio === municipio)),
     [todasQual, municipio]
+  );
+  const hist   = useMemo(() =>
+    todoHist.filter(h => h.municipio === municipio).slice(0, 15),
+    [todoHist, municipio]
   );
 
   // Município não encontrado
@@ -164,13 +171,14 @@ export default function MunicipioPage() {
       </div>
 
       {/* ── Cards de resumo rápido ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         {[
           { label: 'Equipamentos', value: eqs.length,   icon: <Building2 className="w-4 h-4" />,    color: 'text-primary'       },
           { label: 'Viaturas',     value: viats.reduce((s,v)=>s+v.quantidade,0), icon: <Truck className="w-4 h-4" />, color: 'text-cyan-600' },
           { label: 'Solicitações', value: solics.length, icon: <FileText className="w-4 h-4" />,    color: 'text-amber-600'     },
           { label: 'Atividades',   value: ativs.length,  icon: <CalendarDays className="w-4 h-4" />,color: 'text-violet-600'    },
           { label: 'Qualificações',value: quals.length,  icon: <GraduationCap className="w-4 h-4" />,color: 'text-emerald-600'  },
+          { label: 'Alterações',   value: hist.length > 0 ? hist.length + (hist.length === 15 ? '+' as any : '') : 0, icon: <History className="w-4 h-4" />, color: 'text-slate-600' },
         ].map(({ label, value, icon, color }) => (
           <motion.div
             key={label}
@@ -277,21 +285,51 @@ export default function MunicipioPage() {
           ) : (
             <div className="space-y-2">
               {viats.map(v => (
-                <div key={v.id} className="flex items-start gap-3 py-2 border-b border-border/50 last:border-0">
-                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0">
+                <div key={v.id} className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-0">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0 mt-0.5">
                     <Truck className="w-4 h-4 text-cyan-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{v.tipo_patrulha}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {v.orgao_responsavel} · {v.quantidade} unidade{v.quantidade !== 1 ? 's' : ''}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Implantação: {fmtDate(v.data_implantacao)}
-                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium">{v.tipo_patrulha}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 font-medium">
+                        {v.orgao_responsavel}
+                      </span>
+                      {v.vinculada_equipamento && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700">
+                          Vinculada ao equipamento
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                      <p className="text-xs text-muted-foreground">
+                        {v.quantidade} unidade{v.quantidade !== 1 ? 's' : ''}
+                      </p>
+                      {v.data_implantacao && (
+                        <p className="text-xs text-muted-foreground">
+                          Implantação: {fmtDate(v.data_implantacao)}
+                        </p>
+                      )}
+                      {v.responsavel && (
+                        <p className="text-xs text-muted-foreground">
+                          Resp.: {v.responsavel}
+                        </p>
+                      )}
+                    </div>
+                    {v.observacoes && (
+                      <p className="text-xs text-muted-foreground/70 mt-1 italic">{v.observacoes}</p>
+                    )}
                   </div>
                 </div>
               ))}
+              {/* Total de unidades */}
+              {viats.length > 1 && (
+                <div className="pt-1 flex justify-end">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Total: {viats.reduce((s, v) => s + v.quantidade, 0)} unidades em {viats.length} registro{viats.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -335,12 +373,13 @@ export default function MunicipioPage() {
 
         {/* ── Atividades ── */}
         <div className="bg-card border border-border rounded-2xl p-5 lg:col-span-2">
-          <SectionHeader
-            icon={<CalendarDays className="w-4 h-4" />}
-            title="Atividades Registradas"
-            count={ativs.length}
-            color="text-violet-600"
-          />
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-violet-600"><CalendarDays className="w-4 h-4" /></span>
+            <h3 className="font-semibold text-sm">Atividades Registradas</h3>
+            {ativs.length > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">{ativs.length} registro{ativs.length !== 1 ? 's' : ''}</span>
+            )}
+          </div>
           {ativs.length === 0 ? (
             <EmptyState msg="Nenhuma atividade registrada para este município." />
           ) : (
@@ -376,13 +415,81 @@ export default function MunicipioPage() {
                 </tbody>
               </table>
               {ativs.length > 10 && (
-                <p className="text-xs text-muted-foreground text-center mt-3">
-                  Mostrando 10 de {ativs.length} atividades
-                </p>
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
+                  <p className="text-xs text-muted-foreground">
+                    Mostrando 10 de {ativs.length} atividades
+                  </p>
+                  <Link
+                    to={`/atividades?municipio=${encodeURIComponent(municipio)}`}
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    Ver todas <ChevronRight className="w-3 h-3" />
+                  </Link>
+                </div>
               )}
             </div>
           )}
         </div>
+
+        {/* ── Histórico de Alterações ── */}
+        {hist.length > 0 && (
+          <div className="bg-card border border-border rounded-2xl p-5 lg:col-span-2">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-slate-600"><History className="w-4 h-4" /></span>
+              <h3 className="font-semibold text-sm">Histórico de Alterações</h3>
+              <span className="ml-auto text-xs text-muted-foreground">últimas {hist.length}</span>
+            </div>
+            <div className="space-y-0">
+              {hist.map((h, i) => {
+                const ACAO_COR: Record<string, string> = {
+                  INSERT: 'text-emerald-600 bg-emerald-500/10',
+                  UPDATE: 'text-blue-600 bg-blue-500/10',
+                  DELETE: 'text-rose-600 bg-rose-500/10',
+                };
+                const ACAO_LABEL: Record<string, string> = {
+                  INSERT: 'Criação', UPDATE: 'Edição', DELETE: 'Exclusão',
+                };
+                const TABELA_LABEL: Record<string, string> = {
+                  equipamentos: 'Equipamento', solicitacoes: 'Solicitação', atividades: 'Atividade',
+                };
+                const AcaoIcon = h.acao === 'INSERT' ? Plus : h.acao === 'DELETE' ? Trash2 : Pencil;
+                return (
+                  <div key={h.id} className={cn(
+                    'flex items-start gap-3 py-2.5 border-b border-border/40 last:border-0',
+                    i % 2 === 0 ? '' : 'bg-muted/10 -mx-1 px-1 rounded'
+                  )}>
+                    <span className={cn('text-xs px-1.5 py-0.5 rounded font-medium shrink-0', ACAO_COR[h.acao])}>
+                      <AcaoIcon className="w-3 h-3 inline mr-0.5" />
+                      {ACAO_LABEL[h.acao]}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium">{TABELA_LABEL[h.tabela] ?? h.tabela}</p>
+                      {h.acao === 'UPDATE' && h.campo && (
+                        <p className="text-xs text-muted-foreground">
+                          {getCampoLabel(h.campo)}
+                          {h.valor_antes !== null && h.valor_depois !== null && (
+                            <span> · <span className="line-through">{h.valor_antes === 'true' ? 'Sim' : h.valor_antes === 'false' ? 'Não' : h.valor_antes?.slice(0,20)}</span> → <span className="text-emerald-700">{h.valor_depois === 'true' ? 'Sim' : h.valor_depois === 'false' ? 'Não' : h.valor_depois?.slice(0,20)}</span></span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground/60 shrink-0 tabular-nums">
+                      {format(new Date(h.created_at), 'dd/MM/yy', { locale: ptBR })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 pt-2 border-t border-border/50 flex justify-end">
+              <Link
+                to="/historico"
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                Ver histórico completo <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
+        )}
 
       </div>
     </AppLayout>

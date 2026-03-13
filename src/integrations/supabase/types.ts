@@ -117,6 +117,7 @@ export type Database = {
           kit_athena_previo: boolean
           nup: string | null
           possui_patrulha: boolean
+          qualificacao_id: string | null
           responsavel: string | null
           telefone: string | null
           tipo: Database["public"]["Enums"]["tipo_equipamento"]
@@ -133,6 +134,7 @@ export type Database = {
           nup?: string | null
           observacoes?: string | null
           possui_patrulha?: boolean
+          qualificacao_id?: string | null
           responsavel?: string | null
           telefone?: string | null
           tipo: Database["public"]["Enums"]["tipo_equipamento"]
@@ -149,6 +151,7 @@ export type Database = {
           nup?: string | null
           observacoes?: string | null
           possui_patrulha?: boolean
+          qualificacao_id?: string | null
           responsavel?: string | null
           telefone?: string | null
           tipo?: Database["public"]["Enums"]["tipo_equipamento"]
@@ -228,8 +231,10 @@ export type Database = {
           guarda_municipal_estruturada: boolean
           id: string
           kit_athena_entregue: boolean
+          kit_athena_previo: boolean
           municipio: string
           observacoes: string | null
+          qualificacao_id: string | null
           recebeu_patrulha: boolean
           status: Database["public"]["Enums"]["status_solicitacao"]
           nup: string | null
@@ -244,8 +249,10 @@ export type Database = {
           guarda_municipal_estruturada?: boolean
           id?: string
           kit_athena_entregue?: boolean
+          kit_athena_previo?: boolean
           municipio: string
           observacoes?: string | null
+          qualificacao_id?: string | null
           recebeu_patrulha?: boolean
           status?: Database["public"]["Enums"]["status_solicitacao"]
           nup?: string | null
@@ -260,8 +267,10 @@ export type Database = {
           guarda_municipal_estruturada?: boolean
           id?: string
           kit_athena_entregue?: boolean
+          kit_athena_previo?: boolean
           municipio?: string
           observacoes?: string | null
+          qualificacao_id?: string | null
           recebeu_patrulha?: boolean
           status?: Database["public"]["Enums"]["status_solicitacao"]
           nup?: string | null
