@@ -553,20 +553,20 @@ export function exportEquipamentosToPDF(equipamentos: Equipamento[], filterRegia
 export function exportEquipamentosToExcel(equipamentos: Equipamento[], qualificacoes?: QualificacaoExport[]) {
   const qualMap = new Map(qualificacoes?.map(q => [q.id, q.nome]) ?? []);
   const data = equipamentos.map(e => ({
-    'Município':          e.municipio,
-    'Região':             getRegiao(e.municipio) || '',
-    'Tipo':               e.tipo,
-    'Patrulha M.P.':      e.possui_patrulha ? 'Sim' : 'Não',
-    'Kit Athena':         e.kit_athena_entregue ? 'Sim' : 'Não',
-    'Kit Athena (Prévio)':e.kit_athena_previo  ? 'Sim' : 'Não',
-    'Capacitação':        e.capacitacao_realizada ? 'Sim' : 'Não',
-    'Curso Vinculado':    e.qualificacao_id ? (qualMap.get(e.qualificacao_id) ?? e.qualificacao_id) : '',
-    'NUP':                e.nup || '',
-    'Endereço':           e.endereco || '',
-    'Responsável':        e.responsavel || '',
-    'Telefone':           e.telefone || '',
-    'Observações':        e.observacoes || '',
-    'Data de Criação':    fmtDate(e.created_at),
+    'Município':           e.municipio,
+    'Região':              getRegiao(e.municipio) || '',
+    'Tipo':                e.tipo,
+    'Patrulha M.P.':       e.possui_patrulha ? 'Sim' : 'Não',
+    'Kit Athena':          e.kit_athena_entregue ? 'Sim' : 'Não',
+    'Kit Athena (Prévio)': e.kit_athena_previo  ? 'Sim' : 'Não',
+    'Capacitação':         e.capacitacao_realizada ? 'Sim' : 'Não',
+    'Curso Vinculado':     e.qualificacao_id ? (qualMap.get(e.qualificacao_id) ?? e.qualificacao_id) : '',
+    'NUP':                 e.nup || '',
+    'Endereço':            e.endereco || '',
+    'Responsável':         e.responsavel || '',
+    'Telefone':            e.telefone || '',
+    'Observações':         e.observacoes || '',
+    'Data de Criação':     fmtDate(e.created_at),
   }));
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);

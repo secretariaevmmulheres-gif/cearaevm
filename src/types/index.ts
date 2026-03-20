@@ -56,6 +56,7 @@ export interface Equipamento {
   kit_athena_previo: boolean;
   capacitacao_realizada: boolean;
   nup: string | null;
+  qualificacao_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -89,6 +90,7 @@ export interface Solicitacao {
   kit_athena_previo: boolean;
   capacitacao_realizada: boolean;
   nup: string | null;
+  qualificacao_id: string | null;
   observacoes: string;
   anexos: string[];
   created_at: string;
