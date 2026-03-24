@@ -33,13 +33,14 @@ import {
   Download, FileSpreadsheet, FileText as FilePdf, ChevronDown,
   ShieldCheck, Users, Package, GraduationCap, Hash,
   CheckCircle2, Circle, CalendarDays, StickyNote,
-  Eye as EyeIcon, AlertTriangle, CheckCircle,
+  Eye as EyeIcon, AlertTriangle, CheckCircle, Paperclip,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { HistoricoPanel } from '@/components/HistoricoPanel';
+import { AnexosUpload } from '@/components/AnexosUpload';
 import { exportSolicitacoesToPDF, exportSolicitacoesToExcel } from '@/lib/exportUtils';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -128,6 +129,13 @@ function SolicitacaoRow({ solicitacao, onEdit, onDelete, onTransform, canEdit }:
         <td onClick={e => e.stopPropagation()}><ProgressoBar solicitacao={solicitacao} /></td>
         <td onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-1">
+            {/* Badge de anexos */}
+            {solicitacao.anexos && solicitacao.anexos.length > 0 && (
+              <span className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 border border-blue-500/20 font-medium">
+                <Paperclip className="w-2.5 h-2.5" />
+                {solicitacao.anexos.length}
+              </span>
+            )}
             {canEdit && solicitacao.status === 'Inaugurada' && (
               <Button variant="outline" size="sm" className="text-success border-success/30 hover:bg-success/10 h-7 px-2" onClick={onTransform}>
                 <Building2 className="w-3.5 h-3.5 mr-1" /><ArrowRight className="w-3 h-3" />
@@ -187,6 +195,18 @@ function SolicitacaoRow({ solicitacao, onEdit, onDelete, onTransform, canEdit }:
                   <div className="lg:col-span-3">
                     <HistoricoPanel registroId={solicitacao.id} tabela="solicitacoes" />
                   </div>
+                  {/* ── Anexos ── */}
+                  {(solicitacao.anexos && solicitacao.anexos.length > 0) && (
+                    <div className="lg:col-span-3 border-t border-border/50 pt-3">
+                      <AnexosUpload
+                        solicitacaoId={solicitacao.id}
+                        paths={solicitacao.anexos ?? []}
+                        onChange={() => {}}
+                        readOnly
+                        showEmpty={false}
+                      />
+                    </div>
+                  )}
                 </div>
               </motion.div>
             </td>
@@ -561,6 +581,19 @@ export default function Solicitacoes() {
                   )}
                 </div>
               </div>
+            </div>
+            <div className="space-y-2">
+              <AnexosUpload
+                solicitacaoId={editingSolicitacao?.id ?? null}
+                paths={formData.anexos}
+                onChange={(paths) => setFormData({ ...formData, anexos: paths })}
+              />
+              {!editingSolicitacao && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Paperclip className="w-3 h-3" />
+                  Salve a solicitação primeiro para poder adicionar anexos
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Observações</Label>
