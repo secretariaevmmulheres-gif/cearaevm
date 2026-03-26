@@ -28,6 +28,6 @@ export * from './exportAtividades';
 export * from './exportQualificacoes';
 export * from './exportDiagnostico';
 export * from './exportMapa';
-// export * from './exportRegional';
+export * from './exportRegional';
 export * from './exportDashboard';
 export * from './exportCpdi';
