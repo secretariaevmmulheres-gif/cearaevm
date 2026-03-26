@@ -7,12 +7,12 @@
  * - Mostra mapa Leaflet com marcadores das sedes e do município selecionado
  * - Destaca a sede mais próxima (recomendada)
  *
- * Sedes ativas: Fortaleza, Sobral, Juazeiro do Norte
+ * Sedes ativas: Fortaleza, Sobral, Juazeiro do Norte, Tauá, Crateús, Iguatu
  * Quixadá: aparece no mapa mas COMENTADO na lógica de recomendação
  * (descomentar quando Quixadá tiver unidade móvel operacional)
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { municipiosCeara } from '@/data/municipios';
 import { useAtividades } from '@/hooks/useAtividades';
+import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -42,6 +43,9 @@ const SEDES: Sede[] = [
   { nome: 'Fortaleza',         lat: -3.7172,  lng: -38.5433, cor: 'text-teal-700',   corHex: '#0d9488', ativa: true  },
   { nome: 'Sobral',            lat: -3.6861,  lng: -40.3522, cor: 'text-blue-700',   corHex: '#2563eb', ativa: true  },
   { nome: 'Juazeiro do Norte', lat: -7.2136,  lng: -39.3153, cor: 'text-violet-700', corHex: '#7c3aed', ativa: true  },
+  { nome: 'Tauá',              lat: -6.0028,  lng: -40.2944, cor: 'text-emerald-700',corHex: '#047857', ativa: false  },
+  { nome: 'Crateús',           lat: -5.1778,  lng: -40.6731, cor: 'text-orange-700', corHex: '#c2410c', ativa: false  },
+  { nome: 'Iguatu',            lat: -6.3594,  lng: -39.2983, cor: 'text-cyan-700',   corHex: '#0e7490', ativa: false  },
   // Quixadá: sem unidade móvel ainda — manter comentado até ativação
   // { nome: 'Quixadá', lat: -4.9739, lng: -39.0142, cor: 'text-amber-700', corHex: '#d97706', ativa: true },
   { nome: 'Quixadá',           lat: -4.9739,  lng: -39.0142, cor: 'text-amber-700',  corHex: '#d97706', ativa: false },
@@ -169,6 +173,7 @@ function FitBounds({ pontos }: { pontos: [number, number][] }) {
 // ── Componente principal ───────────────────────────────────────────────────────
 export function CoberturaMapa() {
   const { atividades } = useAtividades();
+  const { equipamentos } = useEquipamentos();
   const [municipioSelecionado, setMunicipioSelecionado] = useState<string>('');
   const [inputValue, setInputValue] = useState<string>('');
   const [sugestoes, setSugestoes] = useState<string[]>([]);
@@ -181,6 +186,14 @@ export function CoberturaMapa() {
   const coordsMunicipio = municipioSelecionado ? MUNICIPIOS_COORDS[municipioSelecionado] : null;
 
   // Histórico de atividades do município selecionado
+  // Equipamentos do município selecionado (DDM, Sala em Delegacia, etc.)
+  const equipamentosMunicipio = useMemo(
+    () => municipioSelecionado
+      ? equipamentos.filter(e => e.municipio === municipioSelecionado)
+      : [],
+    [equipamentos, municipioSelecionado]
+  );
+
   const historicoMunicipio = municipioSelecionado
     ? atividades
         .filter(a => a.municipio === municipioSelecionado && a.status === 'Realizado')
@@ -276,7 +289,7 @@ export function CoberturaMapa() {
           <p className="text-violet-700 dark:text-violet-400 text-xs leading-relaxed">
             Selecione o município que precisa de atendimento. O sistema calcula a distância por estrada
             (via OpenStreetMap) até cada CMB/CMC com unidade móvel ativa e recomenda a mais próxima.
-            Fortaleza, Sobral e Juazeiro do Norte estão ativas. Quixadá será ativada futuramente.
+            Sedes ativas: Fortaleza, Sobral, Juazeiro do Norte. Tauá, Crateús, Iguatu e Quixadá será ativada futuramente.
           </p>
         </div>
       </div>
@@ -483,6 +496,25 @@ export function CoberturaMapa() {
                 historicoMunicipio.length > 0 ? 'bg-violet-500/5 border-violet-500/20' : 'bg-muted/30 border-border'
               )}
             >
+              {/* Equipamentos cadastrados no município */}
+              {equipamentosMunicipio.length > 0 && (
+                <div className="mb-3 space-y-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Equipamentos cadastrados</p>
+                  {equipamentosMunicipio.map(e => {
+                    const isPolicia = e.tipo === 'DDM' || e.tipo === 'Sala Lilás em Delegacia';
+                    return (
+                      <div key={e.id} className={cn(
+                        'flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg',
+                        isPolicia ? 'bg-green-500/10 text-green-800' : 'bg-primary/10 text-primary'
+                      )}>
+                        <Building2 className="w-3 h-3 shrink-0" />
+                        <span className="font-medium">{e.tipo}</span>
+                        {e.possui_patrulha && <span className="ml-auto text-cyan-600 font-medium">+ Patrulha M.P.</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <div className="flex items-center gap-2 mb-3">
                 <History className="w-4 h-4 text-violet-600" />
                 <p className="font-semibold text-sm">Histórico — {municipioSelecionado}</p>

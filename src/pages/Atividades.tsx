@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -21,8 +22,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAtividades } from '@/hooks/useAtividades';
-import { municipiosCeara, regioesList, getRegiao } from '@/data/municipios';
-import { Atividade, TipoAtividade, RecursoAtividade, StatusAtividade } from '@/types';
+import { municipiosCeara, regioesList, getRegiao } from '@/data/municipios';import { Atividade, TipoAtividade, RecursoAtividade, StatusAtividade } from '@/types';
 import { exportAtividadesToPDF, exportAtividadesToExcel } from '@/lib/exportUtils';
 import { CoberturaMapa } from '@/components/atividades/CoberturaMapa';
 import {
@@ -39,7 +39,7 @@ import { HistoricoPanel } from '@/components/HistoricoPanel';
 const TIPOS_ATIVIDADE: TipoAtividade[] = ['Unidade Móvel', 'Palestra', 'Evento', 'Tenda Lilás', 'Visita a DDM', 'Visita a Delegacia', 'Outro'];
 const RECURSOS: RecursoAtividade[] = ['Unidade Móvel', 'Equipe', 'Unidade Móvel + Equipe'];
 const STATUS_ATIVIDADE: StatusAtividade[] = ['Agendado', 'Realizado', 'Cancelado'];
-const MUNICIPIOS_SEDE = ['Fortaleza', 'Juazeiro do Norte', 'Sobral', 'Quixadá'];
+const MUNICIPIOS_SEDE = ['Fortaleza', 'Juazeiro do Norte', 'Sobral', 'Tauá', 'Crateús', 'Iguatu', 'Quixadá'];
 
 const statusStyles: Record<StatusAtividade, string> = {
   Agendado:  'bg-blue-500/10 text-blue-600',
@@ -61,6 +61,9 @@ const sedeStyle: Record<string, { border: string; icon: string; text: string }> 
   'Fortaleza':         { border: 'border-l-teal-500',   icon: 'bg-teal-100',   text: 'text-teal-700'   },
   'Juazeiro do Norte': { border: 'border-l-violet-500', icon: 'bg-violet-100', text: 'text-violet-700' },
   'Sobral':            { border: 'border-l-blue-500',   icon: 'bg-blue-100',   text: 'text-blue-700'   },
+  'Tauá':              { border: 'border-l-emerald-500',icon: 'bg-emerald-100',text: 'text-emerald-700'},
+  'Crateús':           { border: 'border-l-orange-500', icon: 'bg-orange-100', text: 'text-orange-700' },
+  'Iguatu':            { border: 'border-l-cyan-500',   icon: 'bg-cyan-100',   text: 'text-cyan-700'   },
   'Quixadá':           { border: 'border-l-amber-500',  icon: 'bg-amber-100',  text: 'text-amber-700'  },
 };
 const sedeDefault = { border: 'border-l-slate-400', icon: 'bg-slate-100', text: 'text-slate-700' };
@@ -269,6 +272,7 @@ const FORM_INICIAL = {
 
 export default function Atividades() {
   const { atividades, addAtividade, updateAtividade, deleteAtividade, isAdding, isUpdating } = useAtividades();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab]       = useState<'registros' | 'cobertura'>('registros');
   const [searchTerm, setSearchTerm]     = useState('');
   const [filterTipo, setFilterTipo]     = useState('all');
@@ -277,6 +281,16 @@ export default function Atividades() {
   const [filterRegiao, setFilterRegiao] = useState('all');
   const [filterMes, setFilterMes]       = useState('all');
   const [filterAno, setFilterAno]       = useState(String(new Date().getFullYear())); // pré-selecionado no ano atual
+  const [filterMunicipio, setFilterMunicipio] = useState('all');
+
+  // Pré-seleciona município se vier da URL (?municipio=Fortaleza)
+  useEffect(() => {
+    const m = searchParams.get('municipio');
+    if (m) {
+      setFilterMunicipio(m);
+      setFilterAno('all'); // mostra todas as atividades daquele município
+    }
+  }, [searchParams]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingId, setEditingId]       = useState<string | null>(null);
@@ -290,6 +304,7 @@ export default function Atividades() {
       (a.municipio.toLowerCase().includes(q) ||
        (a.nome_evento || '').toLowerCase().includes(q) ||
        (a.nup || '').toLowerCase().includes(q)) &&
+      (filterMunicipio === 'all' || a.municipio === filterMunicipio) &&
       (filterTipo   === 'all' || a.tipo === filterTipo) &&
       (filterStatus === 'all' || a.status === filterStatus) &&
       (filterSede   === 'all' || a.municipio_sede === filterSede) &&
@@ -438,6 +453,16 @@ export default function Atividades() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
           </div>
+          {/* Filtro de município — destacado quando ativo via URL */}
+          <Select value={filterMunicipio} onValueChange={setFilterMunicipio}>
+            <SelectTrigger className={cn(filterMunicipio !== 'all' && 'border-primary ring-1 ring-primary/30')}>
+              <SelectValue placeholder="Município" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os municípios</SelectItem>
+              {municipiosCeara.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Select value={filterRegiao} onValueChange={setFilterRegiao}>
             <SelectTrigger><SelectValue placeholder="Região" /></SelectTrigger>
             <SelectContent>

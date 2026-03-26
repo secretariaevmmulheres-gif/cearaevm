@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 import { getRegiao, RegiaoPlanejamento } from '@/data/municipios';
-import { ts, fmtDate, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
+import { ts, fmtDate, lastY, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
 
 export interface RegionStatsExport {
   regiao: RegiaoPlanejamento;

@@ -313,7 +313,7 @@ export default function Dashboard() {
   // Atividades stats
   const totalAtendimentosAtividades = atividades.reduce((s, a) => s + (a.atendimentos ?? 0), 0);
   const atividadesRealizadas = atividades.filter(a => a.status === 'Realizado').length;
-  const atividadesPorSede = (['Fortaleza', 'Juazeiro do Norte', 'Sobral', 'Quixadá'] as const).map(sede => ({
+  const atividadesPorSede = (['Fortaleza', 'Juazeiro do Norte', 'Sobral', 'Tauá', 'Crateús', 'Iguatu', 'Quixadá'] as const).map(sede => ({
     name: sede === 'Juazeiro do Norte' ? 'Juazeiro' : sede,
     total: atividades.filter(a => a.municipio_sede === sede).length,
     realizadas: atividades.filter(a => a.municipio_sede === sede && a.status === 'Realizado').length,

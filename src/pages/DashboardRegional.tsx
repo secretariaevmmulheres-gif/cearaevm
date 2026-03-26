@@ -46,7 +46,7 @@ import {
   exportAllRegionsToPDF,
   exportAllRegionsToExcel,
   RegionStatsExport,
-} from '@/lib/exportUtils';
+} from '@/lib/export/exportRegional';
 import { MonthlyComparisonReport } from '@/components/dashboard/MonthlyComparisonReport';
 import { RegionalGoalsPanel } from '@/components/dashboard/RegionalGoalsPanel';
 
