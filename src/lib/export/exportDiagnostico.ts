@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Equipamento, Solicitacao } from '@/types';
 import { getRegiao } from '@/data/municipios';
-import { ts, lastY, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
+import { ts, lastY, addPdfCover, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
 
 const TIPOS_COM_PATRULHA = new Set(['Casa da Mulher Municipal']);
 const TIPOS_SEM_KIT      = new Set(['Casa da Mulher Brasileira', 'Casa da Mulher Cearense', 'DDM']);
@@ -69,14 +69,35 @@ export function gerarDiagnostico(
   );
 }
 
-export function exportDiagnosticoToPDF(
+export async function exportDiagnosticoToPDF(
   equipamentos: Equipamento[],
   solicitacoes: Solicitacao[],
   filtros: DiagnosticoFiltros = {}
-): void {
+): Promise<void> {
   const pendencias = gerarDiagnostico(equipamentos, solicitacoes, filtros);
   const doc = new jsPDF();
   const PW  = doc.internal.pageSize.getWidth();
+
+  // ── Capa ──────────────────────────────────────────────────────────────────
+  const totalEquips  = pendencias.filter(p => p.origem === 'Equipamento').length;
+  const totalSolics  = pendencias.filter(p => p.origem === 'Solicitação').length;
+  const regioesCnt   = new Set(pendencias.map(p => p.regiao)).size;
+
+  await addPdfCover(doc, {
+    titulo:    'DIAGNÓSTICO DE PENDÊNCIAS',
+    subtitulo: 'Análise de equipamentos e solicitações com alertas — Ceará',
+    colorKey:  'diagnostico',
+    landscape: false,
+    descricao: filtros.regiaoFiltro ? `Região: ${filtros.regiaoFiltro}` : 'Todas as regiões do Estado',
+    stats: pendencias.length > 0 ? [
+      { label: 'Total de Pendências',   valor: pendencias.length },
+      { label: 'Em Equipamentos',       valor: totalEquips },
+      { label: 'Em Solicitações',       valor: totalSolics },
+      { label: 'Regiões com Alertas',   valor: regioesCnt },
+    ] : undefined,
+  });
+
+  doc.addPage();
 
   const checkPage = (y: number, threshold = 230): number => {
     if (y > threshold) { doc.addPage(); return addPdfHeader(doc, 'Diagnóstico EVM'); }

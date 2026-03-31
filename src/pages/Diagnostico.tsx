@@ -480,7 +480,7 @@ export default function Diagnostico() {
 
   const handleExportPDF = async () => {
     setExporting(true);
-    try { await new Promise(r => setTimeout(r, 50)); exportDiagnosticoToPDF(equipamentos, solicitacoes, filtrosDiag); toast.success('PDF exportado!'); }
+    try { await exportDiagnosticoToPDF(equipamentos, solicitacoes, filtrosDiag); toast.success('PDF exportado!'); }
     catch { toast.error('Erro ao exportar PDF'); } finally { setExporting(false); }
   };
   const handleExportExcel = async () => {

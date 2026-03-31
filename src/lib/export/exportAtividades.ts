@@ -3,23 +3,41 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Atividade } from '@/types';
 import { getRegiao } from '@/data/municipios';
-import { ts, fmtDate, lastY, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
+import { ts, fmtDate, lastY, addPdfCover, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
 
-export function exportAtividadesToPDF(atividades: Atividade[], filterLabel?: string) {
+export async function exportAtividadesToPDF(atividades: Atividade[], filterLabel?: string) {
+  const realizadas = atividades.filter(a => a.status === 'Realizado').length;
+  const agendadas  = atividades.filter(a => a.status === 'Agendado').length;
+  const totalAtend = atividades.reduce((s, a) => s + (a.atendimentos ?? 0), 0);
+  const sedes      = new Set(atividades.map(a => a.municipio_sede)).size;
+
   const doc = new jsPDF('landscape');
+
+  await addPdfCover(doc, {
+    titulo:    'ATIVIDADES E ATENDIMENTOS',
+    subtitulo: 'Unidades Móveis, Eventos, Tendas Lilás e Palestras — Ceará',
+    colorKey:  'atividades',
+    landscape: true,
+    descricao: filterLabel || undefined,
+    stats: [
+      { label: 'Total de Atividades', valor: atividades.length },
+      { label: 'Realizadas',          valor: realizadas },
+      { label: 'Agendadas',           valor: agendadas },
+      { label: 'Atendimentos',        valor: totalAtend.toLocaleString('pt-BR') },
+    ],
+  });
+
+  doc.addPage();
   let startY = addPdfHeader(doc, 'Atividades', 'Relatório de Atividades');
   doc.setFontSize(9); doc.setTextColor(80, 80, 80);
   doc.text(`Total: ${atividades.length} registro(s)${filterLabel ? ` — ${filterLabel}` : ''}`, 14, startY);
   doc.setTextColor(0, 0, 0);
-  const realizadas = atividades.filter(a => a.status === 'Realizado').length;
-  const agendadas  = atividades.filter(a => a.status === 'Agendado').length;
-  const totalAtend = atividades.reduce((s, a) => s + (a.atendimentos ?? 0), 0);
   startY += 5;
   doc.setFontSize(8);
   doc.text(`Realizadas: ${realizadas}  |  Agendadas: ${agendadas}  |  Total de atendimentos: ${totalAtend}`, 14, startY);
   startY += 8;
-  const sedes = Array.from(new Set(atividades.map(a => a.municipio_sede))).sort();
-  sedes.forEach((sede, idx) => {
+  const sedesArr = Array.from(new Set(atividades.map(a => a.municipio_sede))).sort();
+  sedesArr.forEach((sede, idx) => {
     const grupo = atividades.filter(a => a.municipio_sede === sede);
     const atendSede = grupo.reduce((s, a) => s + (a.atendimentos ?? 0), 0);
     doc.setFontSize(10); doc.setFont(undefined, 'bold');
@@ -37,7 +55,7 @@ export function exportAtividadesToPDF(atividades: Atividade[], filterLabel?: str
       alternateRowStyles: { fillColor: [245, 243, 255] },
     });
     startY = lastY(doc) + 10;
-    if (idx < sedes.length - 1 && startY > 160) {
+    if (idx < sedesArr.length - 1 && startY > 160) {
       doc.addPage();
       startY = addPdfHeader(doc, 'Atividades', 'Relatório de Atividades (cont.)') + 5;
     }

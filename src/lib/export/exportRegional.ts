@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Equipamento, Viatura, Solicitacao } from '@/types';
 import { getRegiao, RegiaoPlanejamento } from '@/data/municipios';
-import { ts, fmtDate, lastY, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
+import { ts, fmtDate, lastY, addPdfCover, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
 
 export interface RegionStatsExport {
   regiao: RegiaoPlanejamento;
@@ -30,8 +30,24 @@ export interface RegionStatsExport {
   };
 }
 
-export function exportRegionalToPDF(regionStats: RegionStatsExport, equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
+export async function exportRegionalToPDF(regionStats: RegionStatsExport, equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
   const doc = new jsPDF();
+
+  // ── Capa ──────────────────────────────────────────────────────────────────
+  await addPdfCover(doc, {
+    titulo:    `REGIÃO ${regionStats.regiao.toUpperCase()}`,
+    subtitulo: 'Dashboard Regional — Rede EVM de Proteção à Mulher',
+    colorKey:  'regional',
+    landscape: false,
+    stats: [
+      { label: 'Equipamentos',      valor: regionStats.totalEquipamentos },
+      { label: 'Cobertura',         valor: `${regionStats.cobertura.toFixed(1)}%` },
+      { label: 'Solicitações',      valor: regionStats.totalSolicitacoes },
+      { label: 'Municípios',        valor: `${regionStats.municipiosComEquipamento}/${regionStats.totalMunicipios}` },
+    ],
+  });
+
+  doc.addPage();
   let currentY = addPdfHeader(doc, 'Dashboard Regional', `Região: ${regionStats.regiao}`);
 
   doc.setFontSize(12);
@@ -95,24 +111,42 @@ export function exportRegionalToPDF(regionStats: RegionStatsExport, equipamentos
   doc.save(`relatorio-regional-${regionStats.regiao.toLowerCase().replace(/\s+/g, '-')}_${ts()}.pdf`);
 }
 
-export function exportAllRegionsToPDF(regionStats: RegionStatsExport[], equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
+export async function exportAllRegionsToPDF(regionStats: RegionStatsExport[], equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
   const doc = new jsPDF();
-  let currentY = addPdfHeader(doc, 'Dashboard Regional', 'Relatório Consolidado — 14 Regiões de Planejamento');
-  currentY += 4;
 
-  const totalEquipamentos = equipamentos.length;
+  // ── Pré-calcular totais para a capa ───────────────────────────────────────
+  const totalEquipamentos      = equipamentos.length;
   const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
   const municipiosComPatrulhaEquip = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
-  const patrulhasSolicitacoes = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)).length;
-  const totalPatrulhasCasas = equipamentosComPatrulha + patrulhasSolicitacoes;
-  const totalViaturasPMCE = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
-  const viaturasVinculadas = viaturas.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
-  const viaturasNaoVinculadas = viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
-  const totalSolicitacoes = solicitacoes.length;
+  const patrulhasSolicitacoes  = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)).length;
+  const totalPatrulhasCasas    = equipamentosComPatrulha + patrulhasSolicitacoes;
+  const totalViaturasPMCE      = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
+  const viaturasVinculadas     = viaturas.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
+  const viaturasNaoVinculadas  = viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
+  const totalSolicitacoes      = solicitacoes.length;
   const solicitacoesEmAndamento = solicitacoes.filter(s => ['Recebida', 'Em análise', 'Aprovada', 'Em implantação'].includes(s.status)).length;
   const solicitacoesInauguradas = solicitacoes.filter(s => s.status === 'Inaugurada').length;
-  const solicitacoesCanceladas = solicitacoes.filter(s => s.status === 'Cancelada').length;
-  const mediaCobertura = regionStats.reduce((sum, r) => sum + r.cobertura, 0) / regionStats.length;
+  const solicitacoesCanceladas  = solicitacoes.filter(s => s.status === 'Cancelada').length;
+  const mediaCobertura         = regionStats.reduce((sum, r) => sum + r.cobertura, 0) / regionStats.length;
+
+  // ── Capa ──────────────────────────────────────────────────────────────────
+  await addPdfCover(doc, {
+    titulo:    'DASHBOARD REGIONAL CONSOLIDADO',
+    subtitulo: '14 Regiões de Planejamento — Estado do Ceará',
+    colorKey:  'regional',
+    landscape: false,
+    stats: [
+      { label: 'Equipamentos',        valor: totalEquipamentos },
+      { label: 'Cobertura Média',     valor: `${mediaCobertura.toFixed(1)}%` },
+      { label: 'Viaturas PMCE',       valor: totalViaturasPMCE },
+      { label: 'Solicitações',        valor: totalSolicitacoes },
+    ],
+  });
+
+  // ── Resumo geral ──────────────────────────────────────────────────────────
+  doc.addPage();
+  let currentY = addPdfHeader(doc, 'Dashboard Regional', 'Relatório Consolidado — 14 Regiões de Planejamento');
+  currentY += 4;
 
   doc.setFontSize(14);
   doc.text('RESUMO GERAL - ESTADO DO CEARÁ', 14, currentY); currentY += 12;

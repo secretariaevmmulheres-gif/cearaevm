@@ -257,9 +257,14 @@ export default function MunicipioPage() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {fmtDate(s.data_solicitacao)}
+                        Solicitação: {fmtDate(s.data_solicitacao)}
                         {s.nup && <span className="ml-2">· {s.nup}</span>}
                       </p>
+                      {s.data_inauguracao && (
+                        <p className="text-xs font-semibold text-emerald-700 mt-0.5">
+                          Inauguração: {fmtDate(s.data_inauguracao)}
+                        </p>
+                      )}
                       <div className="flex gap-1.5 mt-1 flex-wrap">
                         {s.kit_athena_entregue  && <BoolBadge ok label="Kit Athena" />}
                         {s.recebeu_patrulha     && <BoolBadge ok label="Patrulha" />}

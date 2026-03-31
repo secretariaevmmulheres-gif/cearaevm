@@ -23,7 +23,15 @@ import Usuarios from "./pages/Usuarios";
 import Perfil from "./pages/Perfil";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime:           5 * 60 * 1000, // 5 min — evita re-fetches desnecessários
+      retry:               1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuthContext();

@@ -4,7 +4,7 @@ import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { Equipamento, Viatura, Solicitacao, DashboardStats, Atividade } from '@/types';
 import { getRegiao } from '@/data/municipios';
-import { ts, fmtDate, addPdfFooters, styleWorksheet, saveWb } from './shared';
+import { ts, fmtDate, addPdfCover, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
 
 export async function exportDashboardWithChartsToPDF(
   chartsContainer: HTMLElement,
@@ -14,6 +14,27 @@ export async function exportDashboardWithChartsToPDF(
   stats: DashboardStats
 ) {
   const doc = new jsPDF('landscape');
+
+  // ── Capa ──────────────────────────────────────────────────────────────────
+  const totalViaturasPMCE   = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
+  const equipamentosComPatr = equipamentos.filter(e => e.possui_patrulha).length;
+  const municipiosComPatrEquip = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
+  const patrSolic = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrEquip.has(s.municipio)).length;
+
+  await addPdfCover(doc, {
+    titulo:    'DASHBOARD EVM CEARÁ',
+    subtitulo: 'Visão Geral da Rede de Proteção à Mulher',
+    colorKey:  'dashboard',
+    landscape: true,
+    stats: [
+      { label: 'Equipamentos',        valor: stats.totalEquipamentos },
+      { label: 'Viaturas PMCE',       valor: totalViaturasPMCE },
+      { label: 'Patrulhas das Casas', valor: equipamentosComPatr + patrSolic },
+      { label: 'Solicitações',        valor: stats.totalSolicitacoes },
+    ],
+  });
+
+  doc.addPage();
   let currentY = 20;
 
   doc.setFontSize(20);
@@ -27,11 +48,8 @@ export async function exportDashboardWithChartsToPDF(
   doc.text('Resumo Geral', 14, currentY);
   currentY += 8;
 
-  const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
-  const municipiosComPatrulhaEquip = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
-  const patrulhasSolicitacoes = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)).length;
-  const totalPatrulhasCasas = equipamentosComPatrulha + patrulhasSolicitacoes;
-  const totalViaturasPMCE = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
+  // reutiliza vars calculadas acima para a capa
+  const totalPatrulhasCasas = equipamentosComPatr + patrSolic;
 
   doc.setFontSize(10);
   doc.text(`Equipamentos: ${stats.totalEquipamentos}`, 14, currentY);
@@ -39,14 +57,14 @@ export async function exportDashboardWithChartsToPDF(
   doc.text(`Patrulhas das Casas: ${totalPatrulhasCasas}`, 154, currentY);
   doc.text(`Solicitações: ${stats.totalSolicitacoes}`, 224, currentY);
   currentY += 5;
-  doc.text(`  - Com Patrulha: ${equipamentosComPatrulha}`, 14, currentY);
+  doc.text(`  - Com Patrulha: ${equipamentosComPatr}`, 14, currentY);
   doc.text(`  - Vinculadas: ${viaturas.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0)}`, 84, currentY);
-  doc.text(`  - De Equipamentos: ${equipamentosComPatrulha}`, 154, currentY);
+  doc.text(`  - De Equipamentos: ${equipamentosComPatr}`, 154, currentY);
   doc.text(`  - Inauguradas: ${stats.solicitacoesPorStatus['Inaugurada'] || 0}`, 224, currentY);
   currentY += 5;
-  doc.text(`  - Sem Patrulha: ${stats.totalEquipamentos - equipamentosComPatrulha}`, 14, currentY);
+  doc.text(`  - Sem Patrulha: ${stats.totalEquipamentos - equipamentosComPatr}`, 14, currentY);
   doc.text(`  - Não Vinculadas: ${viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0)}`, 84, currentY);
-  doc.text(`  - De Solicitações: ${patrulhasSolicitacoes}`, 154, currentY);
+  doc.text(`  - De Solicitações: ${patrSolic}`, 154, currentY);
   doc.text(`  - Em Andamento: ${solicitacoes.filter(s => ['Recebida', 'Em análise', 'Aprovada', 'Em implantação'].includes(s.status)).length}`, 224, currentY);
   currentY += 10;
 
@@ -76,20 +94,15 @@ export async function exportDashboardWithChartsToPDF(
   doc.save(`dashboard-com-graficos_${ts()}.pdf`);
 }
 
-export function exportAllToPDF(
+export async function exportAllToPDF(
   equipamentos: Equipamento[],
   viaturas: Viatura[],
   solicitacoes: Solicitacao[],
   atividades: Atividade[] = []
 ) {
   const doc = new jsPDF('landscape');
-  let currentY = 22;
 
-  doc.setFontSize(18);
-  doc.text('Relatório Completo - EVM', 14, currentY); currentY += 8;
-  doc.setFontSize(10);
-  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, currentY); currentY += 12;
-
+  // ── Pré-cálculos para a capa ──────────────────────────────────────────────
   const totalEquipamentos       = equipamentos.length;
   const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
   const municipiosComPatrulhaEquip = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
@@ -101,6 +114,23 @@ export function exportAllToPDF(
   const solicitacoesEmAndamento = solicitacoes.filter(s => ['Recebida', 'Em análise', 'Aprovada', 'Em implantação'].includes(s.status)).length;
   const solicitacoesInauguradas = solicitacoes.filter(s => s.status === 'Inaugurada').length;
   const solicitacoesCanceladas  = solicitacoes.filter(s => s.status === 'Cancelada').length;
+
+  await addPdfCover(doc, {
+    titulo:    'RELATÓRIO COMPLETO EVM',
+    subtitulo: 'Rede de Enfrentamento à Violência contra as Mulheres — Ceará',
+    colorKey:  'dashboard',
+    landscape: true,
+    stats: [
+      { label: 'Equipamentos',        valor: totalEquipamentos },
+      { label: 'Viaturas PMCE',       valor: totalViaturasPMCE },
+      { label: 'Patrulhas das Casas', valor: totalPatrulhasCasas },
+      { label: 'Solicitações',        valor: solicitacoes.length },
+    ],
+  });
+
+  doc.addPage();
+  addPdfHeader(doc, 'Relatório Completo', 'Relatório Completo EVM — Estado do Ceará');
+  let currentY = 36;
 
   doc.setFontSize(14);
   doc.text('RESUMO GERAL - ESTADO DO CEARÁ', 14, currentY); currentY += 10;

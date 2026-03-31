@@ -91,10 +91,11 @@ export interface Solicitacao {
   capacitacao_realizada: boolean;
   nup: string | null;
   qualificacao_id: string | null;
+  data_inauguracao: string | null;
   observacoes: string;
   anexos: string[];
   created_at: string;
-  updated_at: string; // usado pelo diagnóstico para calcular dias sem movimento
+  updated_at: string;
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────

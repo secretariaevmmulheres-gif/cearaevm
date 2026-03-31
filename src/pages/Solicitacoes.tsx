@@ -33,7 +33,7 @@ import {
   Download, FileSpreadsheet, FileText as FilePdf, ChevronDown,
   ShieldCheck, Users, Package, GraduationCap, Hash,
   CheckCircle2, Circle, CalendarDays, StickyNote,
-  Eye as EyeIcon, AlertTriangle, CheckCircle, Paperclip,
+  Eye as EyeIcon, AlertTriangle, CheckCircle, Paperclip, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -184,6 +184,15 @@ function SolicitacaoRow({ solicitacao, onEdit, onDelete, onTransform, canEdit }:
                         <p className="text-xs font-medium">{format(new Date(solicitacao.data_solicitacao + 'T00:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
                       </div>
                     </div>
+                    {solicitacao.data_inauguracao && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-6 h-6 rounded-md bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5"><CalendarDays className="w-3 h-3 text-emerald-600" /></div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground">Data de Inauguração</p>
+                          <p className="text-xs font-semibold text-emerald-700">{format(new Date(solicitacao.data_inauguracao + 'T00:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                        </div>
+                      </div>
+                    )}
                     {solicitacao.observacoes && (
                       <div className="flex items-start gap-2">
                         <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0 mt-0.5"><StickyNote className="w-3 h-3 text-primary" /></div>
@@ -220,7 +229,7 @@ function SolicitacaoRow({ solicitacao, onEdit, onDelete, onTransform, canEdit }:
 export default function Solicitacoes() {
   const { role } = useAuthContext();
   const canEdit = role !== 'atividades_editor' && role !== 'viewer';
-  const { solicitacoes, addSolicitacao, updateSolicitacao, deleteSolicitacao, transformarEmEquipamento, isAdding, isUpdating } = useSolicitacoes();
+  const { solicitacoes, addSolicitacao, updateSolicitacao, deleteSolicitacao, transformarEmEquipamento, isAdding, isUpdating, isLoadingMore, hasMore, loadMore, total, visibleCount } = useSolicitacoes();
   const { equipamentos } = useEquipamentos();
   const { qualificacoes } = useQualificacoes();
 
@@ -244,6 +253,7 @@ export default function Solicitacoes() {
     kit_athena_entregue: false, kit_athena_previo: false, capacitacao_realizada: false,
     qualificacao_id: '' as string,
     nup: '', observacoes: '', anexos: [] as string[],
+    data_inauguracao: '' as string,
   });
 
   const filteredSolicitacoes = solicitacoes
@@ -263,7 +273,7 @@ export default function Solicitacoes() {
     setEditingSolicitacao(null);
     setFormData({ municipio: '', data_solicitacao: format(new Date(), 'yyyy-MM-dd'), tipo_equipamento: '', status: 'Recebida',
       recebeu_patrulha: false, guarda_municipal_estruturada: false, kit_athena_entregue: false, kit_athena_previo: false,
-      capacitacao_realizada: false, qualificacao_id: '', nup: '', observacoes: '', anexos: [] });
+      capacitacao_realizada: false, qualificacao_id: '', nup: '', observacoes: '', anexos: [], data_inauguracao: '' });
     setIsDialogOpen(true);
   };
 
@@ -274,7 +284,8 @@ export default function Solicitacoes() {
       guarda_municipal_estruturada: s.guarda_municipal_estruturada, kit_athena_entregue: s.kit_athena_entregue,
       kit_athena_previo: s.kit_athena_previo ?? false, capacitacao_realizada: s.capacitacao_realizada,
       qualificacao_id: s.qualificacao_id || '',
-      nup: s.nup || '', observacoes: s.observacoes || '', anexos: s.anexos || [] });
+      nup: s.nup || '', observacoes: s.observacoes || '', anexos: s.anexos || [],
+      data_inauguracao: s.data_inauguracao ?? '' });
     setIsDialogOpen(true);
   };
 
@@ -286,6 +297,7 @@ export default function Solicitacoes() {
     kit_athena_entregue: formData.kit_athena_entregue, kit_athena_previo: formData.kit_athena_previo,
     capacitacao_realizada: formData.capacitacao_realizada, nup: formData.nup,
     observacoes: formData.observacoes, anexos: formData.anexos,
+    data_inauguracao: formData.data_inauguracao || null,
   });
 
   const handleSubmit = () => {
@@ -333,7 +345,7 @@ export default function Solicitacoes() {
               <Button variant="outline"><Download className="w-4 h-4 mr-2" />Exportar</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportSolicitacoesToPDF(filteredSolicitacoes, filterRegiao)}>
+              <DropdownMenuItem onClick={() => { exportSolicitacoesToPDF(filteredSolicitacoes, filterRegiao).catch(console.error); }}>
                 <FilePdf className="w-4 h-4 mr-2" />Exportar PDF
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => exportSolicitacoesToExcel(filteredSolicitacoes, qualificacoes)}>
@@ -402,7 +414,12 @@ export default function Solicitacoes() {
               {[2024, 2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
             </SelectContent>
           </Select>
-          <div className="flex items-center text-sm text-muted-foreground">{filteredSolicitacoes.length} registro(s) encontrado(s)</div>
+          <div className="flex items-center text-sm text-muted-foreground">
+            {filteredSolicitacoes.length} registro(s) encontrado(s)
+            {total !== null && solicitacoes.length < total && (
+              <span className="ml-1 text-xs">de {total} carregados</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -424,7 +441,7 @@ export default function Solicitacoes() {
                   <p className="text-xs mt-1 opacity-70">Tente ajustar os filtros ou cadastre uma nova solicitação</p>
                 </td></tr>
               ) : (
-                filteredSolicitacoes.map((s) => (
+                filteredSolicitacoes.slice(0, visibleCount).map((s) => (
                   <SolicitacaoRow key={s.id} solicitacao={s} canEdit={canEdit}
                     onEdit={() => openEditDialog(s)}
                     onDelete={() => { setDeletingId(s.id); setIsDeleteDialogOpen(true); }}
@@ -436,6 +453,18 @@ export default function Solicitacoes() {
           </table>
         </div>
       </div>
+
+      {/* Botão "Carregar mais" */}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" onClick={loadMore} disabled={isLoadingMore} className="gap-2">
+            {isLoadingMore
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Carregando...</>
+              : <>Carregar mais {total !== null ? `(${solicitacoes.length} de ${total})` : ''}</>
+            }
+          </Button>
+        </div>
+      )}
 
       {/* Dialog Criar/Editar */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -474,6 +503,24 @@ export default function Solicitacoes() {
                 </Select>
               </div>
             </div>
+
+            {/* Data de Inauguração — aparece quando status é Inaugurada */}
+            {formData.status === 'Inaugurada' && (
+              <div className="space-y-2">
+                <Label htmlFor="data_inauguracao" className="flex items-center gap-1.5">
+                  <CalendarDays className="w-3.5 h-3.5 text-emerald-600" />
+                  Data de Inauguração
+                  <span className="text-xs text-muted-foreground font-normal">(data real do evento)</span>
+                </Label>
+                <Input
+                  id="data_inauguracao"
+                  type="date"
+                  value={formData.data_inauguracao}
+                  onChange={(e) => setFormData({ ...formData, data_inauguracao: e.target.value })}
+                  className="border-emerald-300 focus-visible:ring-emerald-400/30"
+                />
+              </div>
+            )}
 
             {/* Alerta contextual quando status é Inaugurada no modo edição */}
             {editingSolicitacao && formData.status === 'Inaugurada' && (

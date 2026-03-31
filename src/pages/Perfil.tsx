@@ -8,7 +8,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { User, Lock, Mail, Shield, Clock, CalendarDays } from 'lucide-react';
+import { User, Lock, Mail, Shield, Clock, CalendarDays, Sun, Moon, Monitor } from 'lucide-react';
+
+type Theme = 'light' | 'dark' | 'system';
+
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  if (theme === 'dark') {
+    root.classList.add('dark');
+  } else if (theme === 'light') {
+    root.classList.remove('dark');
+  } else {
+    // system
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.classList.toggle('dark', prefersDark);
+  }
+}
 
 export default function Perfil() {
   const { user, role } = useAuthContext();
@@ -16,6 +31,7 @@ export default function Perfil() {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [lastSignIn, setLastSignIn] = useState<string | null>(null);
   const [createdAt, setCreatedAt]   = useState<string | null>(null);
+  const [theme, setThemeState]      = useState<Theme>('system');
 
   const [profileData, setProfileData] = useState({
     fullName: user?.user_metadata?.full_name || '',
@@ -27,13 +43,34 @@ export default function Perfil() {
     confirmPassword: '',
   });
 
-  // Carrega metadados do auth (last_sign_in_at, created_at)
+  // Carrega metadados do auth + theme do profile
   useEffect(() => {
     if (!user) return;
     const u = user as any;
     setLastSignIn(u.last_sign_in_at ?? null);
     setCreatedAt(u.created_at ?? null);
+
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        const saved = ((data as any)?.theme as Theme) ?? 'system';
+        setThemeState(saved);
+        applyTheme(saved);
+      });
   }, [user]);
+
+  const handleThemeChange = async (newTheme: Theme) => {
+    setThemeState(newTheme);
+    applyTheme(newTheme);
+    // Persiste no banco
+    await supabase
+      .from('profiles')
+      .update({ theme: newTheme } as any)
+      .eq('id', user?.id);
+  };
 
   const fmtDateTime = (iso: string | null) => {
     if (!iso) return '—';
@@ -205,6 +242,41 @@ export default function Perfil() {
                 {isUpdatingPassword ? 'Alterando...' : 'Alterar Senha'}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Tema */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Sun className="w-5 h-5 text-primary" />
+              <CardTitle>Aparência</CardTitle>
+            </div>
+            <CardDescription>Preferência de tema salva na sua conta</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              {([
+                { value: 'light',  label: 'Claro',   icon: Sun     },
+                { value: 'dark',   label: 'Escuro',  icon: Moon    },
+                { value: 'system', label: 'Sistema', icon: Monitor },
+              ] as { value: Theme; label: string; icon: React.ElementType }[]).map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => handleThemeChange(value)}
+                  className={`flex flex-1 flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
+                    theme === value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/40'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 ${theme === value ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className={`text-sm font-medium ${theme === value ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {label}
+                  </span>
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 

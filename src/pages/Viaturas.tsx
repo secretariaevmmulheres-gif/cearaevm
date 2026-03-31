@@ -445,7 +445,7 @@ export default function Viaturas() {
               <Button variant="outline"><Download className="w-4 h-4 mr-2" />Exportar</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportViaturasToPDF(filteredViaturas)}>
+              <DropdownMenuItem onClick={() => { exportViaturasToPDF(filteredViaturas).catch(console.error); }}>
                 <FilePdf className="w-4 h-4 mr-2" />Exportar PDF
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => exportViaturasToExcel(filteredViaturas)}>
@@ -635,7 +635,7 @@ export default function Viaturas() {
                 <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" />Exportar Patrulhas</Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => exportPatrulhasCasasToPDF(equipamentos, solicitacoes)}>
+                <DropdownMenuItem onClick={() => { exportPatrulhasCasasToPDF(equipamentos, solicitacoes).catch(console.error); }}>
                   <FilePdf className="w-4 h-4 mr-2" />Exportar PDF
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => exportPatrulhasCasasToExcel(equipamentos, solicitacoes)}>

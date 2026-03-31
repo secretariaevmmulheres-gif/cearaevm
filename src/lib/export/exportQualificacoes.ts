@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { getRegiao } from '@/data/municipios';
-import { ts, fmtDate, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
+import { ts, fmtDate, addPdfCover, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
 
 export interface QualificacaoExport {
   id: string;
@@ -21,14 +21,29 @@ const REGIOES_LIST = [
   'Sertão dos Crateús', 'Vale do Jaguaribe',
 ] as const;
 
-export function exportQualificacoesToPDF(qualificacoes: QualificacaoExport[]) {
+export async function exportQualificacoesToPDF(qualificacoes: QualificacaoExport[]) {
+  const totalPessoas = qualificacoes.reduce((s, q) => s + q.total_pessoas, 0);
+  const municUnicos  = new Set(qualificacoes.flatMap(q => q.municipios.map(m => m.municipio))).size;
+  const regioesCnt   = new Set(qualificacoes.flatMap(q => q.municipios.map(m => getRegiao(m.municipio))).filter(Boolean)).size;
+
   const doc = new jsPDF();
+
+  await addPdfCover(doc, {
+    titulo:    'QUALIFICAÇÕES EVM',
+    subtitulo: 'Cursos e Capacitações da Rede — Ceará',
+    colorKey:  'qualificacoes',
+    landscape: false,
+    stats: [
+      { label: 'Cursos Realizados',      valor: qualificacoes.length },
+      { label: 'Pessoas Qualificadas',   valor: totalPessoas.toLocaleString('pt-BR') },
+      { label: 'Municípios Alcançados',  valor: municUnicos },
+      { label: 'Regiões',               valor: regioesCnt },
+    ],
+  });
+
+  doc.addPage();
   let y = addPdfHeader(doc, 'Qualificações', 'Cursos e Qualificações Realizados');
   const PW = doc.internal.pageSize.getWidth();
-
-  const totalPessoas = qualificacoes.reduce((s, q) => s + q.total_pessoas, 0);
-  const municipiosUnicosSet = new Set(qualificacoes.flatMap(q => q.municipios.map(m => m.municipio)));
-  const municUnicos = municipiosUnicosSet.size;
 
   doc.setFontSize(9); doc.setTextColor(100, 100, 100);
   doc.text(

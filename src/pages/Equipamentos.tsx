@@ -42,7 +42,7 @@ import {
   Download, FileSpreadsheet, FileText as FilePdf, ChevronDown,
   MapPin, Phone, User, FileText, AlertCircle, ShieldCheck,
   Package, GraduationCap, Hash, AlertTriangle,
-  Eye as EyeIcon,
+  Eye as EyeIcon, Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -349,7 +349,7 @@ function EquipamentoRow({
 export default function Equipamentos() {
   const { role } = useAuthContext();
   const canEdit = role !== 'atividades_editor' && role !== 'viewer';
-  const { equipamentos, addEquipamento, updateEquipamento, deleteEquipamento, isAdding, isUpdating } = useEquipamentos();
+  const { equipamentos, addEquipamento, updateEquipamento, deleteEquipamento, isAdding, isUpdating, isLoadingMore, hasMore, loadMore, total, visibleCount } = useEquipamentos();
   const { solicitacoes } = useSolicitacoes();
   const { qualificacoes } = useQualificacoes();
   const [searchTerm, setSearchTerm] = useState('');
@@ -487,7 +487,7 @@ export default function Equipamentos() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportEquipamentosToPDF(sortedEquipamentos, filterRegiao)}>
+              <DropdownMenuItem onClick={() => { exportEquipamentosToPDF(sortedEquipamentos, filterRegiao).catch(console.error); }}>
                 <FilePdf className="w-4 h-4 mr-2" />
                 Exportar PDF
               </DropdownMenuItem>
@@ -597,6 +597,9 @@ export default function Equipamentos() {
           </Select>
           <div className="flex items-center text-sm text-muted-foreground">
             {filteredEquipamentos.length} registro(s) encontrado(s)
+            {total !== null && equipamentos.length < total && (
+              <span className="ml-1 text-xs">de {total} carregados</span>
+            )}
           </div>
         </div>
       </div>
@@ -626,7 +629,7 @@ export default function Equipamentos() {
                   </td>
                 </tr>
               ) : (
-                sortedEquipamentos.map((equipamento) => (
+                sortedEquipamentos.slice(0, visibleCount).map((equipamento) => (
                   <EquipamentoRow
                     key={equipamento.id}
                     equipamento={equipamento}
@@ -643,6 +646,18 @@ export default function Equipamentos() {
           </table>
         </div>
       </div>
+
+      {/* Botão "Carregar mais" */}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" onClick={loadMore} disabled={isLoadingMore} className="gap-2">
+            {isLoadingMore
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Carregando...</>
+              : <>Carregar mais {total !== null ? `(${equipamentos.length} de ${total})` : ''}</>
+            }
+          </Button>
+        </div>
+      )}
 
       {/* ── Dialog Criar/Editar ── */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

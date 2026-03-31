@@ -381,7 +381,7 @@ export default function Dashboard() {
               PDF com Gráficos
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => exportAllToPDF(equipamentos, viaturas, solicitacoes, atividades)}>
+            <DropdownMenuItem onClick={() => { exportAllToPDF(equipamentos, viaturas, solicitacoes, atividades).catch(console.error); }}>
               <FileText className="w-4 h-4 mr-2" />
               PDF (Tabelas)
             </DropdownMenuItem>

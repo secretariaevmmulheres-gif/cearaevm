@@ -625,8 +625,7 @@ export default function RelatorioEVM() {
   const handleDiagnosticoPDF = async () => {
     setExportingDiag(true);
     try {
-      await new Promise(r => setTimeout(r, 50));
-      exportDiagnosticoToPDF(equipamentos, solicitacoes, filtrosDiag);
+      await exportDiagnosticoToPDF(equipamentos, solicitacoes, filtrosDiag);
       toast.success('Diagnóstico PDF exportado!');
     } catch {
       toast.error('Erro ao gerar diagnóstico');
@@ -849,7 +848,7 @@ export default function RelatorioEVM() {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => exportQualificacoesToPDF(qualificacoes)}
+                  onClick={() => { exportQualificacoesToPDF(qualificacoes).catch(console.error); }}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" /> PDF

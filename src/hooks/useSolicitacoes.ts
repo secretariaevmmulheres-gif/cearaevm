@@ -1,9 +1,12 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Solicitacao } from '@/types';
 import { TipoEquipamento, StatusSolicitacao } from '@/data/municipios';
 import { toast } from 'sonner';
 import { validateNup } from './useEquipamentos';
+
+const PAGE_SIZE = 100;
 
 // Payload explícito — desacoplado do tipo gerado pelo Supabase CLI
 // para não depender do supabase_types.ts estar atualizado.
@@ -21,24 +24,49 @@ type SolicitacaoInsert = {
   observacoes?: string | null;
   anexos?: string[];
   qualificacao_id?: string | null;
+  data_inauguracao?: string | null;
 };
 
 export function useSolicitacoes() {
-  const queryClient = useQueryClient();
+  const [solicitacoes,   setSolicitacoes]   = useState<Solicitacao[]>([]);
+  const [isLoading,      setIsLoading]      = useState(false);
+  const [isLoadingMore,  setIsLoadingMore]  = useState(false);
+  const [hasMore,        setHasMore]        = useState(false);
+  const [total,          setTotal]          = useState<number | null>(null);
+  const [visibleCount,   setVisibleCount]   = useState(PAGE_SIZE);
 
-  const { data: solicitacoes = [], isLoading } = useQuery({
-    queryKey: ['solicitacoes'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+  const fetchAll = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data, error, count } = await supabase
         .from('solicitacoes')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
-
       if (error) throw error;
-      // cast via unknown para contornar tipos gerados desatualizados
-      return (data ?? []) as unknown as Solicitacao[];
-    },
-  });
+
+      const rows = (data ?? []) as unknown as Solicitacao[];
+      setSolicitacoes(rows);
+      setTotal(count ?? rows.length);
+      setVisibleCount(PAGE_SIZE);
+      setHasMore(rows.length > PAGE_SIZE);
+    } catch (e: unknown) {
+      toast.error('Erro ao carregar solicitações');
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev => {
+      const next = prev + PAGE_SIZE;
+      setHasMore(next < solicitacoes.length);
+      return next;
+    });
+    setIsLoadingMore(false);
+  }, [solicitacoes.length]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const addMutation = useMutation({
     mutationFn: async (solicitacao: SolicitacaoInsert) => {
@@ -69,7 +97,7 @@ export function useSolicitacoes() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['solicitacoes'] });
+      fetchAll();
       toast.success('Solicitação cadastrada com sucesso');
     },
     onError: (error) => {
@@ -98,16 +126,20 @@ export function useSolicitacoes() {
       if (data.observacoes                  !== undefined) updateData.observacoes                  = data.observacoes;
       if (data.anexos                       !== undefined) updateData.anexos                       = data.anexos;
       if (data.qualificacao_id              !== undefined) updateData.qualificacao_id              = data.qualificacao_id ?? null;
+      if (data.data_inauguracao             !== undefined) updateData.data_inauguracao             = data.data_inauguracao ?? null;
 
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('solicitacoes')
         .update(updateData as any)
-        .eq('id', id);
+        .eq('id', id)
+        .select()
+        .single();
 
       if (error) throw error;
+      return updated as unknown as Solicitacao;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['solicitacoes'] });
+    onSuccess: (updated) => {
+      setSolicitacoes(prev => prev.map(s => s.id === updated.id ? updated : s));
       toast.success('Solicitação atualizada com sucesso');
     },
     onError: (error) => {
@@ -121,11 +153,12 @@ export function useSolicitacoes() {
         .from('solicitacoes')
         .delete()
         .eq('id', id);
-
       if (error) throw error;
+      return id;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['solicitacoes'] });
+    onSuccess: (id) => {
+      setSolicitacoes(prev => prev.filter(s => s.id !== id));
+      setTotal(prev => prev !== null ? prev - 1 : null);
       toast.success('Solicitação excluída com sucesso');
     },
     onError: (error) => {
@@ -162,7 +195,6 @@ export function useSolicitacoes() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipamentos'] });
       toast.success('Equipamento criado com sucesso — dados da solicitação herdados');
     },
     onError: (error) => {
@@ -173,6 +205,12 @@ export function useSolicitacoes() {
   return {
     solicitacoes,
     isLoading,
+    isLoadingMore,
+    hasMore,
+    total,
+    visibleCount,
+    loadMore,
+    refetch: fetchAll,
     addSolicitacao:           addMutation.mutate,
     updateSolicitacao:        updateMutation.mutate,
     deleteSolicitacao:        deleteMutation.mutate,

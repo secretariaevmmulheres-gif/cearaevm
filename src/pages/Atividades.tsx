@@ -25,11 +25,12 @@ import { useAtividades } from '@/hooks/useAtividades';
 import { municipiosCeara, regioesList, getRegiao } from '@/data/municipios';import { Atividade, TipoAtividade, RecursoAtividade, StatusAtividade } from '@/types';
 import { exportAtividadesToPDF, exportAtividadesToExcel } from '@/lib/exportUtils';
 import { CoberturaMapa } from '@/components/atividades/CoberturaMapa';
+import { CalendarioAtividades } from '@/components/atividades/CalendarioAtividades';
 import {
   Plus, Pencil, Trash2, Search, ChevronDown, MapPin,
   CalendarDays, Users, Hash, StickyNote, Truck, Download,
   FileSpreadsheet, FileText as FilePdf, AlertCircle, Building2,
-  Map, List, Copy,
+  Map, List, Copy, Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -271,9 +272,9 @@ const FORM_INICIAL = {
 };
 
 export default function Atividades() {
-  const { atividades, addAtividade, updateAtividade, deleteAtividade, isAdding, isUpdating } = useAtividades();
+  const { atividades, addAtividade, updateAtividade, deleteAtividade, isAdding, isUpdating, isLoadingMore, hasMore, loadMore, total, visibleCount } = useAtividades();
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab]       = useState<'registros' | 'cobertura'>('registros');
+  const [activeTab, setActiveTab]       = useState<'registros' | 'calendario' | 'cobertura'>('registros');
   const [searchTerm, setSearchTerm]     = useState('');
   const [filterTipo, setFilterTipo]     = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -314,9 +315,12 @@ export default function Atividades() {
     );
   }).sort((a, b) => new Date(b.data + 'T00:00:00').getTime() - new Date(a.data + 'T00:00:00').getTime());
 
+  // Para renderização progressiva: mostra apenas as primeiras visibleCount atividades filtradas
+  const filteredVisible = filtered.slice(0, visibleCount);
+
   const sedesOrdenadas = [
-    ...MUNICIPIOS_SEDE.filter(s => filtered.some(a => a.municipio_sede === s)),
-    ...Array.from(new Set(filtered.filter(a => !MUNICIPIOS_SEDE.includes(a.municipio_sede)).map(a => a.municipio_sede))),
+    ...MUNICIPIOS_SEDE.filter(s => filteredVisible.some(a => a.municipio_sede === s)),
+    ...Array.from(new Set(filteredVisible.filter(a => !MUNICIPIOS_SEDE.includes(a.municipio_sede)).map(a => a.municipio_sede))),
   ];
 
   const totalAtendimentos = atividades.reduce((s, a) => s + (a.atendimentos ?? 0), 0);
@@ -387,7 +391,7 @@ export default function Atividades() {
                   <Button variant="outline"><Download className="w-4 h-4 mr-2" />Exportar</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => exportAtividadesToPDF(filtered, filterSede !== 'all' ? `Sede: ${filterSede}` : undefined)}>
+                  <DropdownMenuItem onClick={() => { exportAtividadesToPDF(filtered, filterSede !== 'all' ? `Sede: ${filterSede}` : undefined).catch(console.error); }}>
                     <FilePdf className="w-4 h-4 mr-2" />Exportar PDF
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => exportAtividadesToExcel(filtered)}>
@@ -414,6 +418,18 @@ export default function Atividades() {
         >
           <List className="w-4 h-4" />
           Registros
+        </button>
+        <button
+          onClick={() => setActiveTab('calendario')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+            activeTab === 'calendario'
+              ? 'bg-card shadow-sm text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <CalendarDays className="w-4 h-4" />
+          Calendário
         </button>
         <button
           onClick={() => setActiveTab('cobertura')}
@@ -523,7 +539,12 @@ export default function Atividades() {
               <SelectItem value="2027">2027</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex items-center text-sm text-muted-foreground">{filtered.length} registro(s)</div>
+          <div className="flex items-center text-sm text-muted-foreground">
+            {filtered.length} registro(s)
+            {total !== null && atividades.length < total && (
+              <span className="ml-1 text-xs">de {total} carregados</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -535,7 +556,7 @@ export default function Atividades() {
           <p className="text-xs mt-1 opacity-70">Tente ajustar os filtros ou cadastre uma nova atividade</p>
         </div>
       ) : sedesOrdenadas.map((sede, i) => {
-        const grupo = filtered.filter(a => a.municipio_sede === sede);
+        const grupo = filteredVisible.filter(a => a.municipio_sede === sede);
         if (!grupo.length) return null;
         return (
           <motion.div key={sede} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
@@ -545,6 +566,18 @@ export default function Atividades() {
           </motion.div>
         );
       })}
+
+      {/* Botão "Carregar mais" */}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" onClick={loadMore} disabled={isLoadingMore} className="gap-2">
+            {isLoadingMore
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Carregando...</>
+              : <>Carregar mais atividades {total !== null ? `(${atividades.length} de ${total})` : ''}</>
+            }
+          </Button>
+        </div>
+      )}
 
       {/* Dialog Criar/Editar */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -691,6 +724,11 @@ export default function Atividades() {
 
       {/* ── Aba Consulta de Cobertura ── */}
       {activeTab === 'cobertura' && <CoberturaMapa />}
+
+      {/* ── Aba Calendário ── */}
+      {activeTab === 'calendario' && (
+        <CalendarioAtividades atividades={atividades} />
+      )}
 
       {/* Dialog Deletar */}
       <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

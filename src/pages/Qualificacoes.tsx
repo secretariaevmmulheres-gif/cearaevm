@@ -869,7 +869,7 @@ export default function Qualificacoes() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => exportQualificacoesToPDF(filtered)}>
+                <DropdownMenuItem onClick={() => { exportQualificacoesToPDF(filtered).catch(console.error); }}>
                   <FilePdf className="w-4 h-4 mr-2 text-rose-500" />
                   PDF
                 </DropdownMenuItem>

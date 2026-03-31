@@ -1,8 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Equipamento } from '@/types';
 import { TipoEquipamento } from '@/data/municipios';
 import { toast } from 'sonner';
+
+const PAGE_SIZE = 100;
 
 // Payload completo para insert/update — desacoplado do tipo gerado pelo Supabase
 type EquipamentoInsert = {
@@ -59,20 +62,50 @@ export function checkDuplicata(
 }
 
 export function useEquipamentos() {
-  const queryClient = useQueryClient();
+  // Carrega TODOS os equipamentos de uma vez.
+  // PAGE_SIZE só é usado no botão "Carregar mais" da UI de listagem
+  // para renderização progressiva — os dados em memória são sempre completos.
+  const [equipamentos,   setEquipamentos]   = useState<Equipamento[]>([]);
+  const [isLoading,      setIsLoading]      = useState(false);
+  const [isLoadingMore,  setIsLoadingMore]  = useState(false);
+  const [hasMore,        setHasMore]        = useState(false);
+  const [total,          setTotal]          = useState<number | null>(null);
+  // visibleCount controla quantos registros a UI mostra (renderização progressiva)
+  const [visibleCount,   setVisibleCount]   = useState(PAGE_SIZE);
 
-  const { data: equipamentos = [], isLoading } = useQuery({
-    queryKey: ['equipamentos'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+  const fetchAll = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data, error, count } = await supabase
         .from('equipamentos')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
-
       if (error) throw error;
-      return (data ?? []) as unknown as Equipamento[];
-    },
-  });
+
+      const rows = (data ?? []) as unknown as Equipamento[];
+      setEquipamentos(rows);
+      setTotal(count ?? rows.length);
+      setVisibleCount(PAGE_SIZE);
+      setHasMore(rows.length > PAGE_SIZE);
+    } catch (e: unknown) {
+      toast.error('Erro ao carregar equipamentos');
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // "Carregar mais" apenas expande o visibleCount — os dados já estão em memória
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev => {
+      const next = prev + PAGE_SIZE;
+      setHasMore(next < equipamentos.length);
+      return next;
+    });
+    setIsLoadingMore(false);
+  }, [equipamentos.length]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const addMutation = useMutation({
     mutationFn: async (equipamento: EquipamentoInsert) => {
@@ -105,7 +138,7 @@ export function useEquipamentos() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipamentos'] });
+      fetchAll();
       toast.success('Equipamento cadastrado com sucesso');
     },
     onError: (error) => {
@@ -140,17 +173,20 @@ export function useEquipamentos() {
       if (data.kit_athena_previo     !== undefined) updateData.kit_athena_previo     = data.kit_athena_previo;
       if (data.capacitacao_realizada !== undefined) updateData.capacitacao_realizada = data.capacitacao_realizada;
       if (data.nup                   !== undefined) updateData.nup                   = data.nup ?? null;
-      if (data.qualificacao_id          !== undefined) updateData.qualificacao_id          = data.qualificacao_id ?? null;
+      if (data.qualificacao_id       !== undefined) updateData.qualificacao_id       = data.qualificacao_id ?? null;
 
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('equipamentos')
         .update(updateData as any)
-        .eq('id', id);
+        .eq('id', id)
+        .select()
+        .single();
 
       if (error) throw error;
+      return updated as unknown as Equipamento;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipamentos'] });
+    onSuccess: (updated) => {
+      setEquipamentos(prev => prev.map(e => e.id === updated.id ? updated : e));
       toast.success('Equipamento atualizado com sucesso');
     },
     onError: (error) => {
@@ -164,11 +200,12 @@ export function useEquipamentos() {
         .from('equipamentos')
         .delete()
         .eq('id', id);
-
       if (error) throw error;
+      return id;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipamentos'] });
+    onSuccess: (id) => {
+      setEquipamentos(prev => prev.filter(e => e.id !== id));
+      setTotal(prev => prev !== null ? prev - 1 : null);
       toast.success('Equipamento excluido com sucesso');
     },
     onError: (error) => {
@@ -177,8 +214,14 @@ export function useEquipamentos() {
   });
 
   return {
-    equipamentos,
+    equipamentos,           // array COMPLETO — usado por Dashboard, filtros, exports
     isLoading,
+    isLoadingMore,
+    hasMore,
+    total,
+    visibleCount,           // UI de listagem usa equipamentos.slice(0, visibleCount)
+    loadMore,
+    refetch: fetchAll,
     addEquipamento:    addMutation.mutate,
     updateEquipamento: updateMutation.mutate,
     deleteEquipamento: deleteMutation.mutate,
