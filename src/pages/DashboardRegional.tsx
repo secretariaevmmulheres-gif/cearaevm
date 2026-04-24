@@ -6,6 +6,7 @@ import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useQualificacoes } from '@/hooks/useQualificacoes';
 import { useAtividades } from '@/hooks/useAtividades';
+import { usePatrulhas } from '@/hooks/usePatrulhas';
 import { regioesList, getRegiao, getMunicipiosPorRegiao, RegiaoPlanejamento } from '@/data/municipios';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -65,6 +66,7 @@ export default function DashboardRegional() {
   const { solicitacoes }  = useSolicitacoes();
   const { qualificacoes } = useQualificacoes();
   const { atividades }    = useAtividades();
+  const { patrulhas }     = usePatrulhas();
   const [selectedRegiao, setSelectedRegiao] = useState<string>('all');
 
   // Calcula estatísticas por região
@@ -76,7 +78,6 @@ export default function DashboardRegional() {
 
       const equipamentosDaRegiao = equipamentos.filter(e => getRegiao(e.municipio) === regiao);
       const municipiosComEquipamento = new Set(equipamentosDaRegiao.map(e => e.municipio)).size;
-      const patrulhasEmEquipamentos = equipamentosDaRegiao.filter(e => e.possui_patrulha).length;
 
       const viaturasDaRegiao = viaturas.filter(v => getRegiao(v.municipio) === regiao);
       const viaturasNaoVinculadas = viaturasDaRegiao.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
@@ -87,13 +88,11 @@ export default function DashboardRegional() {
         ['Recebida', 'Em análise', 'Aprovada', 'Em implantação'].includes(s.status)
       ).length;
 
-      const municipiosComPatrulhaEquip = new Set(
-        equipamentosDaRegiao.filter(e => e.possui_patrulha).map(e => e.municipio)
-      );
-      const patrulhasDeSolicitacoes = solicitacoesDaRegiao.filter(
-        s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)
-      ).length;
-      const totalPatrulhasCasas = patrulhasEmEquipamentos + patrulhasDeSolicitacoes;
+      // Patrulhas da região — usa a tabela patrulhas
+      const patrulhasDaRegiao     = patrulhas.filter(p => getRegiao(p.municipio) === regiao);
+      const patrulhasEmEquipamentos = patrulhasDaRegiao.filter(p => p.equipamento_id !== null).length;
+      const patrulhasDeSolicitacoes = patrulhasDaRegiao.filter(p => p.solicitacao_id !== null).length;
+      const totalPatrulhasCasas     = patrulhasDaRegiao.length;
       const totalViaturas = viaturasDaRegiao.reduce((sum, v) => sum + v.quantidade, 0) + totalPatrulhasCasas;
 
       // Qualificações da região
@@ -213,18 +212,15 @@ export default function DashboardRegional() {
   }, [solicitacoes, selectedRegiao]);
 
   // Totais globais
-  const patrulhasEmEquipamentos = equipamentos.filter(e => e.possui_patrulha).length;
-  const municipiosComPatrulhaEquipGlobal = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
-  const patrulhasDeSolicitacoesGlobal = solicitacoes.filter(
-    s => s.recebeu_patrulha && !municipiosComPatrulhaEquipGlobal.has(s.municipio)
-  ).length;
-  const totalPatrulhasCasasGlobal = patrulhasEmEquipamentos + patrulhasDeSolicitacoesGlobal;
+  const totalPatrulhasCasasGlobal    = patrulhas.length;
+  const patrulhasEmEquipamentosGlobal = patrulhas.filter(p => p.equipamento_id !== null).length;
+  const patrulhasDeSolicitacoesGlobal = patrulhas.filter(p => p.solicitacao_id !== null).length;
 
   const totals = useMemo(() => ({
     equipamentos: equipamentos.length,
     viaturasPMCE: viaturas.reduce((sum, v) => sum + v.quantidade, 0),
     totalPatrulhasCasas: totalPatrulhasCasasGlobal,
-    patrulhasEmEquipamentos,
+    patrulhasEmEquipamentos: patrulhasEmEquipamentosGlobal,
     patrulhasDeSolicitacoes: patrulhasDeSolicitacoesGlobal,
     viaturas: viaturas.reduce((sum, v) => sum + v.quantidade, 0) + totalPatrulhasCasasGlobal,
     viaturasNaoVinculadas: viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0),
@@ -233,7 +229,7 @@ export default function DashboardRegional() {
     totalQualificacoes: qualificacoes.length,
     totalAtividades: atividades.length,
   }), [equipamentos, viaturas, solicitacoes, regionStats, qualificacoes, atividades,
-       patrulhasEmEquipamentos, patrulhasDeSolicitacoesGlobal, totalPatrulhasCasasGlobal]);
+       patrulhas, totalPatrulhasCasasGlobal]);
 
   const selectedStats = selectedRegiao !== 'all'
     ? regionStats.find(r => r.regiao === selectedRegiao)

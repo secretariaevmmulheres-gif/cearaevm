@@ -22,13 +22,14 @@ import {
 import { useViaturas } from '@/hooks/useViaturas';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
+import { usePatrulhas, orgaosPatrulha } from '@/hooks/usePatrulhas';
 import { municipiosCeara, orgaosResponsaveis, OrgaoResponsavel, regioesList, getRegiao } from '@/data/municipios';
-import { Viatura, Equipamento } from '@/types';
+import { Viatura, Equipamento, Patrulha, OrgaoPatrulha } from '@/types';
 import {
   Plus, Pencil, Trash2, Search, Truck, Download, FileSpreadsheet,
   FileText as FilePdf, Building2, ChevronDown, MapPin, User,
   CalendarDays, Link2, Link2Off, StickyNote, AlertCircle,
-  ShieldCheck, Hash,
+  ShieldCheck, Hash, Users, Car,
   Eye as EyeIcon,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -202,102 +203,6 @@ function ViaturaRow({ viatura, equipamentos, onEdit, onDelete, canEdit }: {
   );
 }
 
-// ── Tipo unificado Patrulha das Casas ────────────────────────────────────────
-type PatrulhaCasa = {
-  id: string; municipio: string; tipo: string; endereco: string;
-  responsavel: string; telefone: string; origem: 'equipamento' | 'solicitacao'; status?: string;
-};
-
-// ── Linha expansível — Patrulha das Casas ───────────────────────────────────
-function PatrulhaRow({ patrulha }: { patrulha: PatrulhaCasa }) {
-  const [expanded, setExpanded] = useState(false);
-  const regiao = getRegiao(patrulha.municipio);
-  const temDetalhes = patrulha.endereco || patrulha.responsavel || patrulha.telefone;
-
-  return (
-    <>
-      <tr
-        className={cn(
-          'transition-colors',
-          temDetalhes ? 'cursor-pointer' : '',
-          expanded ? 'bg-muted/40' : temDetalhes ? 'hover:bg-muted/20' : '',
-        )}
-        onClick={() => temDetalhes && setExpanded(!expanded)}
-      >
-        <td>
-          <div className="flex items-center gap-2">
-            {temDetalhes
-              ? <ChevronDown className={cn('w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200', expanded && 'rotate-180')} />
-              : <div className="w-4" />
-            }
-            <div>
-              <p className="font-medium">{patrulha.municipio}</p>
-              {regiao && <p className="text-[11px] text-muted-foreground">{regiao}</p>}
-            </div>
-          </div>
-        </td>
-        <td>
-          <span className="badge-status bg-emerald-500/10 text-emerald-600">{patrulha.tipo}</span>
-        </td>
-        <td>
-          {patrulha.origem === 'equipamento'
-            ? <span className="badge-status bg-primary/10 text-primary">Equipamento</span>
-            : <span className="badge-status bg-warning/10 text-warning">Solicitação ({patrulha.status})</span>
-          }
-        </td>
-        <td className="text-sm text-muted-foreground">{patrulha.endereco || '—'}</td>
-        <td className="text-sm">{patrulha.responsavel || '—'}</td>
-        <td className="text-sm text-muted-foreground">{patrulha.telefone || '—'}</td>
-      </tr>
-
-      <AnimatePresence>
-        {expanded && (
-          <tr className="bg-muted/20">
-            <td colSpan={6} className="p-0">
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="px-6 py-4 border-t border-border/50 grid grid-cols-3 gap-4">
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-0.5">Endereço</p>
-                      <p className="text-sm">{patrulha.endereco || <span className="italic text-muted-foreground/60">Não informado</span>}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                      <User className="w-3.5 h-3.5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-0.5">Responsável</p>
-                      <p className="text-sm">{patrulha.responsavel || <span className="italic text-muted-foreground/60">Não informado</span>}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                      <Hash className="w-3.5 h-3.5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-0.5">Telefone</p>
-                      <p className="text-sm">{patrulha.telefone || <span className="italic text-muted-foreground/60">Não informado</span>}</p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </td>
-          </tr>
-        )}
-      </AnimatePresence>
-    </>
-  );
-}
 
 // ── Página principal ─────────────────────────────────────────────────────────
 export default function Viaturas() {
@@ -306,15 +211,27 @@ export default function Viaturas() {
   const { viaturas, addViatura, updateViatura, deleteViatura, isAdding, isUpdating } = useViaturas();
   const { equipamentos } = useEquipamentos();
   const { solicitacoes } = useSolicitacoes();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterOrgao, setFilterOrgao] = useState<string>('all');
+  const { patrulhas, addPatrulha, updatePatrulha, deletePatrulha,
+          isAdding: isAddingP, isUpdating: isUpdatingP,
+          totalEfetivo, totalViaturas: totalViatP } = usePatrulhas();
+
+  const [searchTerm,      setSearchTerm]      = useState('');
+  const [filterOrgao,     setFilterOrgao]     = useState<string>('all');
   const [filterVinculada, setFilterVinculada] = useState<string>('all');
-  const [filterRegiao, setFilterRegiao] = useState<string>('all');
-  const [filterAno, setFilterAno] = useState<string>('all');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [filterRegiao,    setFilterRegiao]    = useState<string>('all');
+  const [filterAno,       setFilterAno]       = useState<string>('all');
+
+  // Viatura dialog
+  const [isDialogOpen,       setIsDialogOpen]       = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [editingViatura, setEditingViatura] = useState<Viatura | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingViatura,     setEditingViatura]     = useState<Viatura | null>(null);
+  const [deletingId,         setDeletingId]         = useState<string | null>(null);
+
+  // Patrulha dialog
+  const [isPDialogOpen,       setIsPDialogOpen]       = useState(false);
+  const [isPDeleteDialogOpen, setIsPDeleteDialogOpen] = useState(false);
+  const [editingPatrulha,     setEditingPatrulha]     = useState<Patrulha | null>(null);
+  const [deletingPId,         setDeletingPId]         = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     municipio: '', tipo_patrulha: 'Patrulha Maria da Penha',
@@ -323,7 +240,33 @@ export default function Viaturas() {
     quantidade: 1, data_implantacao: '', responsavel: '', observacoes: '',
   });
 
+  const [pFormData, setPFormData] = useState({
+    vinculo: 'equipamento' as 'equipamento' | 'solicitacao',
+    equipamento_id: '',
+    solicitacao_id: '',
+    municipio: '',
+    orgao: '' as OrgaoPatrulha | '',
+    efetivo: '' as string,
+    viaturas_patrulha: '' as string,
+    responsavel: '',
+    contato: '',
+    data_implantacao: '',
+    observacoes: '',
+  });
+
   const equipamentosDoMunicipio = equipamentos.filter(e => e.municipio === formData.municipio);
+
+  // CMMs para vincular patrulha (inauguradas)
+  const cmms = equipamentos.filter(e => e.tipo === 'Casa da Mulher Municipal')
+    .sort((a, b) => a.municipio.localeCompare(b.municipio));
+
+  // Solicitações de CMM com patrulha mas ainda não inauguradas
+  const solicsCMM = solicitacoes.filter(s =>
+    s.tipo_equipamento === 'Casa da Mulher Municipal' &&
+    s.recebeu_patrulha &&
+    s.status !== 'Inaugurada' &&
+    s.status !== 'Cancelada'
+  ).sort((a, b) => a.municipio.localeCompare(b.municipio));
 
   const filteredViaturas = viaturas
     .filter((v) => {
@@ -339,57 +282,32 @@ export default function Viaturas() {
     })
     .sort((a, b) => a.municipio.localeCompare(b.municipio));
 
+  const filteredPatrulhas = patrulhas
+    .filter(p => {
+      const matchesSearch = p.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.responsavel || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesOrgao  = filterOrgao === 'all' || p.orgao === filterOrgao;
+      const matchesRegiao = filterRegiao === 'all' || getRegiao(p.municipio) === filterRegiao;
+      return matchesSearch && matchesOrgao && matchesRegiao;
+    });
+
   const anosDisponiveis = Array.from(
-    new Set(
-      viaturas
-        .filter(v => !!v.data_implantacao)
-        .map(v => new Date(v.data_implantacao! + 'T00:00:00').getFullYear())
-    )
+    new Set(viaturas.filter(v => !!v.data_implantacao)
+      .map(v => new Date(v.data_implantacao! + 'T00:00:00').getFullYear()))
   ).sort((a, b) => b - a);
 
-  const patrulhasDeEquipamentos = equipamentos
-    .filter(e => e.possui_patrulha)
-    .filter(e => {
-      const matchesSearch = e.municipio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (e.responsavel || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRegiao = filterRegiao === 'all' || getRegiao(e.municipio) === filterRegiao;
-      return matchesSearch && matchesRegiao;
-    });
-
-  const municipiosComPatrulhaEquip = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
-
-  const patrulhasDeSolicitacoes = solicitacoes
-    .filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio))
-    .filter(s => {
-      const matchesSearch = s.municipio.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRegiao = filterRegiao === 'all' || getRegiao(s.municipio) === filterRegiao;
-      return matchesSearch && matchesRegiao;
-    });
-
-  const patrulhasDasCasas: PatrulhaCasa[] = [
-    ...patrulhasDeEquipamentos.map(e => ({
-      id: e.id, municipio: e.municipio, tipo: e.tipo,
-      endereco: e.endereco || '', responsavel: e.responsavel || '',
-      telefone: e.telefone || '', origem: 'equipamento' as const,
-    })),
-    ...patrulhasDeSolicitacoes.map(s => ({
-      id: s.id, municipio: s.municipio, tipo: s.tipo_equipamento,
-      endereco: '', responsavel: '', telefone: '',
-      origem: 'solicitacao' as const, status: s.status,
-    })),
-  ].sort((a, b) => a.municipio.localeCompare(b.municipio));
-
-  // ── Cards de resumo ──
+  // ── Cards de resumo (Viaturas PMCE) ─────────────────────────────────────
   const totalViaturas = viaturas.reduce((s, v) => s + v.quantidade, 0);
-  const vinculadas = viaturas.filter(v => v.vinculada_equipamento).reduce((s, v) => s + v.quantidade, 0);
+  const vinculadas    = viaturas.filter(v => v.vinculada_equipamento).reduce((s, v) => s + v.quantidade, 0);
   const naoVinculadas = totalViaturas - vinculadas;
-  const incompletas = filteredViaturas.filter(v => getCompletude(v).pct < 100).length;
+  const incompletas   = filteredViaturas.filter(v => getCompletude(v).pct < 100).length;
 
   const orgaosCounts = orgaosResponsaveis.map(orgao => ({
     orgao,
     count: viaturas.filter(v => v.orgao_responsavel === orgao).reduce((s, v) => s + v.quantidade, 0),
   })).filter(o => o.count > 0);
 
+  // ── Handlers Viaturas ─────────────────────────────────────────────────────
   const openCreateDialog = () => {
     setEditingViatura(null);
     setFormData({ municipio: '', tipo_patrulha: 'Patrulha Maria da Penha', vinculada_equipamento: false, equipamento_id: '', orgao_responsavel: '', quantidade: 1, data_implantacao: '', responsavel: '', observacoes: '' });
@@ -406,6 +324,31 @@ export default function Viaturas() {
       responsavel: v.responsavel || '', observacoes: v.observacoes || '',
     });
     setIsDialogOpen(true);
+  };
+
+  // ── Handlers Patrulhas ────────────────────────────────────────────────────
+  const openCreatePDialog = () => {
+    setEditingPatrulha(null);
+    setPFormData({ vinculo: 'equipamento', equipamento_id: '', solicitacao_id: '', municipio: '', orgao: '', efetivo: '', viaturas_patrulha: '', responsavel: '', contato: '', data_implantacao: '', observacoes: '' });
+    setIsPDialogOpen(true);
+  };
+
+  const openEditPDialog = (p: Patrulha) => {
+    setEditingPatrulha(p);
+    setPFormData({
+      vinculo:           p.equipamento_id ? 'equipamento' : 'solicitacao',
+      equipamento_id:    p.equipamento_id ?? '',
+      solicitacao_id:    p.solicitacao_id ?? '',
+      municipio:         p.municipio,
+      orgao:             p.orgao,
+      efetivo:           p.efetivo != null ? String(p.efetivo) : '',
+      viaturas_patrulha: p.viaturas != null ? String(p.viaturas) : '',
+      responsavel:       p.responsavel || '',
+      contato:           p.contato || '',
+      data_implantacao:  p.data_implantacao ? format(new Date(p.data_implantacao + 'T00:00:00'), 'yyyy-MM-dd') : '',
+      observacoes:       p.observacoes || '',
+    });
+    setIsPDialogOpen(true);
   };
 
   const handleSubmit = () => {
@@ -428,6 +371,28 @@ export default function Viaturas() {
     if (deletingId) { deleteViatura(deletingId); setIsDeleteDialogOpen(false); setDeletingId(null); }
   };
 
+  const handleSubmitPatrulha = () => {
+    const temVinculo = pFormData.vinculo === 'equipamento'
+      ? !!pFormData.equipamento_id
+      : !!pFormData.solicitacao_id;
+    if (!temVinculo || !pFormData.orgao) return;
+    const payload = {
+      equipamento_id:   pFormData.vinculo === 'equipamento' ? pFormData.equipamento_id : null,
+      solicitacao_id:   pFormData.vinculo === 'solicitacao'  ? pFormData.solicitacao_id  : null,
+      municipio:        pFormData.municipio,
+      orgao:            pFormData.orgao as OrgaoPatrulha,
+      efetivo:          pFormData.efetivo ? parseInt(pFormData.efetivo) : null,
+      viaturas:         pFormData.viaturas_patrulha ? parseInt(pFormData.viaturas_patrulha) : null,
+      responsavel:      pFormData.responsavel || null,
+      contato:          pFormData.contato || null,
+      data_implantacao: pFormData.data_implantacao || null,
+      observacoes:      pFormData.observacoes || null,
+    };
+    if (editingPatrulha) { updatePatrulha({ id: editingPatrulha.id, ...payload }); }
+    else { addPatrulha(payload); }
+    setIsPDialogOpen(false);
+  };
+
   return (
     <AppLayout>
 
@@ -438,18 +403,18 @@ export default function Viaturas() {
           <span>Você tem acesso de <strong>somente leitura</strong> nesta página. Para editar, acesse <strong>Atividades</strong>.</span>
         </div>
       )}
-      <PageHeader title="Viaturas" description="Gerencie as viaturas da Patrulha Maria da Penha">
+      <PageHeader title="Viaturas & Patrulhas" description="Viaturas PMCE e Patrulhas Maria da Penha">
         <div className="flex gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline"><Download className="w-4 h-4 mr-2" />Exportar</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => { exportViaturasToPDF(filteredViaturas).catch(console.error); }}>
-                <FilePdf className="w-4 h-4 mr-2" />Exportar PDF
+              <DropdownMenuItem onClick={() => { exportViaturasToPDF(viaturas).catch(console.error); }}>
+                <FilePdf className="w-4 h-4 mr-2" />PDF — Viaturas (todas)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportViaturasToExcel(filteredViaturas)}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />Exportar Excel
+              <DropdownMenuItem onClick={() => exportViaturasToExcel(viaturas)}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />Excel — Viaturas (todas)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -503,8 +468,8 @@ export default function Viaturas() {
           <div className="w-7 h-7 rounded-lg bg-violet-500/15 flex items-center justify-center mb-2">
             <ShieldCheck className="w-3.5 h-3.5 text-violet-600" />
           </div>
-          <p className="text-2xl font-bold">{patrulhasDasCasas.length}</p>
-          <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">Patrulhas das Casas</p>
+          <p className="text-2xl font-bold">{patrulhas.length}</p>
+          <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">Patrulhas M.P.</p>
         </motion.div>
 
         {/* Cadastros incompletos */}
@@ -579,7 +544,7 @@ export default function Viaturas() {
             <Truck className="w-4 h-4" />Viaturas PMCE ({filteredViaturas.length})
           </TabsTrigger>
           <TabsTrigger value="casas" className="gap-2">
-            <Building2 className="w-4 h-4" />Patrulhas das Casas ({patrulhasDasCasas.length})
+            <ShieldCheck className="w-4 h-4" />Patrulhas M.P. ({filteredPatrulhas.length})
           </TabsTrigger>
         </TabsList>
 
@@ -627,64 +592,127 @@ export default function Viaturas() {
           </div>
         </TabsContent>
 
-        {/* ── Aba Patrulhas das Casas ── */}
+        {/* ── Aba Patrulhas Maria da Penha ── */}
         <TabsContent value="casas">
-          <div className="flex justify-end mb-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" />Exportar Patrulhas</Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => { exportPatrulhasCasasToPDF(equipamentos, solicitacoes).catch(console.error); }}>
-                  <FilePdf className="w-4 h-4 mr-2" />Exportar PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportPatrulhasCasasToExcel(equipamentos, solicitacoes)}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />Exportar Excel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-muted-foreground">
+              {patrulhas.length > 0 && (
+                <span>{patrulhas.length} patrulha{patrulhas.length !== 1 ? 's' : ''} · {totalEfetivo} agentes · {totalViatP} viaturas próprias</span>
+              )}
+            </p>
+            <div className="flex gap-2">
+              {canEdit && (
+                <Button size="sm" onClick={openCreatePDialog} className="gap-2">
+                  <Plus className="w-4 h-4" />Nova Patrulha
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" />Exportar</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => { exportPatrulhasCasasToPDF(patrulhas, equipamentos, solicitacoes).catch(console.error); }}>
+                    <FilePdf className="w-4 h-4 mr-2" />PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportPatrulhasCasasToExcel(patrulhas, equipamentos, solicitacoes)}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
+
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="data-table">
                 <thead>
                   <tr>
                     <th>Município / Região</th>
-                    <th>Tipo de Equipamento</th>
-                    <th>Origem</th>
-                    <th>Endereço</th>
+                    <th>CMM Vinculada</th>
+                    <th>Órgão</th>
+                    <th>Efetivo</th>
+                    <th>Viaturas</th>
+                    <th>Implantação</th>
                     <th>Responsável</th>
-                    <th>Telefone</th>
+                    <th className="text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {patrulhasDasCasas.length === 0 ? (
+                  {filteredPatrulhas.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-muted-foreground">
-                        <Building2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                        <p className="font-medium">Nenhum equipamento com Patrulha Maria da Penha</p>
-                        <p className="text-xs mt-1 opacity-70">Marque "Possui Patrulha" em Equipamentos ou Solicitações</p>
+                      <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                        <ShieldCheck className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p className="font-medium">Nenhuma Patrulha Maria da Penha cadastrada</p>
+                        <p className="text-xs mt-1 opacity-70">Cadastre as patrulhas vinculadas às Casas da Mulher Municipal</p>
                       </td>
                     </tr>
-                  ) : (
-                    patrulhasDasCasas.map(p => <PatrulhaRow key={p.id} patrulha={p} />)
-                  )}
+                  ) : filteredPatrulhas.map(p => {
+                    const cmm = equipamentos.find(e => e.id === p.equipamento_id);
+                    const orgaoColor = p.orgao === 'PMCE'
+                      ? 'bg-blue-500/10 text-blue-700'
+                      : p.orgao === 'Guarda Municipal'
+                      ? 'bg-emerald-500/10 text-emerald-700'
+                      : 'bg-muted text-muted-foreground';
+                    return (
+                      <tr key={p.id}>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            <div>
+                              <p className="font-medium text-sm">{p.municipio}</p>
+                              <p className="text-xs text-muted-foreground">{getRegiao(p.municipio) || '—'}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="text-sm text-muted-foreground">
+                          {cmm ? cmm.tipo : <span className="italic opacity-60">—</span>}
+                        </td>
+                        <td>
+                          <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', orgaoColor)}>
+                            {p.orgao}
+                          </span>
+                        </td>
+                        <td className="text-sm tabular-nums">
+                          {p.efetivo != null ? `${p.efetivo} agente${p.efetivo !== 1 ? 's' : ''}` : <span className="text-muted-foreground/60 italic">—</span>}
+                        </td>
+                        <td className="text-sm tabular-nums">
+                          {p.viaturas != null ? p.viaturas : <span className="text-muted-foreground/60 italic">—</span>}
+                        </td>
+                        <td className="text-sm text-muted-foreground">
+                          {p.data_implantacao
+                            ? format(new Date(p.data_implantacao + 'T00:00:00'), "dd/MM/yyyy")
+                            : <span className="italic opacity-60">—</span>}
+                        </td>
+                        <td className="text-sm">{p.responsavel || <span className="italic text-muted-foreground/60">—</span>}</td>
+                        <td className="text-right">
+                          {canEdit && (
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditPDialog(p)}>
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => { setDeletingPId(p.id); setIsPDeleteDialogOpen(true); }}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-3">
-            * Patrulhas de Equipamentos são gerenciadas em Equipamentos. Patrulhas de Solicitações são gerenciadas em Solicitações.
-          </p>
         </TabsContent>
       </Tabs>
 
-      {/* ── Dialog Criar/Editar ── */}
+      {/* ── Dialog Viatura Criar/Editar ── */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingViatura ? 'Editar Viatura' : 'Nova Viatura'}</DialogTitle>
-            <DialogDescription>Cadastre ou atualize uma viatura da Patrulha Maria da Penha.</DialogDescription>
+            <DialogTitle>{editingViatura ? 'Editar Viatura' : 'Nova Viatura PMCE'}</DialogTitle>
+            <DialogDescription>Cadastre ou atualize uma viatura da Polícia Militar do Ceará.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -752,7 +780,149 @@ export default function Viaturas() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Dialog Deletar ── */}
+      {/* ── Dialog Patrulha Criar/Editar ── */}
+      <Dialog open={isPDialogOpen} onOpenChange={setIsPDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingPatrulha ? 'Editar Patrulha' : 'Nova Patrulha Maria da Penha'}</DialogTitle>
+            <DialogDescription>Vincule a patrulha à Casa da Mulher Municipal — inaugurada ou em processo.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+
+            {/* Tipo de vínculo */}
+            {!editingPatrulha && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPFormData({ ...pFormData, vinculo: 'equipamento', solicitacao_id: '' })}
+                  className={cn('flex-1 py-2 px-3 text-sm rounded-lg border-2 transition-colors', pFormData.vinculo === 'equipamento' ? 'border-primary bg-primary/5 text-primary font-medium' : 'border-border text-muted-foreground hover:border-primary/40')}
+                >
+                  CMM Inaugurada
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPFormData({ ...pFormData, vinculo: 'solicitacao', equipamento_id: '' })}
+                  className={cn('flex-1 py-2 px-3 text-sm rounded-lg border-2 transition-colors', pFormData.vinculo === 'solicitacao' ? 'border-amber-500 bg-amber-500/5 text-amber-700 font-medium' : 'border-border text-muted-foreground hover:border-amber-500/40')}
+                >
+                  CMM em Processo
+                </button>
+              </div>
+            )}
+
+            {/* Vínculo com CMM inaugurada */}
+            {pFormData.vinculo === 'equipamento' && (
+              <div className="space-y-2">
+                <Label>Casa da Mulher Municipal *</Label>
+                <Select
+                  value={pFormData.equipamento_id}
+                  onValueChange={v => {
+                    const cmm = cmms.find(e => e.id === v);
+                    setPFormData({ ...pFormData, equipamento_id: v, municipio: cmm?.municipio ?? '' });
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione a CMM" /></SelectTrigger>
+                  <SelectContent>
+                    {cmms.length === 0
+                      ? <div className="px-2 py-1.5 text-sm text-muted-foreground">Nenhuma CMM cadastrada</div>
+                      : cmms.map(e => <SelectItem key={e.id} value={e.id}>{e.municipio}</SelectItem>)
+                    }
+                  </SelectContent>
+                </Select>
+                {pFormData.municipio && <p className="text-xs text-muted-foreground">Município: {pFormData.municipio}</p>}
+              </div>
+            )}
+
+            {/* Vínculo com solicitação em processo */}
+            {pFormData.vinculo === 'solicitacao' && (
+              <div className="space-y-2">
+                <Label>Solicitação de CMM *</Label>
+                <Select
+                  value={pFormData.solicitacao_id}
+                  onValueChange={v => {
+                    const solic = solicsCMM.find(s => s.id === v);
+                    setPFormData({ ...pFormData, solicitacao_id: v, municipio: solic?.municipio ?? '' });
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione a solicitação" /></SelectTrigger>
+                  <SelectContent>
+                    {solicsCMM.length === 0
+                      ? <div className="px-2 py-1.5 text-sm text-muted-foreground">Nenhuma solicitação de CMM com patrulha em andamento</div>
+                      : solicsCMM.map(s => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.municipio} <span className="text-muted-foreground text-xs ml-1">({s.status})</span>
+                          </SelectItem>
+                        ))
+                    }
+                  </SelectContent>
+                </Select>
+                {pFormData.municipio && <p className="text-xs text-amber-600">Município: {pFormData.municipio} · Patrulha será migrada para a CMM quando inaugurada</p>}
+              </div>
+            )}
+
+            {/* Órgão */}
+            <div className="space-y-2">
+              <Label>Órgão Responsável *</Label>
+              <Select value={pFormData.orgao} onValueChange={v => setPFormData({ ...pFormData, orgao: v as OrgaoPatrulha })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>{orgaosPatrulha.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+
+            {/* Efetivo e Viaturas */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />Efetivo (agentes)</Label>
+                <Input type="number" min={0} placeholder="0"
+                  value={pFormData.efetivo}
+                  onChange={e => setPFormData({ ...pFormData, efetivo: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5"><Car className="w-3.5 h-3.5" />Viaturas próprias</Label>
+                <Input type="number" min={0} placeholder="0"
+                  value={pFormData.viaturas_patrulha}
+                  onChange={e => setPFormData({ ...pFormData, viaturas_patrulha: e.target.value })} />
+              </div>
+            </div>
+
+            {/* Responsável e Contato */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Responsável</Label>
+                <Input value={pFormData.responsavel}
+                  onChange={e => setPFormData({ ...pFormData, responsavel: e.target.value })}
+                  placeholder="Nome do responsável" />
+              </div>
+              <div className="space-y-2">
+                <Label>Contato</Label>
+                <Input value={pFormData.contato}
+                  onChange={e => setPFormData({ ...pFormData, contato: e.target.value })}
+                  placeholder="Telefone ou e-mail" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Data de Implantação</Label>
+              <Input type="date" value={pFormData.data_implantacao}
+                onChange={e => setPFormData({ ...pFormData, data_implantacao: e.target.value })} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Textarea value={pFormData.observacoes}
+                onChange={e => setPFormData({ ...pFormData, observacoes: e.target.value })}
+                placeholder="Informações adicionais sobre a patrulha..." rows={2} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSubmitPatrulha} disabled={isAddingP || isUpdatingP}>
+              {editingPatrulha ? 'Salvar Alterações' : 'Cadastrar Patrulha'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog Deletar Viatura ── */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -762,6 +932,25 @@ export default function Viaturas() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Dialog Deletar Patrulha ── */}
+      <AlertDialog open={isPDeleteDialogOpen} onOpenChange={setIsPDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Patrulha</AlertDialogTitle>
+            <AlertDialogDescription>Tem certeza que deseja remover esta patrulha? Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deletingPId) { deletePatrulha(deletingPId); setIsPDeleteDialogOpen(false); } }}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Remover
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

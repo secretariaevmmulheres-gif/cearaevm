@@ -14,6 +14,7 @@ import Viaturas from "./pages/Viaturas";
 import Solicitacoes from "./pages/Solicitacoes";
 import Atividades from "./pages/Atividades";
 import Qualificacoes from "./pages/Qualificacoes";
+import MaterialGrafico from "./pages/MaterialGrafico";
 import MunicipioPage from "./pages/MunicipioPage";
 import Mapa from "./pages/Mapa";
 import RelatorioEVM from "./pages/RelatorioEVM";
@@ -103,6 +104,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Qualificacoes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/material-grafico"
+        element={
+          <ProtectedRoute>
+            <MaterialGrafico />
           </ProtectedRoute>
         }
       />

@@ -31,3 +31,4 @@ export * from './exportMapa';
 export * from './exportRegional';
 export * from './exportDashboard';
 export * from './exportCpdi';
+export * from './exportMaterialGrafico';

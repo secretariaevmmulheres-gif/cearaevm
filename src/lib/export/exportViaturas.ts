@@ -1,65 +1,89 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Equipamento, Viatura, Solicitacao } from '@/types';
+import { Equipamento, Viatura, Solicitacao, Patrulha } from '@/types';
 import { getRegiao } from '@/data/municipios';
 import { ts, fmtDate, addPdfCover, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
 
-export async function exportPatrulhasCasasToPDF(equipamentos: Equipamento[], solicitacoes: Solicitacao[]) {
-  const patrulhasEquip = equipamentos.filter(e => e.possui_patrulha);
-  const municipiosComPatrulhaEquip = new Set(patrulhasEquip.map(e => e.municipio));
-  const patrulhasSolic = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio));
-  const total = patrulhasEquip.length + patrulhasSolic.length;
-  const regioes = new Set([...patrulhasEquip.map(e => getRegiao(e.municipio)), ...patrulhasSolic.map(s => getRegiao(s.municipio))].filter(Boolean)).size;
+export async function exportPatrulhasCasasToPDF(patrulhas: Patrulha[], equipamentos: Equipamento[], solicitacoes: Solicitacao[]) {
+  const comEquipamento = patrulhas.filter(p => p.equipamento_id !== null);
+  const emSolicitacao  = patrulhas.filter(p => p.solicitacao_id !== null);
+  const total   = patrulhas.length;
+  const regioes = new Set(patrulhas.map(p => getRegiao(p.municipio)).filter(Boolean)).size;
 
   const doc = new jsPDF('landscape');
 
   await addPdfCover(doc, {
     titulo:    'PATRULHAS MARIA DA PENHA',
-    subtitulo: 'Patrulhas nas Casas da Mulher e Salas Lilás — Ceará',
+    subtitulo: 'Patrulhas nas Casas da Mulher — Ceará',
     colorKey:  'viaturas',
     landscape: true,
     stats: [
       { label: 'Total de Patrulhas', valor: total },
-      { label: 'Em Equipamentos',   valor: patrulhasEquip.length },
-      { label: 'Em Solicitações',   valor: patrulhasSolic.length },
-      { label: 'Regiões',           valor: regioes },
+      { label: 'CMM Inaugurada',     valor: comEquipamento.length },
+      { label: 'CMM em Processo',    valor: emSolicitacao.length },
+      { label: 'Regiões',            valor: regioes },
     ],
   });
 
   doc.addPage();
-  const startY = addPdfHeader(doc, 'Patrulhas das Casas', 'Relatório de Patrulhas Maria da Penha das Casas');
+  const startY = addPdfHeader(doc, 'Patrulhas Maria da Penha', 'Relatório de Patrulhas M.P. das Casas da Mulher');
   doc.setFontSize(9); doc.setTextColor(80, 80, 80);
-  doc.text(`Total: ${total} registros (${patrulhasEquip.length} de Equipamentos + ${patrulhasSolic.length} de Solicitações)`, 14, startY);
+  doc.text(`Total: ${total} patrulhas (${comEquipamento.length} em CMMs inauguradas · ${emSolicitacao.length} em processo)`, 14, startY);
   doc.setTextColor(0, 0, 0);
+
+  // Enriquecer com dados de equipamento/solicitação
+  const rows = patrulhas.map(p => {
+    const equip = p.equipamento_id ? equipamentos.find(e => e.id === p.equipamento_id) : null;
+    const solic = p.solicitacao_id ? solicitacoes.find(s => s.id === p.solicitacao_id) : null;
+    const situacao = equip ? 'CMM Inaugurada' : solic ? `Em processo (${solic.status})` : '—';
+    return [
+      p.municipio,
+      getRegiao(p.municipio) || '—',
+      p.orgao,
+      p.efetivo != null ? String(p.efetivo) : '—',
+      p.viaturas != null ? String(p.viaturas) : '—',
+      p.data_implantacao ? fmtDate(p.data_implantacao) : '—',
+      p.responsavel || '—',
+      situacao,
+    ];
+  });
+
   autoTable(doc, {
-    head: [['Município', 'Região', 'Tipo Equipamento', 'Origem', 'Status', 'Endereço', 'Responsável', 'Telefone']],
-    body: [
-      ...patrulhasEquip.map(e => [e.municipio, getRegiao(e.municipio) || '-', e.tipo, 'Equipamento', '-', e.endereco || '-', e.responsavel || '-', e.telefone || '-']),
-      ...patrulhasSolic.map(s => [s.municipio, getRegiao(s.municipio) || '-', s.tipo_equipamento, 'Solicitação', s.status, '-', '-', '-']),
-    ],
+    head: [['Município', 'Região', 'Órgão', 'Efetivo', 'Viaturas', 'Implantação', 'Responsável', 'Situação']],
+    body: rows,
     startY: startY + 6,
     styles: { fontSize: 7 },
     headStyles: { fillColor: [6, 182, 212] },
     alternateRowStyles: { fillColor: [236, 254, 255] },
   });
   addPdfFooters(doc);
-  doc.save(`patrulhas-casas_${ts()}.pdf`);
+  doc.save(`patrulhas-maria-da-penha_${ts()}.pdf`);
 }
 
-export function exportPatrulhasCasasToExcel(equipamentos: Equipamento[], solicitacoes: Solicitacao[]) {
-  const patrulhasEquip = equipamentos.filter(e => e.possui_patrulha);
-  const municipiosComPatrulhaEquip = new Set(patrulhasEquip.map(e => e.municipio));
-  const patrulhasSolic = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio));
-  const data = [
-    ...patrulhasEquip.map(e => ({ 'Município': e.municipio, 'Região': getRegiao(e.municipio) || '', 'Tipo de Equipamento': e.tipo, 'Origem': 'Equipamento', 'Status': '-', 'Endereço': e.endereco || '', 'Responsável': e.responsavel || '', 'Telefone': e.telefone || '', 'Observações': e.observacoes || '', 'Data de Criação': fmtDate(e.created_at) })),
-    ...patrulhasSolic.map(s => ({ 'Município': s.municipio, 'Região': getRegiao(s.municipio) || '', 'Tipo de Equipamento': s.tipo_equipamento, 'Origem': 'Solicitação', 'Status': s.status, 'Endereço': '', 'Responsável': '', 'Telefone': '', 'Observações': s.observacoes || '', 'Data de Criação': fmtDate(s.created_at) })),
-  ];
+export function exportPatrulhasCasasToExcel(patrulhas: Patrulha[], equipamentos: Equipamento[], solicitacoes: Solicitacao[]) {
+  const data = patrulhas.map(p => {
+    const equip = p.equipamento_id ? equipamentos.find(e => e.id === p.equipamento_id) : null;
+    const solic = p.solicitacao_id ? solicitacoes.find(s => s.id === p.solicitacao_id) : null;
+    const situacao = equip ? 'CMM Inaugurada' : solic ? `Em processo (${solic.status})` : '—';
+    return {
+      'Município':       p.municipio,
+      'Região':          getRegiao(p.municipio) || '',
+      'Órgão':           p.orgao,
+      'Efetivo':         p.efetivo ?? '',
+      'Viaturas Próprias': p.viaturas ?? '',
+      'Responsável':     p.responsavel || '',
+      'Contato':         p.contato || '',
+      'Data Implantação': p.data_implantacao ? fmtDate(p.data_implantacao) : '',
+      'Situação':        situacao,
+      'Observações':     p.observacoes || '',
+    };
+  });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
   styleWorksheet(ws, '06B6D4');
-  XLSX.utils.book_append_sheet(wb, ws, 'Patrulhas Casas');
-  saveWb(wb, `patrulhas-casas_${ts()}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, 'Patrulhas M.P.');
+  saveWb(wb, `patrulhas-maria-da-penha_${ts()}.xlsx`);
 }
 
 export async function exportViaturasToPDF(viaturas: Viatura[]) {

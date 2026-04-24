@@ -230,7 +230,7 @@ export default function Solicitacoes() {
   const { role } = useAuthContext();
   const canEdit = role !== 'atividades_editor' && role !== 'viewer';
   const { solicitacoes, addSolicitacao, updateSolicitacao, deleteSolicitacao, transformarEmEquipamento, isAdding, isUpdating, isLoadingMore, hasMore, loadMore, total, visibleCount } = useSolicitacoes();
-  const { equipamentos } = useEquipamentos();
+  const { equipamentos, refetch: refetchEquipamentos } = useEquipamentos();
   const { qualificacoes } = useQualificacoes();
 
   const [searchTerm,   setSearchTerm]   = useState('');
@@ -326,7 +326,13 @@ export default function Solicitacoes() {
   };
 
   const handleTransform = () => {
-    if (transformingId) { transformarEmEquipamento(transformingId); setIsTransformDialogOpen(false); setTransformingId(null); }
+    if (transformingId) {
+      transformarEmEquipamento(transformingId, {
+        onSuccess: () => { refetchEquipamentos(); }
+      });
+      setIsTransformDialogOpen(false);
+      setTransformingId(null);
+    }
   };
 
   return (

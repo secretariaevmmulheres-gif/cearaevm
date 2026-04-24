@@ -10,6 +10,7 @@ import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useAtividades } from '@/hooks/useAtividades';
+import { usePatrulhas } from '@/hooks/usePatrulhas';
 import { useEvolucaoTemporal } from '@/hooks/useEvolucaoTemporal';
 import { Button } from '@/components/ui/button';
 import {
@@ -125,6 +126,7 @@ export default function Dashboard() {
   const { viaturas } = useViaturas();
   const { solicitacoes } = useSolicitacoes();
   const { atividades } = useAtividades();
+  const { patrulhas } = usePatrulhas();
 
   // ── Filtro de ano para gráficos de evolução temporal ──────────────────────
   const anoAtual = new Date().getFullYear();
@@ -229,24 +231,15 @@ export default function Dashboard() {
       .sort((a, b) => b.value - a.value);
   }, [solicitacoes]);
 
-  // Patrulha das Casas
+  // Patrulha das Casas — usa a tabela patrulhas
   const patrulhaData = useMemo(() => {
-    const municipiosComEquipamentoEPatrulha = new Set(
-      equipamentos.filter((e) => e.possui_patrulha).map((e) => e.municipio)
-    );
-
-    const municipiosEmSolicitacaoComPatrulha = new Set(
-      solicitacoes
-        .filter((s) => s.recebeu_patrulha && s.status !== 'Inaugurada')
-        .map((s) => s.municipio)
-        .filter((m) => !municipiosComEquipamentoEPatrulha.has(m))
-    );
-
+    const comEquipamento = patrulhas.filter(p => p.equipamento_id !== null).length;
+    const emSolicitacao  = patrulhas.filter(p => p.solicitacao_id !== null).length;
     return [
-      { name: 'Com Equipamento', value: municipiosComEquipamentoEPatrulha.size, color: 'hsl(160, 60%, 45%)', gradient: 'patrulhaGrad0' },
-      { name: 'Em Solicitação', value: municipiosEmSolicitacaoComPatrulha.size, color: 'hsl(40, 85%, 55%)', gradient: 'patrulhaGrad1' },
+      { name: 'CMM Inaugurada',  value: comEquipamento, color: 'hsl(160, 60%, 45%)', gradient: 'patrulhaGrad0' },
+      { name: 'CMM em Processo', value: emSolicitacao,  color: 'hsl(40, 85%, 55%)',  gradient: 'patrulhaGrad1' },
     ].filter(item => item.value > 0);
-  }, [equipamentos, solicitacoes]);
+  }, [patrulhas]);
 
   // ✅ NOVO: Progresso do checklist por tipo de equipamento (histórico completo)
   const checklistData = useMemo(() => {
@@ -409,7 +402,7 @@ export default function Dashboard() {
 
       {/* Secondary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <MotionStatCard title="Com Patrulha M.P." value={stats.equipamentosComPatrulha} icon={CheckCircle2} description="Equipamentos com patrulha" index={5} />
+        <MotionStatCard title="Patrulhas M.P." value={patrulhas.length} icon={CheckCircle2} description={`${patrulhas.filter(p => p.equipamento_id).length} ativas · ${patrulhas.filter(p => p.solicitacao_id).length} em processo`} index={5} />
         <MotionStatCard title="Viatura s/ Equipamento" value={stats.municipiosComViaturaSemEquipamento} icon={Truck} description="Municípios" index={6} />
         <MotionStatCard title="Sem Cobertura" value={stats.municipiosSemEquipamento} icon={AlertCircle} description="Municípios" index={7} />
         <MotionStatCard title="Inauguradas" value={stats.solicitacoesPorStatus['Inaugurada'] || 0} icon={Users} description="Solicitações concluídas" index={8} />

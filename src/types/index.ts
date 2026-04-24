@@ -62,6 +62,25 @@ export interface Equipamento {
 }
 
 // ── Viaturas ──────────────────────────────────────────────────────────────────
+export type OrgaoPatrulha = 'PMCE' | 'Guarda Municipal' | 'Outro';
+
+export interface Patrulha {
+  id: string;
+  equipamento_id: string | null;   // CMM inaugurada
+  solicitacao_id: string | null;   // CMM em processo
+  municipio: string;
+  orgao: OrgaoPatrulha;
+  efetivo: number | null;
+  viaturas: number | null;
+  responsavel: string | null;
+  contato: string | null;
+  data_implantacao: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+
 export interface Viatura {
   id: string;
   municipio: string;
@@ -114,4 +133,62 @@ export interface DashboardStats {
   totalSolicitacoes: number;
   solicitacoesPorStatus: Record<StatusSolicitacao, number>;
   solicitacoesPorTipo: Record<TipoEquipamento, number>;
+}
+
+// ── Material Gráfico ──────────────────────────────────────────────────────────
+export type MgTipoItem     = 'Folder' | 'Panfleto' | 'Ventarola' | 'Bottom' | 'Cartaz' | 'Outro';
+export type MgSituacao     = 'Aguardando' | 'Em separação' | 'Atendido' | 'Cancelado';
+export type MgFormaEntrega = 'Entregue' | 'Retirada';
+export type MgUnidade      = 'caixas' | 'unidades';
+
+export interface MgItem {
+  id: string;
+  tipo: MgTipoItem;
+  campanha: string;
+  descricao: string | null;
+  peso_cx_g: number | null;        // peso por caixa em gramas
+  unidades_por_cx: number | null;  // aprox. — pode ser null quando desconhecida
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MgEstoque {
+  id: string;
+  item_id: string;
+  local: string;
+  caixas: number;
+  unidades_avulsas: number;
+  updated_at: string;
+}
+
+export interface MgItemPedido {
+  id: string;
+  pedido_id: string;
+  item_id: string;
+  unidade_medida: MgUnidade;
+  qtd_solicitada: number;
+  qtd_autorizada: number | null;
+  created_at: string;
+  // join
+  item?: MgItem;
+}
+
+export interface MgPedido {
+  id: string;
+  municipio: string | null;
+  destino_avulso: string | null;
+  nup: string | null;
+  oficio: string | null;
+  data_pedido: string | null;
+  data_entrega: string | null;
+  situacao: MgSituacao;
+  forma_entrega: MgFormaEntrega | null;
+  tipo_pedido: string | null;
+  observacoes: string | null;
+  estoque_abatido: boolean;
+  created_at: string;
+  updated_at: string;
+  // join
+  itens?: MgItemPedido[];
 }

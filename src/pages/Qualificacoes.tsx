@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -176,26 +176,26 @@ function QualificacaoDialog({
       : FORM_EMPTY
   );
 
-  // Reset quando o dialog abre com novo `initial`
-  useState(() => {
-    if (open) {
-      setForm(
-        initial
-          ? {
-              nome: initial.nome,
-              ministrante: initial.ministrante,
-              data: initial.data,
-              total_pessoas: String(initial.total_pessoas),
-              observacoes: initial.observacoes ?? '',
-              municipios: initial.municipios.map(m => ({
-                municipio: m.municipio,
-                quantidade_pessoas: m.quantidade_pessoas,
-              })),
-            }
-          : FORM_EMPTY
-      );
-    }
-  });
+  // Reset quando o dialog abre — seja para editar (new initial) ou criar (initial=null)
+  useEffect(() => {
+    if (!open) return;
+    setForm(
+      initial
+        ? {
+            nome: initial.nome,
+            ministrante: initial.ministrante,
+            data: initial.data,
+            total_pessoas: String(initial.total_pessoas),
+            observacoes: initial.observacoes ?? '',
+            municipios: initial.municipios.map(m => ({
+              municipio: m.municipio,
+              quantidade_pessoas: m.quantidade_pessoas,
+            })),
+          }
+        : FORM_EMPTY
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.id]);
 
   const municipiosUsados = useMemo(
     () => new Set(form.municipios.map(m => m.municipio).filter(Boolean)),
@@ -920,6 +920,7 @@ export default function Qualificacoes() {
 
       {/* ── Dialog de form ── */}
       <QualificacaoDialog
+        key={editing?.id ?? 'new'}
         open={dialogOpen}
         onClose={() => { setDialogOpen(false); setEditing(null); }}
         onSave={handleSave}
