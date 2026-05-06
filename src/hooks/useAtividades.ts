@@ -22,26 +22,28 @@ type AtividadeInsert = {
   atendimentos?: number | null;
   endereco?: string | null;
   observacoes?: string | null;
+  municipios_participantes?: string[];
 };
 
 type AtividadeUpdate = Partial<AtividadeInsert>;
 
 function toInsert(payload: Omit<Atividade, 'id' | 'created_at' | 'updated_at'>): AtividadeInsert {
   return {
-    municipio:         payload.municipio,
-    municipio_sede:    payload.municipio_sede,
-    tipo:              payload.tipo,
-    recurso:           payload.recurso,
-    status:            payload.status,
-    data:              payload.data,
-    quantidade_equipe: payload.quantidade_equipe ?? null,
-    nup:               payload.nup ?? null,
-    nome_evento:       payload.nome_evento ?? null,
-    dias:              payload.dias ?? null,
-    horario:           payload.horario ?? null,
-    atendimentos:      payload.atendimentos ?? null,
-    endereco:          payload.endereco ?? null,
-    observacoes:       payload.observacoes ?? null,
+    municipio:                payload.municipio,
+    municipio_sede:           payload.municipio_sede,
+    tipo:                     payload.tipo,
+    recurso:                  payload.recurso,
+    status:                   payload.status,
+    data:                     payload.data,
+    quantidade_equipe:        payload.quantidade_equipe ?? null,
+    nup:                      payload.nup ?? null,
+    nome_evento:              payload.nome_evento ?? null,
+    dias:                     payload.dias ?? null,
+    horario:                  payload.horario ?? null,
+    atendimentos:             payload.atendimentos ?? null,
+    endereco:                 payload.endereco ?? null,
+    observacoes:              payload.observacoes ?? null,
+    municipios_participantes: payload.municipios_participantes ?? [],
   };
 }
 

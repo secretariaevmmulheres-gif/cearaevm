@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
+import { usePatrulhas } from '@/hooks/usePatrulhas';
 import { municipiosCeara, tiposEquipamento, statusSolicitacao, regioesList, getRegiao, getMunicipiosPorRegiao } from '@/data/municipios';
 import { CEARA_GEOJSON_URL } from '@/data/ceara-geojson-url';
 import {
@@ -98,6 +99,17 @@ export default function Mapa() {
   const { equipamentos } = useEquipamentos();
   const { viaturas } = useViaturas();
   const { solicitacoes } = useSolicitacoes();
+  const { patrulhas } = usePatrulhas();
+
+  // Sets para lookup O(1)
+  const equipIdsComPatrulha = useMemo(
+    () => new Set(patrulhas.filter(p => p.equipamento_id).map(p => p.equipamento_id!)),
+    [patrulhas]
+  );
+  const solicIdsComPatrulha = useMemo(
+    () => new Set(patrulhas.filter(p => p.solicitacao_id).map(p => p.solicitacao_id!)),
+    [patrulhas]
+  );
   const {
     setMapaCapturado,
     setGeoJsonData: setGeoJsonDataCtx,
@@ -106,6 +118,8 @@ export default function Mapa() {
     setMapaEquipmentCounts,
   } = useMapaContext();
   const [selectedMunicipio, setSelectedMunicipio] = useState<MunicipioData | null>(null);
+  const [highlightedMunicipio, setHighlightedMunicipio] = useState<string | null>(null);
+  const highlightedLayerRef = useRef<any | null>(null);
   const [geoJsonData, setGeoJsonData] = useState<FeatureCollection | null>(null);
   const [isLoadingGeoJson, setIsLoadingGeoJson] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -166,7 +180,7 @@ export default function Mapa() {
       if (filterTipoEquipamento !== 'all' && !eqs.some((e) => e.tipo === filterTipoEquipamento)) visible = false;
       if (filterStatusSolicitacao !== 'all' && !sols.some((s) => s.status === filterStatusSolicitacao)) visible = false;
       if (filterApenasComViatura) {
-        const hasViatura = viats.length > 0 || eqs.some((e) => e.possui_patrulha) || sols.some((s) => s.recebeu_patrulha);
+        const hasViatura = viats.length > 0 || eqs.some(e => equipIdsComPatrulha.has(e.id)) || sols.some(s => solicIdsComPatrulha.has(s.id));
         if (!hasViatura) visible = false;
       }
       let prioridade = 9; let cor = 'bg-muted'; let hexColor = priorityColors[9];
@@ -245,6 +259,11 @@ export default function Mapa() {
   const getFeatureStyle = (feature: Feature<Geometry> | undefined): PathOptions => {
     if (!feature?.properties) return { fillColor: priorityColors[8], weight: 1, opacity: 1, color: '#ffffff', fillOpacity: 0.7 };
     const municipioData = municipiosData.get(normalizarNome(feature.properties.name as string));
+    const isHighlighted = highlightedMunicipio &&
+      normalizarNome(feature.properties.name as string) === normalizarNome(highlightedMunicipio);
+    if (isHighlighted) {
+      return { fillColor: municipioData?.hexColor || priorityColors[8], weight: 4, opacity: 1, color: '#000000', fillOpacity: 0.95 };
+    }
     return { fillColor: municipioData?.hexColor || priorityColors[8], weight: 1, opacity: 1, color: '#ffffff', fillOpacity: 0.7 };
   };
 
@@ -252,8 +271,19 @@ export default function Mapa() {
     const municipioName = feature.properties?.name as string;
     const municipioData = municipiosData.get(normalizarNome(municipioName));
     layer.on({
-      mouseover: (e) => { e.target.setStyle({ weight: 3, color: '#1f2937', fillOpacity: 0.9 }); e.target.bringToFront(); },
-      mouseout: (e) => { e.target.setStyle({ weight: 1, color: '#ffffff', fillOpacity: 0.7 }); },
+      mouseover: (e) => {
+        const isHighlighted = highlightedMunicipio && normalizarNome(municipioName) === normalizarNome(highlightedMunicipio);
+        if (!isHighlighted) e.target.setStyle({ weight: 3, color: '#1f2937', fillOpacity: 0.9 });
+        e.target.bringToFront();
+      },
+      mouseout: (e) => {
+        const isHighlighted = highlightedMunicipio && normalizarNome(municipioName) === normalizarNome(highlightedMunicipio);
+        if (isHighlighted) {
+          e.target.setStyle({ weight: 4, color: '#000000', fillOpacity: 0.95 });
+        } else {
+          e.target.setStyle({ weight: 1, color: '#ffffff', fillOpacity: 0.7 });
+        }
+      },
       click: () => {
         setSelectedMunicipio(municipioData || { nome: municipioName, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 9, cor: 'bg-muted', hexColor: priorityColors[9], visible: true });
       },
@@ -270,7 +300,7 @@ export default function Mapa() {
       : municipioData.prioridade === 7 ? '🚔 Só Viatura'
       : '⚪ Sem Cobertura'
       : '⚪ Sem Cobertura';
-    const patrulha = municipioData?.equipamentos?.some(e => e.possui_patrulha) ? ' · Patrulha M.P.' : '';
+    const patrulha = municipioData?.equipamentos?.some(e => equipIdsComPatrulha.has(e.id)) ? ' · Patrulha M.P.' : '';
     layer.bindTooltip(
       `<strong>${municipioName}</strong><br/><span style="font-size:10px">${cobertura}${patrulha}</span>`,
       { permanent: false, direction: 'top', className: 'bg-card text-foreground border border-border rounded-md px-2 py-1 text-xs shadow-lg', opacity: 0.97 }
@@ -353,7 +383,15 @@ export default function Mapa() {
                   return (
                     <li key={municipio}>
                       <button
-                        onClick={() => { setSelectedMunicipio(data || { nome: municipio, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 6, cor: 'bg-muted', hexColor: priorityColors[8], visible: true }); setSearchQuery(''); setSearchResults([]); }}
+                        onClick={() => {
+                          setSelectedMunicipio(data || { nome: municipio, equipamentos: [], viaturas: [], solicitacoes: [], prioridade: 6, cor: 'bg-muted', hexColor: priorityColors[8], visible: true });
+                          // Destacar município no mapa com borda preta
+                          setHighlightedMunicipio(municipio);
+                          // Remover destaque após 5 segundos
+                          setTimeout(() => setHighlightedMunicipio(null), 5000);
+                          setSearchQuery('');
+                          setSearchResults([]);
+                        }}
                         className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-left rounded-lg hover:bg-muted transition-colors"
                       >
                         <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: data?.hexColor || priorityColors[8] }} />
@@ -448,7 +486,7 @@ export default function Mapa() {
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                    {geoJsonData && <GeoJSON key={`geojson-${municipiosData.size}-${equipamentos.length}-${viaturas.length}`} data={geoJsonData} style={getFeatureStyle} onEachFeature={onEachFeature} />}
+                    {geoJsonData && <GeoJSON key={`geojson-${municipiosData.size}-${equipamentos.length}-${viaturas.length}-${highlightedMunicipio ?? ''}`} data={geoJsonData} style={getFeatureStyle} onEachFeature={onEachFeature} />}
                   </MapContainer>
                 </ErrorBoundary>
               )}
@@ -539,7 +577,7 @@ export default function Mapa() {
                     </h3>
                     {selectedMunicipio.solicitacoes.map((s) => {
                       const checks = [
-                        { label: 'Patrulha M.P.', done: s.recebeu_patrulha },
+                        { label: 'Patrulha M.P.', done: solicIdsComPatrulha.has(s.id) },
                         { label: 'Kit Athena', done: s.kit_athena_entregue },
                         { label: 'Capacitação', done: s.capacitacao_realizada },
                         { label: 'NUP', done: !!s.nup },
@@ -581,7 +619,7 @@ export default function Mapa() {
                       {selectedMunicipio.equipamentos.map((e) => (
                         <div key={e.id} className="flex items-center gap-2 text-sm bg-muted/30 rounded-lg px-2.5 py-1.5">
                           <span className="flex-1">{e.tipo}</span>
-                          {e.possui_patrulha && <span className="text-xs text-success bg-success/10 px-1.5 py-0.5 rounded-full">Patrulha ✓</span>}
+                          {equipIdsComPatrulha.has(e.id) && <span className="text-xs text-success bg-success/10 px-1.5 py-0.5 rounded-full">Patrulha ✓</span>}
                         </div>
                       ))}
                     </div>
@@ -596,19 +634,19 @@ export default function Mapa() {
                     </div>
                     <h3 className="font-semibold text-sm">
                       Viaturas ({(() => {
-                        const viaturasCount = selectedMunicipio.viaturas.reduce((s, v) => s + v.quantidade, 0);
-                        const patrulhasEquip = selectedMunicipio.equipamentos.filter(e => e.possui_patrulha).length;
-                        // Só conta patrulha de solicitação se o município ainda NÃO tem equipamento com patrulha
-                        // (evita dupla contagem quando solicitação é transformada em equipamento)
+                        const viaturasCount    = selectedMunicipio.viaturas.reduce((s, v) => s + v.quantidade, 0);
+                        const patrulhasEquip   = selectedMunicipio.equipamentos.filter(e => equipIdsComPatrulha.has(e.id)).length;
                         const municipioTemPatrulhaEquip = patrulhasEquip > 0;
-                        const patrulhasSolic = municipioTemPatrulhaEquip
+                        const patrulhasSolic   = municipioTemPatrulhaEquip
                           ? 0
-                          : selectedMunicipio.solicitacoes.filter(s => s.recebeu_patrulha).length;
+                          : selectedMunicipio.solicitacoes.filter(s => solicIdsComPatrulha.has(s.id)).length;
                         return viaturasCount + patrulhasEquip + patrulhasSolic;
                       })()})
                     </h3>
                   </div>
-                  {selectedMunicipio.viaturas.length === 0 && !selectedMunicipio.equipamentos.some(e => e.possui_patrulha) && !selectedMunicipio.solicitacoes.some(s => s.recebeu_patrulha && !selectedMunicipio.equipamentos.some(e2 => e2.possui_patrulha)) ? (
+                  {selectedMunicipio.viaturas.length === 0 &&
+                   !selectedMunicipio.equipamentos.some(e => equipIdsComPatrulha.has(e.id)) &&
+                   !selectedMunicipio.solicitacoes.some(s => solicIdsComPatrulha.has(s.id)) ? (
                     <p className="text-sm text-muted-foreground pl-8">Nenhuma viatura</p>
                   ) : (
                     <div className="space-y-1.5 pl-8">
@@ -618,13 +656,15 @@ export default function Mapa() {
                           {v.vinculada_equipamento && <span className="text-xs text-muted-foreground">vinculada</span>}
                         </div>
                       ))}
-                      {selectedMunicipio.equipamentos.filter(e => e.possui_patrulha).map((e) => (
+                      {selectedMunicipio.equipamentos.filter(e => equipIdsComPatrulha.has(e.id)).map((e) => (
                         <div key={`pe-${e.id}`} className="flex items-center gap-2 text-sm bg-success/5 rounded-lg px-2.5 py-1.5 border border-success/20">
                           <span className="flex-1">1x Patrulha das Casas</span>
                           <span className="text-xs text-success">via {e.tipo}</span>
                         </div>
                       ))}
-                      {selectedMunicipio.solicitacoes.filter(s => s.recebeu_patrulha && !selectedMunicipio.equipamentos.some(e => e.possui_patrulha)).map((s) => (
+                      {selectedMunicipio.solicitacoes
+                        .filter(s => solicIdsComPatrulha.has(s.id) && !selectedMunicipio.equipamentos.some(e => equipIdsComPatrulha.has(e.id)))
+                        .map((s) => (
                         <div key={`ps-${s.id}`} className="flex items-center gap-2 text-sm bg-warning/5 rounded-lg px-2.5 py-1.5 border border-warning/20">
                           <span className="flex-1">1x Patrulha das Casas</span>
                           <span className="text-xs text-warning">Solicitação · {s.status}</span>

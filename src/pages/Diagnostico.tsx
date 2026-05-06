@@ -17,6 +17,7 @@ import {
 import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { usePendenciasResolvidas } from '@/hooks/usePendenciasResolvidas';
+import { usePatrulhas } from '@/hooks/usePatrulhas';
 import { regioesList, statusSolicitacao, StatusSolicitacao } from '@/data/municipios';
 import {
   gerarDiagnostico, exportDiagnosticoToPDF, exportDiagnosticoToExcel, PendenciaMunicipio,
@@ -77,7 +78,7 @@ function PendenciaBadge({ texto, resolvido, onToggle }: { texto: string; resolvi
 // ── Linha expansível ──────────────────────────────────────────────────────────
 function LinhaTabela({
   item, delay, isResolvido, onTogglePendencia, itemResolvido,
-  equipamento, solicitacao, onEditEquipamento, onEditSolicitacao,
+  equipamento, solicitacao, temPatrulha, onEditEquipamento, onEditSolicitacao,
 }: {
   item: PendenciaMunicipio;
   delay: number;
@@ -86,6 +87,7 @@ function LinhaTabela({
   itemResolvido: boolean;
   equipamento?: Equipamento;
   solicitacao?: Solicitacao;
+  temPatrulha?: boolean;
   onEditEquipamento: (e: Equipamento) => void;
   onEditSolicitacao: (s: Solicitacao) => void;
 }) {
@@ -107,7 +109,7 @@ function LinhaTabela({
       ))}
       <div className="flex items-start gap-2">
         <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 text-primary"><ShieldCheck className="w-3 h-3" /></div>
-        <div><p className="text-[10px] text-muted-foreground">Patrulha M.P.</p><p className="text-xs font-medium">{equipamento.possui_patrulha ? 'Sim' : 'Não'}</p></div>
+        <div><p className="text-[10px] text-muted-foreground">Patrulha M.P.</p><p className="text-xs font-medium">{temPatrulha ? 'Sim' : 'Não'}</p></div>
       </div>
       <div className="flex items-start gap-2">
         <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 text-primary"><Package className="w-3 h-3" /></div>
@@ -132,7 +134,7 @@ function LinhaTabela({
       </div>
       <div className="flex items-start gap-2">
         <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 text-primary"><ShieldCheck className="w-3 h-3" /></div>
-        <div><p className="text-[10px] text-muted-foreground">Patrulha M.P.</p><p className="text-xs font-medium">{solicitacao.recebeu_patrulha ? 'Sim' : 'Não'}</p></div>
+        <div><p className="text-[10px] text-muted-foreground">Patrulha M.P.</p><p className="text-xs font-medium">{temPatrulha ? 'Sim' : 'Não'}</p></div>
       </div>
       <div className="flex items-start gap-2">
         <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 text-primary"><Package className="w-3 h-3" /></div>
@@ -254,7 +256,6 @@ function ModalEquipamento({
   equipamento, onClose, onSave,
 }: { equipamento: Equipamento; onClose: () => void; onSave: (data: Partial<Equipamento> & { id: string }) => void }) {
   const [form, setForm] = useState({
-    possui_patrulha:       equipamento.possui_patrulha,
     kit_athena_entregue:   equipamento.kit_athena_entregue,
     kit_athena_previo:     equipamento.kit_athena_previo ?? false,
     capacitacao_realizada: equipamento.capacitacao_realizada,
@@ -296,8 +297,8 @@ function ModalEquipamento({
 
           <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
             <Label className="text-sm font-semibold">Acompanhamento</Label>
+            <p className="text-xs text-muted-foreground">Patrulha M.P. é gerenciada na aba <strong>Viaturas → Patrulhas M.P.</strong></p>
             {[
-              { id: 'patrulha', label: 'Patrulha M.P.',    key: 'possui_patrulha'       },
               { id: 'kit',      label: 'Kit Athena',        key: 'kit_athena_entregue'   },
               { id: 'qualif',   label: 'Qualificação',      key: 'capacitacao_realizada' },
             ].map(item => (
@@ -334,7 +335,6 @@ function ModalSolicitacao({
 }: { solicitacao: Solicitacao; onClose: () => void; onSave: (data: Partial<Solicitacao> & { id: string }) => void }) {
   const [form, setForm] = useState({
     status:                       solicitacao.status,
-    recebeu_patrulha:             solicitacao.recebeu_patrulha,
     guarda_municipal_estruturada: solicitacao.guarda_municipal_estruturada,
     kit_athena_entregue:          solicitacao.kit_athena_entregue,
     kit_athena_previo:            solicitacao.kit_athena_previo ?? false,
@@ -374,8 +374,8 @@ function ModalSolicitacao({
 
           <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
             <Label className="text-sm font-semibold">Acompanhamento</Label>
+            <p className="text-xs text-muted-foreground">Patrulha M.P. é gerenciada na aba <strong>Viaturas → Patrulhas M.P.</strong></p>
             {[
-              { id: 'patrulha', label: 'Patrulha M.P.',    key: 'recebeu_patrulha'             },
               { id: 'guarda',   label: 'Guarda Municipal',  key: 'guarda_municipal_estruturada' },
               { id: 'kit',      label: 'Kit Athena',        key: 'kit_athena_entregue'          },
               { id: 'qualif',   label: 'Qualificação',      key: 'capacitacao_realizada'        },
@@ -412,6 +412,17 @@ export default function Diagnostico() {
   const { equipamentos, updateEquipamento } = useEquipamentos();
   const { solicitacoes, updateSolicitacao } = useSolicitacoes();
   const { isResolvido, toggleResolvido, limparTodos, isLoading: isLoadingResolvidos } = usePendenciasResolvidas();
+  const { patrulhas } = usePatrulhas();
+
+  // Sets para lookup O(1): equipamento_id e solicitacao_id com patrulha
+  const equipIdsComPatrulha = useMemo(
+    () => new Set(patrulhas.filter(p => p.equipamento_id).map(p => p.equipamento_id!)),
+    [patrulhas]
+  );
+  const solicIdsComPatrulha = useMemo(
+    () => new Set(patrulhas.filter(p => p.solicitacao_id).map(p => p.solicitacao_id!)),
+    [patrulhas]
+  );
 
   const [regiaoFiltro,     setRegiaoFiltro]     = useState('');
   const [origemFiltro,     setOrigemFiltro]     = useState('');
@@ -428,8 +439,8 @@ export default function Diagnostico() {
   const [editSolicitacao,  setEditSolicitacao]  = useState<Solicitacao | null>(null);
 
   const todasPendencias = useMemo(() =>
-    gerarDiagnostico(equipamentos, solicitacoes, { regiaoFiltro: regiaoFiltro || undefined, diasSemMovimento }),
-    [equipamentos, solicitacoes, regiaoFiltro, diasSemMovimento]
+    gerarDiagnostico(equipamentos, solicitacoes, { regiaoFiltro: regiaoFiltro || undefined, diasSemMovimento }, patrulhas),
+    [equipamentos, solicitacoes, regiaoFiltro, diasSemMovimento, patrulhas]
   );
 
   const itemTotalmenteResolvido = (item: PendenciaMunicipio) =>
@@ -480,12 +491,12 @@ export default function Diagnostico() {
 
   const handleExportPDF = async () => {
     setExporting(true);
-    try { await exportDiagnosticoToPDF(equipamentos, solicitacoes, filtrosDiag); toast.success('PDF exportado!'); }
+    try { await exportDiagnosticoToPDF(equipamentos, solicitacoes, filtrosDiag, patrulhas); toast.success('PDF exportado!'); }
     catch { toast.error('Erro ao exportar PDF'); } finally { setExporting(false); }
   };
   const handleExportExcel = async () => {
     setExporting(true);
-    try { await new Promise(r => setTimeout(r, 50)); exportDiagnosticoToExcel(equipamentos, solicitacoes, filtrosDiag); toast.success('Excel exportado!'); }
+    try { await new Promise(r => setTimeout(r, 50)); exportDiagnosticoToExcel(equipamentos, solicitacoes, filtrosDiag, patrulhas); toast.success('Excel exportado!'); }
     catch { toast.error('Erro ao exportar Excel'); } finally { setExporting(false); }
   };
 
@@ -642,19 +653,29 @@ export default function Diagnostico() {
               </thead>
               <tbody>
                 <AnimatePresence>
-                  {pendenciasFiltradas.map((item, i) => (
-                    <LinhaTabela
-                      key={item.itemId}
-                      item={item} delay={i * 0.015}
-                      itemResolvido={itemTotalmenteResolvido(item)}
-                      isResolvido={p => isResolvido(item.municipio, item.tipo, item.origem, p)}
-                      onTogglePendencia={p => toggleResolvido(item.municipio, item.tipo, item.origem, p)}
-                      equipamento={findEquipamento(item)}
-                      solicitacao={findSolicitacao(item)}
-                      onEditEquipamento={setEditEquipamento}
-                      onEditSolicitacao={setEditSolicitacao}
-                    />
-                  ))}
+                  {pendenciasFiltradas.map((item, i) => {
+                    const equip = findEquipamento(item);
+                    const solic = findSolicitacao(item);
+                    const temPatrulha = equip
+                      ? equipIdsComPatrulha.has(equip.id)
+                      : solic
+                        ? solicIdsComPatrulha.has(solic.id)
+                        : false;
+                    return (
+                      <LinhaTabela
+                        key={item.itemId}
+                        item={item} delay={i * 0.015}
+                        itemResolvido={itemTotalmenteResolvido(item)}
+                        isResolvido={p => isResolvido(item.municipio, item.tipo, item.origem, p)}
+                        onTogglePendencia={p => toggleResolvido(item.municipio, item.tipo, item.origem, p)}
+                        equipamento={equip}
+                        solicitacao={solic}
+                        temPatrulha={temPatrulha}
+                        onEditEquipamento={setEditEquipamento}
+                        onEditSolicitacao={setEditSolicitacao}
+                      />
+                    );
+                  })}
                 </AnimatePresence>
               </tbody>
             </table>

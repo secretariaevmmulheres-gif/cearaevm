@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Equipamento, Viatura, Solicitacao } from '@/types';
+import { Equipamento, Viatura, Solicitacao, Patrulha } from '@/types';
 import { getRegiao, RegiaoPlanejamento } from '@/data/municipios';
 import { ts, fmtDate, lastY, addPdfCover, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
 
@@ -30,7 +30,7 @@ export interface RegionStatsExport {
   };
 }
 
-export async function exportRegionalToPDF(regionStats: RegionStatsExport, equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
+export async function exportRegionalToPDF(regionStats: RegionStatsExport, equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[], patrulhas: Patrulha[] = []) {
   const doc = new jsPDF();
 
   // ── Capa ──────────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export async function exportRegionalToPDF(regionStats: RegionStatsExport, equipa
     doc.text('Equipamentos:', 14, currentY);
     autoTable(doc, {
       head: [['Município', 'Tipo', 'Responsável', 'Telefone', 'Patrulha']],
-      body: regionEquipamentos.map(e => [e.municipio, e.tipo, e.responsavel || '-', e.telefone || '-', e.possui_patrulha ? 'Sim' : 'Não']),
+      body: regionEquipamentos.map(e => [e.municipio, e.tipo, e.responsavel || '-', e.telefone || '-', patrulhas.some(p => p.equipamento_id === e.id) ? 'Sim' : 'Não']),
       startY: currentY + 5,
       styles: { fontSize: 7 },
       headStyles: { fillColor: [31, 81, 140] },
@@ -111,15 +111,16 @@ export async function exportRegionalToPDF(regionStats: RegionStatsExport, equipa
   doc.save(`relatorio-regional-${regionStats.regiao.toLowerCase().replace(/\s+/g, '-')}_${ts()}.pdf`);
 }
 
-export async function exportAllRegionsToPDF(regionStats: RegionStatsExport[], equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
+export async function exportAllRegionsToPDF(regionStats: RegionStatsExport[], equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[], patrulhas: Patrulha[] = []) {
   const doc = new jsPDF();
 
   // ── Pré-calcular totais para a capa ───────────────────────────────────────
   const totalEquipamentos      = equipamentos.length;
-  const equipamentosComPatrulha = equipamentos.filter(e => e.possui_patrulha).length;
-  const municipiosComPatrulhaEquip = new Set(equipamentos.filter(e => e.possui_patrulha).map(e => e.municipio));
-  const patrulhasSolicitacoes  = solicitacoes.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio)).length;
-  const totalPatrulhasCasas    = equipamentosComPatrulha + patrulhasSolicitacoes;
+  const equipIdsComPatrulha    = new Set(patrulhas.filter(p => p.equipamento_id).map(p => p.equipamento_id!));
+  const solicIdsComPatrulha    = new Set(patrulhas.filter(p => p.solicitacao_id).map(p => p.solicitacao_id!));
+  const equipamentosComPatrulha = equipamentos.filter(e => equipIdsComPatrulha.has(e.id)).length;
+  const patrulhasSolicitacoes   = patrulhas.filter(p => p.solicitacao_id !== null).length;
+  const totalPatrulhasCasas     = patrulhas.length;
   const totalViaturasPMCE      = viaturas.reduce((sum, v) => sum + v.quantidade, 0);
   const viaturasVinculadas     = viaturas.filter(v => v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
   const viaturasNaoVinculadas  = viaturas.filter(v => !v.vinculada_equipamento).reduce((sum, v) => sum + v.quantidade, 0);
@@ -202,7 +203,7 @@ export async function exportAllRegionsToPDF(regionStats: RegionStatsExport[], eq
       doc.text('Equipamentos:', 14, currentY);
       autoTable(doc, {
         head: [['Município', 'Tipo', 'Responsável', 'Patrulha']],
-        body: regionEquipamentos.map(e => [e.municipio, e.tipo, e.responsavel || '-', e.possui_patrulha ? 'Sim' : 'Não']),
+        body: regionEquipamentos.map(e => [e.municipio, e.tipo, e.responsavel || '-', equipIdsComPatrulha.has(e.id) ? 'Sim' : 'Não']),
         startY: currentY + 4,
         styles: { fontSize: 7 },
         headStyles: { fillColor: [31, 81, 140] },
@@ -247,7 +248,9 @@ export async function exportAllRegionsToPDF(regionStats: RegionStatsExport[], eq
   doc.save(`dashboard-regional-consolidado_${ts()}.pdf`);
 }
 
-export function exportAllRegionsToExcel(regionStats: RegionStatsExport[], equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[]) {
+export function exportAllRegionsToExcel(regionStats: RegionStatsExport[], equipamentos: Equipamento[], viaturas: Viatura[], solicitacoes: Solicitacao[], patrulhas: Patrulha[] = []) {
+  const equipIdsComPatrulha = new Set(patrulhas.filter(p => p.equipamento_id).map(p => p.equipamento_id!));
+  const solicIdsComPatrulha = new Set(patrulhas.filter(p => p.solicitacao_id).map(p => p.solicitacao_id!));
   const wb = XLSX.utils.book_new();
 
   const summaryData = regionStats.map((r, idx) => ({
@@ -271,7 +274,7 @@ export function exportAllRegionsToExcel(regionStats: RegionStatsExport[], equipa
     'Município': e.municipio,
     'Região': getRegiao(e.municipio) || '',
     'Tipo': e.tipo,
-    'Patrulha M.P.': e.possui_patrulha ? 'Sim' : 'Não',
+    'Patrulha M.P.': equipIdsComPatrulha.has(e.id) ? 'Sim' : 'Não',
     'Endereço': e.endereco || '',
     'Responsável': e.responsavel || '',
     'Telefone': e.telefone || '',
@@ -303,7 +306,7 @@ export function exportAllRegionsToExcel(regionStats: RegionStatsExport[], equipa
     'Data da Solicitação': fmtDate(s.data_solicitacao),
     'NUP': s.nup || '',
     'Guarda Municipal': s.guarda_municipal_estruturada ? 'Sim' : 'Não',
-    'Recebeu Patrulha': s.recebeu_patrulha ? 'Sim' : 'Não',
+    'Recebeu Patrulha': solicIdsComPatrulha.has(s.id) ? 'Sim' : 'Não',
     'Kit Athena': s.kit_athena_entregue ? 'Sim' : 'Não',
     'Qualificação': s.capacitacao_realizada ? 'Sim' : 'Não',
     'Observações': s.observacoes || '',

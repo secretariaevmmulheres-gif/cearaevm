@@ -491,13 +491,13 @@ export default function MaterialGrafico() {
     if (!itemForm.campanha.trim()) return toast.error('Nome da campanha é obrigatório');
     setSavingItem(true);
     try {
-      const data: Record<string, unknown> = {
+      const data = {
         tipo:            itemForm.tipo,
         campanha:        itemForm.campanha.trim(),
         descricao:       itemForm.descricao.trim() || null,
         peso_cx_g:       itemForm.peso_cx_g       ? parseFloat(itemForm.peso_cx_g)       : null,
         unidades_por_cx: itemForm.unidades_por_cx ? parseInt(itemForm.unidades_por_cx)   : null,
-      };
+      } satisfies { tipo: string; campanha: string; descricao?: string | null; peso_cx_g?: number | null; unidades_por_cx?: number | null };
       if (editingItem) {
         const { error } = await supabase.from('mg_itens').update(data).eq('id', editingItem.id);
         if (error) throw error;

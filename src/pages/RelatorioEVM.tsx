@@ -7,6 +7,7 @@ import { useEquipamentos } from '@/hooks/useEquipamentos';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
 import { useViaturas } from '@/hooks/useViaturas';
 import { useQualificacoes } from '@/hooks/useQualificacoes';
+import { usePatrulhas } from '@/hooks/usePatrulhas';
 import { getRegiao, regioesList } from '@/data/municipios';
 import {
   exportCpdiToPDF,
@@ -499,6 +500,7 @@ export default function RelatorioEVM() {
   const { solicitacoes } = useSolicitacoes();
   const { viaturas }     = useViaturas();
   const { qualificacoes } = useQualificacoes();
+  const { patrulhas }    = usePatrulhas();
 
   // ── Dados do mapa — lidos do contexto (populado pelo Mapa.tsx) ────────────
   const {
@@ -534,10 +536,13 @@ export default function RelatorioEVM() {
     const lilasDelegacia = equips.filter(e => e.tipo === 'Sala Lilás em Delegacia');
     const ddm            = equips.filter(e => e.tipo === 'DDM');
 
-    const municipiosComEquip         = new Set(equips.map(e => e.municipio));
-    const municipiosComPatrulhaEquip = new Set(equips.filter(e => e.possui_patrulha).map(e => e.municipio));
-    const equipsComPatrulha          = equips.filter(e => e.possui_patrulha);
-    const solicsComPatrulha          = sols.filter(s => s.recebeu_patrulha && !municipiosComPatrulhaEquip.has(s.municipio));
+    const municipiosComEquip = new Set(equips.map(e => e.municipio));
+
+    // Sets para lookup via tabela patrulhas
+    const equipIdsComPatrulha = new Set(patrulhas.filter(p => p.equipamento_id).map(p => p.equipamento_id!));
+    const solicIdsComPatrulha = new Set(patrulhas.filter(p => p.solicitacao_id).map(p => p.solicitacao_id!));
+    const equipsComPatrulha   = equips.filter(e => equipIdsComPatrulha.has(e.id));
+    const solicsComPatrulha   = sols.filter(s => solicIdsComPatrulha.has(s.id));
 
     const kitAthenaTotal =
       equips.filter(e => e.kit_athena_entregue).length +
@@ -566,7 +571,7 @@ export default function RelatorioEVM() {
       kitAthenaTotal,
       qualificacaoTotal,
     };
-  }, [equipamentos, solicitacoes, viaturas, regiaoFiltro]);
+  }, [equipamentos, solicitacoes, viaturas, patrulhas, regiaoFiltro]);
 
   const contagens = useMemo((): Record<SecaoId, number> => ({
     cmb:            equipamentos.filter(e => e.tipo === 'Casa da Mulher Brasileira').length,
@@ -576,7 +581,7 @@ export default function RelatorioEVM() {
     lilasEstado:    equipamentos.filter(e => e.tipo === 'Sala Lilás Governo do Estado').length,
     lilasDelegacia: equipamentos.filter(e => e.tipo === 'Sala Lilás em Delegacia').length,
     ddm:            equipamentos.filter(e => e.tipo === 'DDM').length,
-    patrulha:       equipamentos.filter(e => e.possui_patrulha).length,
+    patrulha:       patrulhas.length,
     viaturas:       viaturas.reduce((s, v) => s + v.quantidade, 0),
   }), [equipamentos, viaturas]);
 
@@ -719,11 +724,15 @@ export default function RelatorioEVM() {
       )}
 
       {/* Seções */}
+      {/* Set para lookup de patrulha nas linhas de equipamento */}
+      {(() => {
+        const equipIdsComPatrulhaSet = new Set(dados.equipsComPatrulha.map(e => e.id));
+        return (
       <div className="space-y-4">
         <SectionCard numero={1} titulo="Casa da Mulher Brasileira (CMB)" cor="cmb"
           funcionando={dados.cmb.length} emAndamento={dados.cmbSolics.length} delay={0.1}>
           {dados.cmb.length > 0
-            ? <><SubTitle label="Em funcionamento" count={dados.cmb.length} />{dados.cmb.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmb" />)}</>
+            ? <><SubTitle label="Em funcionamento" count={dados.cmb.length} />{dados.cmb.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={equipIdsComPatrulhaSet.has(e.id)} cor="cmb" />)}</>
             : <EmptyState msg="Nenhuma CMB em funcionamento." />}
           {dados.cmbSolics.length > 0 && <><SubTitle label="Em construção / Previstas" count={dados.cmbSolics.length} />{dados.cmbSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}</>}
         </SectionCard>
@@ -731,7 +740,7 @@ export default function RelatorioEVM() {
         <SectionCard numero={2} titulo="Casa da Mulher Cearense (CMC)" cor="cmc"
           funcionando={dados.cmc.length} emAndamento={dados.cmcSolics.length} delay={0.15}>
           {dados.cmc.length > 0
-            ? <><SubTitle label="Em funcionamento" count={dados.cmc.length} />{dados.cmc.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmc" />)}</>
+            ? <><SubTitle label="Em funcionamento" count={dados.cmc.length} />{dados.cmc.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={equipIdsComPatrulhaSet.has(e.id)} cor="cmc" />)}</>
             : <EmptyState msg="Nenhuma CMC em funcionamento." />}
           {dados.cmcSolics.length > 0 && <><SubTitle label="Em construção / Previstas" count={dados.cmcSolics.length} />{dados.cmcSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}</>}
         </SectionCard>
@@ -739,7 +748,7 @@ export default function RelatorioEVM() {
         <SectionCard numero={3} titulo="Casa da Mulher Municipal (CMM)" cor="cmm"
           funcionando={dados.cmm.length} emAndamento={dados.cmmSolics.length} delay={0.2}>
           {dados.cmm.length > 0
-            ? <><SubTitle label="Em funcionamento" count={dados.cmm.length} />{dados.cmm.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="cmm" />)}</>
+            ? <><SubTitle label="Em funcionamento" count={dados.cmm.length} />{dados.cmm.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={equipIdsComPatrulhaSet.has(e.id)} cor="cmm" />)}</>
             : <EmptyState msg="Nenhuma CMM em funcionamento." />}
           {dados.cmmSolics.length > 0 && <><SubTitle label="Em construção / Previstas" count={dados.cmmSolics.length} />{dados.cmmSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}</>}
         </SectionCard>
@@ -747,7 +756,7 @@ export default function RelatorioEVM() {
         <SectionCard numero={4} titulo="Salas Lilás Municipal" cor="lilasMunicipal"
           funcionando={dados.lilasMunicipal.length} emAndamento={dados.lilasMunicipalSolics.length} delay={0.25}>
           {dados.lilasMunicipal.length > 0
-            ? <><SubTitle label="Em funcionamento" count={dados.lilasMunicipal.length} />{dados.lilasMunicipal.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="lilasMunicipal" />)}</>
+            ? <><SubTitle label="Em funcionamento" count={dados.lilasMunicipal.length} />{dados.lilasMunicipal.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={equipIdsComPatrulhaSet.has(e.id)} cor="lilasMunicipal" />)}</>
             : <EmptyState msg="Nenhuma Sala Lilás Municipal em funcionamento." />}
           {dados.lilasMunicipalSolics.length > 0 && <><SubTitle label="Em andamento" count={dados.lilasMunicipalSolics.length} />{dados.lilasMunicipalSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} data={s.data_solicitacao} nup={s.nup} />)}</>}
         </SectionCard>
@@ -755,7 +764,7 @@ export default function RelatorioEVM() {
         <SectionCard numero={5} titulo="Salas Lilás Governo do Estado" cor="lilasEstado"
           funcionando={dados.lilasEstado.length} emAndamento={dados.lilasEstadoSolics.length} delay={0.3}>
           {dados.lilasEstado.length > 0
-            ? <><SubTitle label="Em funcionamento" count={dados.lilasEstado.length} />{dados.lilasEstado.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="lilasEstado" extra={e.observacoes || undefined} />)}</>
+            ? <><SubTitle label="Em funcionamento" count={dados.lilasEstado.length} />{dados.lilasEstado.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={equipIdsComPatrulhaSet.has(e.id)} cor="lilasEstado" extra={e.observacoes || undefined} />)}</>
             : <EmptyState msg="Nenhuma Sala Lilás Governo do Estado em funcionamento." />}
           {dados.lilasEstadoSolics.length > 0 && <><SubTitle label="Em andamento" count={dados.lilasEstadoSolics.length} />{dados.lilasEstadoSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} />)}</>}
         </SectionCard>
@@ -763,7 +772,7 @@ export default function RelatorioEVM() {
         <SectionCard numero={6} titulo="Salas Lilás em Delegacia" cor="lilasDelegacia"
           funcionando={dados.lilasDelegacia.length} emAndamento={dados.lilasDelegaciaSolics.length} delay={0.35}>
           {dados.lilasDelegacia.length > 0
-            ? <><SubTitle label="Em funcionamento" count={dados.lilasDelegacia.length} />{dados.lilasDelegacia.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={e.possui_patrulha} cor="lilasDelegacia" kitAthena={e.kit_athena_entregue} kitAthenaPrevio={e.kit_athena_previo} />)}</>
+            ? <><SubTitle label="Em funcionamento" count={dados.lilasDelegacia.length} />{dados.lilasDelegacia.map(e => <EquipRow key={e.id} municipio={e.municipio} tipo={e.tipo} endereco={e.endereco} responsavel={e.responsavel} patrulha={equipIdsComPatrulhaSet.has(e.id)} cor="lilasDelegacia" kitAthena={e.kit_athena_entregue} kitAthenaPrevio={e.kit_athena_previo} />)}</>
             : <EmptyState msg="Nenhuma Sala Lilás em Delegacia em funcionamento." />}
           {dados.lilasDelegaciaSolics.length > 0 && <><SubTitle label="Em andamento" count={dados.lilasDelegaciaSolics.length} />{dados.lilasDelegaciaSolics.map(s => <SolicRow key={s.id} municipio={s.municipio} status={s.status} />)}</>}
         </SectionCard>
@@ -910,6 +919,8 @@ export default function RelatorioEVM() {
           </div>
         )}
       </div>
+        );
+      })()}
     </AppLayout>
   );
 }

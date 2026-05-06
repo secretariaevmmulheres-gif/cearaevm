@@ -9,6 +9,7 @@ import { useViaturas } from '@/hooks/useViaturas';
 import { useAtividades } from '@/hooks/useAtividades';
 import { useQualificacoes } from '@/hooks/useQualificacoes';
 import { useHistoricoRecente, getCampoLabel } from '@/hooks/useHistorico';
+import { usePatrulhas } from '@/hooks/usePatrulhas';
 import { getRegiao, municipiosCeara } from '@/data/municipios';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -100,6 +101,17 @@ export default function MunicipioPage() {
   const { atividades: todasAtiv }       = useAtividades();
   const { qualificacoes: todasQual }    = useQualificacoes();
   const { historico: todoHist }         = useHistoricoRecente(200);
+  const { patrulhas }                   = usePatrulhas();
+
+  // Sets para lookup de patrulha O(1)
+  const equipIdsComPatrulha = useMemo(
+    () => new Set(patrulhas.filter(p => p.equipamento_id).map(p => p.equipamento_id!)),
+    [patrulhas]
+  );
+  const solicIdsComPatrulha = useMemo(
+    () => new Set(patrulhas.filter(p => p.solicitacao_id).map(p => p.solicitacao_id!)),
+    [patrulhas]
+  );
 
   const eqs   = useMemo(() => todosEq.filter(e => e.municipio === municipio), [todosEq, municipio]);
   const solics = useMemo(() => todasSolic.filter(s => s.municipio === municipio), [todasSolic, municipio]);
@@ -216,7 +228,7 @@ export default function MunicipioPage() {
                       <span className={cn('text-sm font-semibold', cor.text)}>{e.tipo}</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5 mb-2">
-                      <BoolBadge ok={e.possui_patrulha}      label="Patrulha" />
+                      <BoolBadge ok={equipIdsComPatrulha.has(e.id)} label="Patrulha" />
                       <BoolBadge ok={e.kit_athena_entregue}  label="Kit Athena" />
                       <BoolBadge ok={e.capacitacao_realizada} label="Qualificação" />
                     </div>
@@ -267,7 +279,7 @@ export default function MunicipioPage() {
                       )}
                       <div className="flex gap-1.5 mt-1 flex-wrap">
                         {s.kit_athena_entregue  && <BoolBadge ok label="Kit Athena" />}
-                        {s.recebeu_patrulha     && <BoolBadge ok label="Patrulha" />}
+                        {solicIdsComPatrulha.has(s.id) && <BoolBadge ok label="Patrulha" />}
                         {s.capacitacao_realizada && <BoolBadge ok label="Qualificação" />}
                       </div>
                     </div>

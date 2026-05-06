@@ -47,6 +47,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useSolicitacoes } from '@/hooks/useSolicitacoes';
+import { usePatrulhas } from '@/hooks/usePatrulhas';
 import { useQualificacoes } from '@/hooks/useQualificacoes';
 import { HistoricoPanel } from '@/components/HistoricoPanel';
 import { exportEquipamentosToPDF, exportEquipamentosToExcel } from '@/lib/exportUtils';
@@ -351,6 +352,7 @@ export default function Equipamentos() {
   const canEdit = role !== 'atividades_editor' && role !== 'viewer';
   const { equipamentos, addEquipamento, updateEquipamento, deleteEquipamento, isAdding, isUpdating, isLoadingMore, hasMore, loadMore, total, visibleCount } = useEquipamentos();
   const { solicitacoes } = useSolicitacoes();
+  const { patrulhas }    = usePatrulhas();
   const { qualificacoes } = useQualificacoes();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<string>('all');
@@ -487,11 +489,11 @@ export default function Equipamentos() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => { exportEquipamentosToPDF(sortedEquipamentos, filterRegiao).catch(console.error); }}>
+              <DropdownMenuItem onClick={() => { exportEquipamentosToPDF(sortedEquipamentos, filterRegiao, patrulhas, solicitacoes).catch(console.error); }}>
                 <FilePdf className="w-4 h-4 mr-2" />
                 Exportar PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportEquipamentosToExcel(sortedEquipamentos, qualificacoes)}>
+              <DropdownMenuItem onClick={() => exportEquipamentosToExcel(sortedEquipamentos, qualificacoes, patrulhas)}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
                 Exportar Excel
               </DropdownMenuItem>

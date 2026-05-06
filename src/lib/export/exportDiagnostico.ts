@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Equipamento, Solicitacao } from '@/types';
+import { Equipamento, Solicitacao, Patrulha } from '@/types';
 import { getRegiao } from '@/data/municipios';
 import { ts, lastY, addPdfCover, addPdfHeader, addPdfFooters, styleWorksheet, saveWb } from './shared';
 
@@ -27,11 +27,15 @@ export interface PendenciaMunicipio {
 export function gerarDiagnostico(
   equipamentos: Equipamento[],
   solicitacoes: Solicitacao[],
-  filtros: DiagnosticoFiltros = {}
+  filtros: DiagnosticoFiltros = {},
+  patrulhas: Patrulha[] = []
 ): PendenciaMunicipio[] {
   const { regiaoFiltro, diasSemMovimento = 60 } = filtros;
   const hoje = new Date();
   const resultado: PendenciaMunicipio[] = [];
+
+  // Sets para lookup O(1)
+  const equipIdsComPatrulha = new Set(patrulhas.filter(p => p.equipamento_id).map(p => p.equipamento_id!));
 
   const equips = regiaoFiltro
     ? equipamentos.filter(e => getRegiao(e.municipio) === regiaoFiltro)
@@ -39,9 +43,9 @@ export function gerarDiagnostico(
 
   equips.forEach(e => {
     const pendencias: string[] = [];
-    if (TIPOS_COM_PATRULHA.has(e.tipo) && !e.possui_patrulha)  pendencias.push('Sem Patrulha M.P.');
+    if (TIPOS_COM_PATRULHA.has(e.tipo) && !equipIdsComPatrulha.has(e.id)) pendencias.push('Sem Patrulha M.P.');
     if (!TIPOS_SEM_KIT.has(e.tipo)     && !e.kit_athena_entregue) pendencias.push('Sem Kit Athena');
-    if (!e.capacitacao_realizada)                                pendencias.push('Sem Qualificação');
+    if (!e.capacitacao_realizada)                                  pendencias.push('Sem Qualificação');
     if (pendencias.length > 0) {
       resultado.push({ itemId: e.id, municipio: e.municipio, regiao: getRegiao(e.municipio) || '—', tipo: e.tipo, pendencias, origem: 'Equipamento' });
     }
@@ -72,9 +76,10 @@ export function gerarDiagnostico(
 export async function exportDiagnosticoToPDF(
   equipamentos: Equipamento[],
   solicitacoes: Solicitacao[],
-  filtros: DiagnosticoFiltros = {}
+  filtros: DiagnosticoFiltros = {},
+  patrulhas: Patrulha[] = []
 ): Promise<void> {
-  const pendencias = gerarDiagnostico(equipamentos, solicitacoes, filtros);
+  const pendencias = gerarDiagnostico(equipamentos, solicitacoes, filtros, patrulhas);
   const doc = new jsPDF();
   const PW  = doc.internal.pageSize.getWidth();
 
@@ -214,9 +219,10 @@ export async function exportDiagnosticoToPDF(
 export function exportDiagnosticoToExcel(
   equipamentos: Equipamento[],
   solicitacoes: Solicitacao[],
-  filtros: DiagnosticoFiltros = {}
+  filtros: DiagnosticoFiltros = {},
+  patrulhas: Patrulha[] = []
 ): void {
-  const pendencias = gerarDiagnostico(equipamentos, solicitacoes, filtros);
+  const pendencias = gerarDiagnostico(equipamentos, solicitacoes, filtros, patrulhas);
   const wb = XLSX.utils.book_new();
 
   const contPorTipo: Record<string, number> = {};

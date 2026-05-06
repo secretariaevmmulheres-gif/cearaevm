@@ -15,6 +15,7 @@ import Solicitacoes from "./pages/Solicitacoes";
 import Atividades from "./pages/Atividades";
 import Qualificacoes from "./pages/Qualificacoes";
 import MaterialGrafico from "./pages/MaterialGrafico";
+import PPA from "./pages/Ppa";
 import MunicipioPage from "./pages/MunicipioPage";
 import Mapa from "./pages/Mapa";
 import RelatorioEVM from "./pages/RelatorioEVM";
@@ -116,7 +117,15 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/mapa"
+        path="/ppa"
+        element={
+          <ProtectedRoute>
+            <PPA />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+      path="/mapa"
         element={
           <ProtectedRoute>
             <Mapa />

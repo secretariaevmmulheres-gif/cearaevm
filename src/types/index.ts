@@ -3,7 +3,7 @@ import { TipoEquipamento, StatusSolicitacao, OrgaoResponsavel } from "@/data/mun
 export type AppRole = 'admin' | 'editor' | 'viewer' | 'atividades_editor';
 
 // ── Atividades ────────────────────────────────────────────────────────────────
-export type TipoAtividade = 'Unidade Móvel' | 'Palestra' | 'Evento' | 'Tenda Lilás' | 'Visita a DDM' | 'Visita a Delegacia' | 'Outro';
+export type TipoAtividade = 'Unidade Móvel' | 'Palestra' | 'Evento' | 'Tenda Lilás' | 'Visita a DDM' | 'Visita a Delegacia' | 'Qualificação' | 'Outro';
 export type RecursoAtividade = 'Unidade Móvel' | 'Equipe' | 'Unidade Móvel + Equipe';
 export type StatusAtividade = 'Agendado' | 'Realizado' | 'Cancelado';
 
@@ -23,6 +23,7 @@ export interface Atividade {
   atendimentos: number | null;
   endereco: string | null;
   observacoes: string | null;
+  municipios_participantes: string[];   // para qualificações — municípios que participaram
   created_at: string;
   updated_at: string;
 }

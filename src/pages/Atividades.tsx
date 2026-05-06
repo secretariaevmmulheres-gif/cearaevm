@@ -30,17 +30,17 @@ import {
   Plus, Pencil, Trash2, Search, ChevronDown, MapPin,
   CalendarDays, Users, Hash, StickyNote, Truck, Download,
   FileSpreadsheet, FileText as FilePdf, AlertCircle, Building2,
-  Map, List, Copy, Loader2,
+  Map, List, Copy, Loader2, X, UserCheck,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { HistoricoPanel } from '@/components/HistoricoPanel';
 
-const TIPOS_ATIVIDADE: TipoAtividade[] = ['Unidade Móvel', 'Palestra', 'Evento', 'Tenda Lilás', 'Visita a DDM', 'Visita a Delegacia', 'Outro'];
+const TIPOS_ATIVIDADE: TipoAtividade[] = ['Qualificação', 'Unidade Móvel', 'Palestra', 'Evento', 'Tenda Lilás', 'Visita a DDM', 'Visita a Delegacia', 'Outro'];
 const RECURSOS: RecursoAtividade[] = ['Unidade Móvel', 'Equipe', 'Unidade Móvel + Equipe'];
 const STATUS_ATIVIDADE: StatusAtividade[] = ['Agendado', 'Realizado', 'Cancelado'];
-const MUNICIPIOS_SEDE = ['Fortaleza', 'Juazeiro do Norte', 'Sobral', 'Tauá', 'Crateús', 'Iguatu', 'Quixadá'];
+const MUNICIPIOS_SEDE = ['CMB', 'SEM', 'Juazeiro do Norte', 'Sobral', 'Tauá', 'Crateús', 'Iguatu', 'Quixadá'];
 
 const statusStyles: Record<StatusAtividade, string> = {
   Agendado:  'bg-blue-500/10 text-blue-600',
@@ -49,13 +49,17 @@ const statusStyles: Record<StatusAtividade, string> = {
 };
 
 const tipoColors: Record<TipoAtividade, { bg: string; text: string }> = {
-  'Unidade Móvel':      { bg: 'bg-teal-500/15',   text: 'text-teal-700'   },
-  'Palestra':           { bg: 'bg-blue-500/15',    text: 'text-blue-700'   },
-  'Evento':             { bg: 'bg-violet-500/15',  text: 'text-violet-700' },
-  'Tenda Lilás':        { bg: 'bg-pink-500/15',    text: 'text-pink-700'   },
-  'Visita a DDM':       { bg: 'bg-green-700/15',   text: 'text-green-800'  },
-  'Visita a Delegacia': { bg: 'bg-green-400/15',   text: 'text-green-700'  },
-  'Outro':              { bg: 'bg-slate-500/15',   text: 'text-slate-700'  },
+  'Unidade Móvel': { bg: 'bg-teal-500/15', text: 'text-teal-700' },
+  'Palestra': { bg: 'bg-blue-500/15', text: 'text-blue-700' },
+  'Evento': { bg: 'bg-violet-500/15', text: 'text-violet-700' },
+  'Tenda Lilás': { bg: 'bg-pink-500/15', text: 'text-pink-700' },
+  'Visita a DDM': { bg: 'bg-green-700/15', text: 'text-green-800' },
+  'Visita a Delegacia': { bg: 'bg-green-400/15', text: 'text-green-700' },
+  'Outro': { bg: 'bg-slate-500/15', text: 'text-slate-700' },
+  Qualificação: {
+    bg: 'bg-black/10',
+    text: 'text-black/800'
+  }
 };
 
 const sedeStyle: Record<string, { border: string; icon: string; text: string }> = {
@@ -268,7 +272,9 @@ const FORM_INICIAL = {
   tipo: '' as TipoAtividade | '', recurso: '' as RecursoAtividade | '',
   quantidade_equipe: '' as number | '', status: 'Agendado' as StatusAtividade,
   nup: '', nome_evento: '', data: '', dias: '' as number | '',
-  horario: '', atendimentos: '' as number | '', endereco: '', observacoes: '', tipo_personalizado: '',
+  horario: '', atendimentos: '' as number | '', endereco: '', observacoes: '',
+  tipo_personalizado: '',
+  municipios_participantes: [] as string[],
 };
 
 export default function Atividades() {
@@ -335,24 +341,29 @@ export default function Atividades() {
   const openCreate = () => { setEditingId(null); setFormData({ ...FORM_INICIAL }); setIsDialogOpen(true); };
   const openEdit = (a: Atividade) => {
     setEditingId(a.id);
-    setFormData({ municipio: a.municipio, municipio_sede: a.municipio_sede, tipo: a.tipo, recurso: a.recurso,
+    setFormData({
+      municipio: a.municipio, municipio_sede: a.municipio_sede, tipo: a.tipo, recurso: a.recurso,
       quantidade_equipe: a.quantidade_equipe ?? '', status: a.status, nup: a.nup ?? '',
       nome_evento: a.nome_evento ?? '', data: a.data, dias: a.dias ?? '', horario: a.horario ?? '',
-      atendimentos: a.atendimentos ?? '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '', tipo_personalizado: (a as any).tipo_personalizado ?? '' });
+      atendimentos: a.atendimentos ?? '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '',
+      tipo_personalizado: (a as any).tipo_personalizado ?? '',
+      municipios_participantes: a.municipios_participantes ?? [],
+    });
     setIsDialogOpen(true);
   };
 
-  // Duplicar: abre formulário de nova atividade pré-preenchido com os dados da existente
-  // Data é resetada para hoje — o usuário só muda a data e salva
+  // Duplicar
   const openDuplicate = (a: Atividade) => {
     setEditingId(null);
     setFormData({
       municipio: a.municipio, municipio_sede: a.municipio_sede, tipo: a.tipo, recurso: a.recurso,
       quantidade_equipe: a.quantidade_equipe ?? '', status: 'Agendado',
       nup: '', nome_evento: a.nome_evento ?? '',
-      data: new Date().toISOString().split('T')[0], // hoje
+      data: new Date().toISOString().split('T')[0],
       dias: a.dias ?? '', horario: a.horario ?? '',
-      atendimentos: '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '', tipo_personalizado: '',
+      atendimentos: '', endereco: a.endereco ?? '', observacoes: a.observacoes ?? '',
+      tipo_personalizado: '',
+      municipios_participantes: a.municipios_participantes ?? [],
     });
     setIsDialogOpen(true);
   };
@@ -371,6 +382,7 @@ export default function Atividades() {
       observacoes: formData.tipo === 'Outro' && formData.tipo_personalizado
         ? `[${formData.tipo_personalizado}] ${formData.observacoes || ''}`.trim()
         : formData.observacoes || null,
+      municipios_participantes: formData.municipios_participantes ?? [],
     };
     if (editingId) { updateAtividade({ id: editingId, ...payload }); } else { addAtividade(payload); }
     setIsDialogOpen(false);
@@ -707,6 +719,57 @@ export default function Atividades() {
               <Label>Observações</Label>
               <Textarea value={formData.observacoes} onChange={e => f('observacoes', e.target.value)} placeholder="Informações adicionais..." rows={3} />
             </div>
+
+            {/* Municípios participantes — só para Qualificação */}
+            {formData.tipo === 'Qualificação' && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <UserCheck className="w-3.5 h-3.5 text-primary" />
+                  Municípios Participantes
+                  <span className="text-muted-foreground font-normal text-xs">(para gerar o texto do PPA)</span>
+                </Label>
+                {/* Lista dos selecionados */}
+                {formData.municipios_participantes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-muted/30 rounded-lg border border-border">
+                    {formData.municipios_participantes.map(m => (
+                      <span key={m} className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                        {m}
+                        <button
+                          type="button"
+                          onClick={() => f('municipios_participantes', formData.municipios_participantes.filter(x => x !== m))}
+                          className="hover:text-destructive transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {/* Seletor de município */}
+                <Select
+                  value=""
+                  onValueChange={v => {
+                    if (v && !formData.municipios_participantes.includes(v)) {
+                      f('municipios_participantes', [...formData.municipios_participantes, v]);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Adicionar município..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {municipiosCeara
+                      .filter(m => !formData.municipios_participantes.includes(m))
+                      .map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {formData.municipios_participantes.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    {formData.municipios_participantes.length} município(s) — o texto narrativo do PPA será gerado automaticamente.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
